@@ -2,8 +2,8 @@
 import { dirname, resolve } from "node:path";
 import { analyze } from "datamog-core";
 import { CsvLoader } from "datamog-csv";
+import { type Backend, DatamogExecutor, translate } from "datamog-engine";
 import { parse } from "datamog-parser";
-import { type Backend, DatamogExecutor, translate } from "datamog-postgres";
 
 function usage(): never {
   console.error("Usage: datamog [options] <program.dl> [csv-directory]");

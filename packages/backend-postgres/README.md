@@ -5,7 +5,7 @@ Postgres backend for Datamog, using `Bun.sql`.
 ## Usage
 
 ```ts
-import { DatamogExecutor } from "datamog-postgres";
+import { DatamogExecutor } from "datamog-engine";
 import { createPostgresBackend } from "datamog-backend-postgres";
 
 const backend = createPostgresBackend();

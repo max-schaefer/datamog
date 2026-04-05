@@ -11,6 +11,6 @@
     "datamog-core": "workspace:*",
     "datamog-csv": "workspace:*",
     "datamog-parser": "workspace:*",
-    "datamog-postgres": "workspace:*"
+    "datamog-engine": "workspace:*"
   }
 }

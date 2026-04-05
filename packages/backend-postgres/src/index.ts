@@ -1,4 +1,4 @@
-import type { Backend } from "datamog-postgres";
+import type { Backend } from "datamog-engine";
 
 export function createPostgresBackend(): Backend {
   const sql = Bun.sql;

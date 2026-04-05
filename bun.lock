@@ -16,14 +16,14 @@
       "name": "datamog-backend-postgres",
       "version": "0.1.0",
       "dependencies": {
-        "datamog-postgres": "workspace:*",
+        "datamog-engine": "workspace:*",
       },
     },
     "packages/backend-sqlite": {
       "name": "datamog-backend-sqlite",
       "version": "0.1.0",
       "dependencies": {
-        "datamog-postgres": "workspace:*",
+        "datamog-engine": "workspace:*",
       },
     },
     "packages/cli": {
@@ -37,8 +37,8 @@
         "datamog-backend-sqlite": "workspace:*",
         "datamog-core": "workspace:*",
         "datamog-csv": "workspace:*",
+        "datamog-engine": "workspace:*",
         "datamog-parser": "workspace:*",
-        "datamog-postgres": "workspace:*",
       },
     },
     "packages/core": {
@@ -53,7 +53,15 @@
       "version": "0.1.0",
       "dependencies": {
         "datamog-core": "workspace:*",
-        "datamog-postgres": "workspace:*",
+        "datamog-engine": "workspace:*",
+      },
+    },
+    "packages/engine": {
+      "name": "datamog-engine",
+      "version": "0.1.0",
+      "dependencies": {
+        "datamog-core": "workspace:*",
+        "datamog-parser": "workspace:*",
       },
     },
     "packages/parser": {
@@ -61,14 +69,6 @@
       "version": "0.1.0",
       "dependencies": {
         "datamog-core": "workspace:*",
-      },
-    },
-    "packages/postgres": {
-      "name": "datamog-postgres",
-      "version": "0.1.0",
-      "dependencies": {
-        "datamog-core": "workspace:*",
-        "datamog-parser": "workspace:*",
       },
     },
   },
@@ -107,9 +107,9 @@
 
     "datamog-csv": ["datamog-csv@workspace:packages/csv"],
 
-    "datamog-parser": ["datamog-parser@workspace:packages/parser"],
+    "datamog-engine": ["datamog-engine@workspace:packages/engine"],
 
-    "datamog-postgres": ["datamog-postgres@workspace:packages/postgres"],
+    "datamog-parser": ["datamog-parser@workspace:packages/parser"],
 
     "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 

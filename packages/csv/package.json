@@ -7,6 +7,6 @@
   },
   "dependencies": {
     "datamog-core": "workspace:*",
-    "datamog-postgres": "workspace:*"
+    "datamog-engine": "workspace:*"
   }
 }

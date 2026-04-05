@@ -5,7 +5,7 @@ SQLite backend for Datamog, using `bun:sqlite`. Uses an in-memory database by de
 ## Usage
 
 ```ts
-import { DatamogExecutor } from "datamog-postgres";
+import { DatamogExecutor } from "datamog-engine";
 import { createSqliteBackend } from "datamog-backend-sqlite";
 
 // In-memory (default)

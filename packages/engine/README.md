@@ -1,4 +1,4 @@
-# datamog-postgres
+# datamog-engine
 
 SQL translator and executor for the Datamog Datalog system. This package provides the shared translation logic and the `Backend` interface that database-specific packages implement.
 
@@ -7,7 +7,7 @@ SQL translator and executor for the Datamog Datalog system. This package provide
 Implement the `Backend` interface to add support for a new database:
 
 ```ts
-import type { Backend } from "datamog-postgres";
+import type { Backend } from "datamog-engine";
 
 const myBackend: Backend = {
   dialect: "postgres", // or "sqlite"
@@ -23,7 +23,7 @@ Built-in backend packages: `datamog-backend-postgres` and `datamog-backend-sqlit
 ```ts
 import { parse } from "datamog-parser";
 import { analyze } from "datamog-core";
-import { translate } from "datamog-postgres";
+import { translate } from "datamog-engine";
 
 const program = parse(source);
 const analyzed = analyze(program);
@@ -39,7 +39,7 @@ result.queries;      // SELECT statements for queries
 `DatamogExecutor` orchestrates the full pipeline (create tables, load data, create views, run queries):
 
 ```ts
-import { DatamogExecutor } from "datamog-postgres";
+import { DatamogExecutor } from "datamog-engine";
 import { createSqliteBackend } from "datamog-backend-sqlite";
 
 const backend = createSqliteBackend();
@@ -53,7 +53,7 @@ await backend.close();
 Implement `ExtensionalLoader` to add custom data sources:
 
 ```ts
-import type { ExtensionalLoader, Backend } from "datamog-postgres";
+import type { ExtensionalLoader, Backend } from "datamog-engine";
 
 const myLoader: ExtensionalLoader = {
   name: "my-loader",

@@ -28,7 +28,7 @@ ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
 |---------|-------------|
 | `datamog-core` | AST type definitions and program analyzer (dependency graph, recursion detection) |
 | `datamog-parser` | Lexer and recursive-descent parser producing a typed AST |
-| `datamog-postgres` | SQL translator, executor, and pluggable loader interface |
+| `datamog-engine` | SQL translator, executor, and pluggable loader interface |
 | `datamog-backend-postgres` | Postgres backend (via `Bun.sql`) |
 | `datamog-backend-sqlite` | SQLite backend (via `bun:sqlite`, in-memory by default) |
 | `datamog-csv` | Loader plugin for populating extensional predicates from CSV files |
@@ -68,7 +68,7 @@ The CLI looks for `<predicate>.csv` files (e.g. `parent.csv`) in the same direct
 ### Programmatic API
 
 ```ts
-import { DatamogExecutor } from "datamog-postgres";
+import { DatamogExecutor } from "datamog-engine";
 import { CsvLoader } from "datamog-csv";
 import { createSqliteBackend } from "datamog-backend-sqlite";
 

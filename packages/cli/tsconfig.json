@@ -9,7 +9,7 @@
   "references": [
     { "path": "../core" },
     { "path": "../parser" },
-    { "path": "../postgres" },
+    { "path": "../engine" },
     { "path": "../csv" },
     { "path": "../backend-postgres" },
     { "path": "../backend-sqlite" }

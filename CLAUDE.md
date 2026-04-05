@@ -13,7 +13,7 @@ Educational Datalog → SQL translator. TypeScript/Bun monorepo.
 
 - `packages/core` — AST types, program analyzer (no deps)
 - `packages/parser` — lexer, recursive descent parser (depends on core)
-- `packages/postgres` — SQL translator, executor, Backend interface, loader interface
+- `packages/engine` — SQL translator, executor, Backend interface, loader interface
 - `packages/backend-postgres` — Postgres backend via Bun.sql
 - `packages/backend-sqlite` — SQLite backend via bun:sqlite
 - `packages/csv` — CSV loader plugin

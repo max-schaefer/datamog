@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import type { ExtDecl, SqlType } from "datamog-core";
-import type { Backend, ExtensionalLoader, LoadResult } from "datamog-postgres";
+import type { Backend, ExtensionalLoader, LoadResult } from "datamog-engine";
 
 export interface CsvLoaderOptions {
   directory: string;

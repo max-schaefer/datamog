@@ -2,7 +2,7 @@
   "references": [
     { "path": "packages/core" },
     { "path": "packages/parser" },
-    { "path": "packages/postgres" },
+    { "path": "packages/engine" },
     { "path": "packages/csv" },
     { "path": "packages/backend-postgres" },
     { "path": "packages/backend-sqlite" },

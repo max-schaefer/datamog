@@ -5,7 +5,7 @@ CSV loader plugin for Datamog. Populates extensional predicate tables from CSV f
 ## Usage
 
 ```ts
-import { DatamogExecutor } from "datamog-postgres";
+import { DatamogExecutor } from "datamog-engine";
 import { CsvLoader } from "datamog-csv";
 
 const executor = new DatamogExecutor(Bun.sql, [

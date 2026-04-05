@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import type { Backend } from "datamog-postgres";
+import type { Backend } from "datamog-engine";
 
 export function createSqliteBackend(path = ":memory:"): Backend {
   const db = new Database(path);

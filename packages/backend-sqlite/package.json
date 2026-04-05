@@ -6,6 +6,6 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "datamog-postgres": "workspace:*"
+    "datamog-engine": "workspace:*"
   }
 }
