@@ -18,9 +18,11 @@ Educational Datalog → Postgres translator. TypeScript/Bun monorepo.
 
 ## Packages
 
-- `packages/parser` — lexer, parser, AST types (no deps)
-- `packages/postgres` — analyzer, SQL translator, loader interface (depends on parser)
-- `packages/csv` — CSV loader plugin (depends on parser + postgres)
+- `packages/core` — AST types and program analyzer (no deps)
+- `packages/parser` — lexer and recursive descent parser (depends on core)
+- `packages/postgres` — SQL translator, loader interface, executor (depends on core + parser)
+- `packages/csv` — CSV loader plugin (depends on core + postgres)
+- `packages/cli` — CLI for running .dl programs (depends on all four)
 
 ## Conventions
 

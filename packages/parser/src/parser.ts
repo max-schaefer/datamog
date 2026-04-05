@@ -8,7 +8,7 @@ import type {
   SqlType,
   Statement,
   Term,
-} from "./ast.ts";
+} from "datamog-core";
 import { ParseError } from "./errors.ts";
 import { type Token, TokenType } from "./lexer.ts";
 

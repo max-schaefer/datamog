@@ -1,5 +1,4 @@
-import type { Atom, ExtDecl, Rule, Term } from "datamog-parser";
-import type { AnalyzedProgram } from "./analyzer.ts";
+import type { AnalyzedProgram, Atom, ExtDecl, Rule, Term } from "datamog-core";
 
 export interface TranslationResult {
   createTables: string[];

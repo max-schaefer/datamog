@@ -1,12 +1,14 @@
 {
-  "name": "datamog-csv",
+  "name": "datamog-cli",
   "version": "0.1.0",
   "type": "module",
-  "exports": {
-    ".": "./src/index.ts"
+  "bin": {
+    "datamog": "./src/main.ts"
   },
   "dependencies": {
     "datamog-core": "workspace:*",
+    "datamog-csv": "workspace:*",
+    "datamog-parser": "workspace:*",
     "datamog-postgres": "workspace:*"
   }
 }

@@ -1,5 +1,5 @@
+import { analyze } from "datamog-core";
 import { parse } from "datamog-parser";
-import { analyze } from "./analyzer.ts";
 import type { BunSQL, ExtensionalLoader } from "./loader.ts";
 import { translate } from "./translator.ts";
 

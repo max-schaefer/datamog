@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import type { ExtDecl, SqlType } from "datamog-parser";
+import type { ExtDecl, SqlType } from "datamog-core";
 import type { BunSQL, ExtensionalLoader, LoadResult } from "datamog-postgres";
 
 export interface CsvLoaderOptions {

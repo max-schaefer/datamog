@@ -12,12 +12,12 @@ export type {
   StringLiteral,
   Term,
   Variable,
-} from "./ast.ts";
+} from "datamog-core";
 export { ParseError } from "./errors.ts";
 export { type Token, TokenType, tokenize } from "./lexer.ts";
 export { Parser } from "./parser.ts";
 
-import type { Program } from "./ast.ts";
+import type { Program } from "datamog-core";
 import { tokenize } from "./lexer.ts";
 import { Parser } from "./parser.ts";
 

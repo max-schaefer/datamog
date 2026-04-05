@@ -12,22 +12,46 @@
         "typescript": "^5",
       },
     },
+    "packages/cli": {
+      "name": "datamog-cli",
+      "version": "0.1.0",
+      "bin": {
+        "datamog": "./src/main.ts",
+      },
+      "dependencies": {
+        "datamog-core": "workspace:*",
+        "datamog-csv": "workspace:*",
+        "datamog-parser": "workspace:*",
+        "datamog-postgres": "workspace:*",
+      },
+    },
+    "packages/core": {
+      "name": "datamog-core",
+      "version": "0.1.0",
+      "devDependencies": {
+        "datamog-parser": "workspace:*",
+      },
+    },
     "packages/csv": {
       "name": "datamog-csv",
       "version": "0.1.0",
       "dependencies": {
-        "datamog-parser": "workspace:*",
+        "datamog-core": "workspace:*",
         "datamog-postgres": "workspace:*",
       },
     },
     "packages/parser": {
       "name": "datamog-parser",
       "version": "0.1.0",
+      "dependencies": {
+        "datamog-core": "workspace:*",
+      },
     },
     "packages/postgres": {
       "name": "datamog-postgres",
       "version": "0.1.0",
       "dependencies": {
+        "datamog-core": "workspace:*",
         "datamog-parser": "workspace:*",
       },
     },
@@ -56,6 +80,10 @@
     "@types/node": ["@types/node@25.5.2", "", { "dependencies": { "undici-types": "~7.18.0" } }, "sha512-tO4ZIRKNC+MDWV4qKVZe3Ql/woTnmHDr5JD8UI5hn2pwBrHEwOEMZK7WlNb5RKB6EoJ02gwmQS9OrjuFnZYdpg=="],
 
     "bun-types": ["bun-types@1.3.11", "", { "dependencies": { "@types/node": "*" } }, "sha512-1KGPpoxQWl9f6wcZh57LvrPIInQMn2TQ7jsgxqpRzg+l0QPOFvJVH7HmvHo/AiPgwXy+/Thf6Ov3EdVn1vOabg=="],
+
+    "datamog-cli": ["datamog-cli@workspace:packages/cli"],
+
+    "datamog-core": ["datamog-core@workspace:packages/core"],
 
     "datamog-csv": ["datamog-csv@workspace:packages/csv"],
 

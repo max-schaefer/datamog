@@ -6,5 +6,5 @@
     "outDir": "dist"
   },
   "include": ["src"],
-  "references": [{ "path": "../parser" }, { "path": "../postgres" }]
+  "references": [{ "path": "../core" }, { "path": "../postgres" }]
 }

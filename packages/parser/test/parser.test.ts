@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { ExtDecl, Query, Rule } from "../src/ast.ts";
+import type { ExtDecl, Query, Rule } from "datamog-core";
 import { parse } from "../src/index.ts";
 
 describe("parser", () => {

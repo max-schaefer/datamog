@@ -1,4 +1,4 @@
-import type { Span } from "./ast.ts";
+import type { Span } from "datamog-core";
 import { ParseError } from "./errors.ts";
 
 export enum TokenType {

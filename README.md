@@ -26,9 +26,70 @@ ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
 
 | Package | Description |
 |---------|-------------|
+| `datamog-core` | AST type definitions and program analyzer (dependency graph, recursion detection) |
 | `datamog-parser` | Lexer and recursive-descent parser producing a typed AST |
-| `datamog-postgres` | Analyzer (dependency graph, recursion detection) and SQL translator with pluggable extensional loading |
+| `datamog-postgres` | SQL translator with pluggable extensional loading |
 | `datamog-csv` | Loader plugin for populating extensional predicates from CSV files |
+| `datamog-cli` | Command-line interface for running Datamog programs |
+
+## Usage
+
+Given a Datalog program `family.dl`:
+
+```datalog
+extensional parent(name: text, child: text).
+
+ancestor(X, Y) :- parent(X, Y).
+ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
+
+?- ancestor("alice", X).
+```
+
+And a CSV file `data/parent.csv` (matching the extensional predicate name):
+
+```csv
+name,child
+alice,bob
+bob,carol
+bob,dave
+```
+
+Run it with the CLI:
+
+```bash
+# Execute against Postgres, loading CSVs from the same directory as the .dl file
+DATABASE_URL=postgres://localhost:5432/mydb bun datamog family.dl
+
+# Or specify a separate CSV directory
+DATABASE_URL=postgres://localhost:5432/mydb bun datamog family.dl ./data
+
+# Preview the generated SQL without connecting to Postgres
+bun datamog --dry-run family.dl
+```
+
+The CLI looks for `<predicate>.csv` files (e.g. `parent.csv`) in the CSV directory, which defaults to the directory containing the `.dl` file.
+
+### Programmatic API
+
+You can also use the packages directly:
+
+```ts
+import { DatamogExecutor } from "datamog-postgres";
+import { CsvLoader } from "datamog-csv";
+
+const sql = Bun.sql;
+const executor = new DatamogExecutor(sql, [
+  new CsvLoader({ directory: "./data" }),
+]);
+
+const source = await Bun.file("family.dl").text();
+const results = await executor.execute(source);
+
+for (const result of results) {
+  console.log(result.sql);
+  console.table(result.rows);
+}
+```
 
 ## Development
 

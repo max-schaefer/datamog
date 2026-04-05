@@ -1,4 +1,4 @@
-import type { Span } from "./ast.ts";
+import type { Span } from "datamog-core";
 
 export class ParseError extends Error {
   constructor(

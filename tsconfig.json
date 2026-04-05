@@ -1,8 +1,10 @@
 {
   "references": [
+    { "path": "packages/core" },
     { "path": "packages/parser" },
     { "path": "packages/postgres" },
-    { "path": "packages/csv" }
+    { "path": "packages/csv" },
+    { "path": "packages/cli" }
   ],
   "files": []
 }

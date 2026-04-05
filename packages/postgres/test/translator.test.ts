@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { analyze } from "datamog-core";
 import { parse } from "datamog-parser";
-import { analyze } from "../src/analyzer.ts";
 import { translate } from "../src/translator.ts";
 
 function translateSource(source: string) {

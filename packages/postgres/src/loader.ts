@@ -1,4 +1,4 @@
-import type { ExtDecl } from "datamog-parser";
+import type { ExtDecl } from "datamog-core";
 
 export interface LoadResult {
   rowsLoaded: number;

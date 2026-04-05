@@ -1,4 +1,4 @@
-import type { ExtDecl, Program, Query, Rule } from "datamog-parser";
+import type { ExtDecl, Program, Query, Rule } from "./ast.ts";
 
 export interface AnalyzedProgram {
   extDecls: Map<string, ExtDecl>;
