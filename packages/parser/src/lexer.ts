@@ -7,7 +7,7 @@ export enum TokenType {
   String = 2,
   Number = 3,
 
-  ExtKeyword = 4,
+  Extensional = 4,
   TextType = 5,
   IntegerType = 6,
   RealType = 7,
@@ -32,7 +32,8 @@ export interface Token {
   span: Span;
 }
 
-const TYPE_KEYWORDS: Record<string, TokenType> = {
+const KEYWORDS: Record<string, TokenType> = {
+  extensional: TokenType.Extensional,
   text: TokenType.TextType,
   integer: TokenType.IntegerType,
   real: TokenType.RealType,
@@ -99,21 +100,6 @@ export function tokenize(source: string): Token[] {
     const startPos = pos;
     const startLine = line;
     const startCol = column;
-
-    // .ext keyword
-    if (ch === "." && source.substring(pos, pos + 4) === ".ext") {
-      const next = source[pos + 4];
-      if (next === "(" || next === " " || next === undefined) {
-        pos += 4;
-        column += 4;
-        tokens.push({
-          type: TokenType.ExtKeyword,
-          value: ".ext",
-          span: span(startPos, startLine, startCol),
-        });
-        continue;
-      }
-    }
 
     // Two-character operators
     if (ch === ":" && source[pos + 1] === "-") {
@@ -195,9 +181,9 @@ export function tokenize(source: string): Token[] {
       let value = "";
       while (pos < source.length && isAlphaNum(peek())) value += advance();
 
-      const typeKw = TYPE_KEYWORDS[value];
-      if (typeKw !== undefined) {
-        tokens.push({ type: typeKw, value, span: span(startPos, startLine, startCol) });
+      const kw = KEYWORDS[value];
+      if (kw !== undefined) {
+        tokens.push({ type: kw, value, span: span(startPos, startLine, startCol) });
       } else if (isUpper(value[0]!)) {
         tokens.push({ type: TokenType.Variable, value, span: span(startPos, startLine, startCol) });
       } else {

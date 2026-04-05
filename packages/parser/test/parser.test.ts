@@ -4,7 +4,7 @@ import { parse } from "../src/index.ts";
 
 describe("parser", () => {
   test("ext declaration", () => {
-    const program = parse(".ext(parent, [name: text, child: text]).");
+    const program = parse("extensional parent(name: text, child: text).");
     expect(program.statements).toHaveLength(1);
     const decl = program.statements[0] as ExtDecl;
     expect(decl.kind).toBe("ext_decl");
@@ -16,7 +16,7 @@ describe("parser", () => {
   });
 
   test("ext declaration with all types", () => {
-    const program = parse(".ext(t, [a: text, b: integer, c: real, d: boolean]).");
+    const program = parse("extensional t(a: text, b: integer, c: real, d: boolean).");
     const decl = program.statements[0] as ExtDecl;
     expect(decl.columns).toEqual([
       { name: "a", type: "text" },
@@ -75,7 +75,7 @@ describe("parser", () => {
   test("complete program", () => {
     const source = `
       % Extensional
-      .ext(parent, [name: text, child: text]).
+      extensional parent(name: text, child: text).
 
       % Rules
       ancestor(X, Y) :- parent(X, Y).

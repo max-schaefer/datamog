@@ -38,8 +38,8 @@ describe("lexer", () => {
     expect(values("42 3.14")).toEqual(["42", "3.14"]);
   });
 
-  test(".ext keyword", () => {
-    expect(types(".ext(")).toEqual([TokenType.ExtKeyword, TokenType.LParen]);
+  test("extensional keyword", () => {
+    expect(types("extensional")).toEqual([TokenType.Extensional]);
   });
 
   test("turnstile and query mark", () => {
@@ -74,20 +74,17 @@ describe("lexer", () => {
   });
 
   test("ext declaration tokens", () => {
-    expect(types(".ext(parent, [name: text, child: text]).")).toEqual([
-      TokenType.ExtKeyword,
+    expect(types("extensional parent(name: text, child: text).")).toEqual([
+      TokenType.Extensional,
+      TokenType.Ident,
       TokenType.LParen,
       TokenType.Ident,
-      TokenType.Comma,
-      TokenType.LBracket,
-      TokenType.Ident,
       TokenType.Colon,
       TokenType.TextType,
       TokenType.Comma,
       TokenType.Ident,
       TokenType.Colon,
       TokenType.TextType,
-      TokenType.RBracket,
       TokenType.RParen,
       TokenType.Dot,
     ]);

@@ -6,7 +6,7 @@ Datamog is an educational Datalog dialect that translates into Postgres. It supp
 
 ```datalog
 % Declare extensional predicates (backed by tables)
-.ext(parent, [name: text, child: text]).
+extensional parent(name: text, child: text).
 
 % Define rules (Horn clauses)
 ancestor(X, Y) :- parent(X, Y).
@@ -16,7 +16,7 @@ ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
 ?- ancestor("alice", X).
 ```
 
-- **Extensional declarations** (`.ext`) define predicates backed by Postgres tables with typed columns (`text`, `integer`, `real`, `boolean`).
+- **Extensional declarations** (`extensional`) define predicates backed by Postgres tables with typed columns (`text`, `integer`, `real`, `boolean`).
 - **Rules** define intensional predicates. Multiple rules for the same predicate are combined with `UNION`. Recursive predicates use `CREATE RECURSIVE VIEW`.
 - **Facts** are rules with no body: `base_case("x").`
 - **Queries** (`?-`) execute `SELECT` statements against the generated views.

@@ -5,7 +5,7 @@ import { analyze } from "../src/analyzer.ts";
 describe("analyzer", () => {
   test("classifies extensional predicates", () => {
     const program = parse(`
-      .ext(parent, [name: text, child: text]).
+      extensional parent(name: text, child: text).
       ancestor(X, Y) :- parent(X, Y).
     `);
     const result = analyze(program);
@@ -16,7 +16,7 @@ describe("analyzer", () => {
 
   test("builds dependency graph", () => {
     const program = parse(`
-      .ext(parent, [name: text, child: text]).
+      extensional parent(name: text, child: text).
       ancestor(X, Y) :- parent(X, Y).
       ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
     `);
@@ -26,7 +26,7 @@ describe("analyzer", () => {
 
   test("detects self-recursion", () => {
     const program = parse(`
-      .ext(parent, [name: text, child: text]).
+      extensional parent(name: text, child: text).
       ancestor(X, Y) :- parent(X, Y).
       ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
     `);
@@ -36,7 +36,7 @@ describe("analyzer", () => {
 
   test("detects non-recursive predicates", () => {
     const program = parse(`
-      .ext(parent, [name: text, child: text]).
+      extensional parent(name: text, child: text).
       grandparent(X, Y) :- parent(X, Z), parent(Z, Y).
     `);
     const result = analyze(program);
@@ -45,7 +45,7 @@ describe("analyzer", () => {
 
   test("errors on predicate that is both EDB and IDB", () => {
     const program = parse(`
-      .ext(parent, [name: text, child: text]).
+      extensional parent(name: text, child: text).
       parent(X, Y) :- parent(X, Y).
     `);
     expect(() => analyze(program)).toThrow(/both extensional and intensional/);
@@ -53,7 +53,7 @@ describe("analyzer", () => {
 
   test("topological sort produces valid order", () => {
     const program = parse(`
-      .ext(edge, [src: text, dst: text]).
+      extensional edge(src: text, dst: text).
       path(X, Y) :- edge(X, Y).
       path(X, Y) :- edge(X, Z), path(Z, Y).
       reachable(X) :- path("start", X).
@@ -66,7 +66,7 @@ describe("analyzer", () => {
 
   test("errors on mutual recursion", () => {
     const program = parse(`
-      .ext(base, [x: integer]).
+      extensional base(x: integer).
       even(X) :- base(X).
       even(X) :- odd(X).
       odd(X) :- even(X).
@@ -76,7 +76,7 @@ describe("analyzer", () => {
 
   test("collects queries", () => {
     const program = parse(`
-      .ext(parent, [name: text, child: text]).
+      extensional parent(name: text, child: text).
       ancestor(X, Y) :- parent(X, Y).
       ?- ancestor("alice", X).
     `);

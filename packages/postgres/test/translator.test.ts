@@ -14,7 +14,7 @@ function norm(sql: string): string {
 
 describe("translator", () => {
   test("generates CREATE TABLE for ext declaration", () => {
-    const result = translateSource(".ext(parent, [name: text, child: text]).");
+    const result = translateSource("extensional parent(name: text, child: text).");
     expect(result.createTables).toHaveLength(1);
     expect(norm(result.createTables[0]!)).toBe(
       'CREATE TABLE IF NOT EXISTS "parent" ( "name" TEXT NOT NULL, "child" TEXT NOT NULL );',
@@ -22,7 +22,7 @@ describe("translator", () => {
   });
 
   test("maps SQL types correctly", () => {
-    const result = translateSource(".ext(t, [a: text, b: integer, c: real, d: boolean]).");
+    const result = translateSource("extensional t(a: text, b: integer, c: real, d: boolean).");
     const sql = norm(result.createTables[0]!);
     expect(sql).toContain('"a" TEXT NOT NULL');
     expect(sql).toContain('"b" INTEGER NOT NULL');
@@ -32,7 +32,7 @@ describe("translator", () => {
 
   test("generates CREATE VIEW for non-recursive rule", () => {
     const result = translateSource(`
-      .ext(parent, [name: text, child: text]).
+      extensional parent(name: text, child: text).
       grandparent(X, Y) :- parent(X, Z), parent(Z, Y).
     `);
     expect(result.createViews).toHaveLength(1);
@@ -44,7 +44,7 @@ describe("translator", () => {
 
   test("generates join conditions from shared variables", () => {
     const result = translateSource(`
-      .ext(parent, [name: text, child: text]).
+      extensional parent(name: text, child: text).
       grandparent(X, Y) :- parent(X, Z), parent(Z, Y).
     `);
     const sql = norm(result.createViews[0]!);
@@ -55,7 +55,7 @@ describe("translator", () => {
 
   test("generates WHERE for constants in rule body", () => {
     const result = translateSource(`
-      .ext(parent, [name: text, child: text]).
+      extensional parent(name: text, child: text).
       alice_child(X) :- parent("alice", X).
     `);
     const sql = norm(result.createViews[0]!);
@@ -64,7 +64,7 @@ describe("translator", () => {
 
   test("generates UNION for multiple rules with same head", () => {
     const result = translateSource(`
-      .ext(parent, [name: text, child: text]).
+      extensional parent(name: text, child: text).
       related(X, Y) :- parent(X, Y).
       related(X, Y) :- parent(Y, X).
     `);
@@ -74,7 +74,7 @@ describe("translator", () => {
 
   test("generates CREATE RECURSIVE VIEW for recursive rules", () => {
     const result = translateSource(`
-      .ext(parent, [name: text, child: text]).
+      extensional parent(name: text, child: text).
       ancestor(X, Y) :- parent(X, Y).
       ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
     `);
@@ -86,7 +86,7 @@ describe("translator", () => {
 
   test("generates SELECT for query with constants", () => {
     const result = translateSource(`
-      .ext(parent, [name: text, child: text]).
+      extensional parent(name: text, child: text).
       ancestor(X, Y) :- parent(X, Y).
       ?- ancestor("alice", X).
     `);
@@ -98,7 +98,7 @@ describe("translator", () => {
 
   test("generates SELECT for query with all variables", () => {
     const result = translateSource(`
-      .ext(parent, [name: text, child: text]).
+      extensional parent(name: text, child: text).
       ancestor(X, Y) :- parent(X, Y).
       ?- ancestor(X, Y).
     `);
@@ -118,7 +118,7 @@ describe("translator", () => {
 
   test("views are ordered by dependencies", () => {
     const result = translateSource(`
-      .ext(edge, [src: text, dst: text]).
+      extensional edge(src: text, dst: text).
       path(X, Y) :- edge(X, Y).
       path(X, Y) :- edge(X, Z), path(Z, Y).
       reachable(X) :- path("start", X).
@@ -132,7 +132,7 @@ describe("translator", () => {
 
   test("number constants in queries", () => {
     const result = translateSource(`
-      .ext(scores, [name: text, score: integer]).
+      extensional scores(name: text, score: integer).
       high(X) :- scores(X, 100).
       ?- high(X).
     `);

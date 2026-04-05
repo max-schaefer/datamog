@@ -26,7 +26,7 @@ export class Parser {
   }
 
   private parseStatement(): Statement {
-    if (this.isAt(TokenType.ExtKeyword)) {
+    if (this.isAt(TokenType.Extensional)) {
       return this.parseExtDecl();
     }
     if (this.isAt(TokenType.QueryMark)) {
@@ -42,11 +42,9 @@ export class Parser {
   }
 
   private parseExtDecl(): ExtDecl {
-    const start = this.expect(TokenType.ExtKeyword);
-    this.expect(TokenType.LParen);
+    const start = this.expect(TokenType.Extensional);
     const predicate = this.expect(TokenType.Ident).value;
-    this.expect(TokenType.Comma);
-    this.expect(TokenType.LBracket);
+    this.expect(TokenType.LParen);
 
     const columns: ColumnDecl[] = [this.parseColumnDecl()];
     while (this.isAt(TokenType.Comma)) {
@@ -54,7 +52,6 @@ export class Parser {
       columns.push(this.parseColumnDecl());
     }
 
-    this.expect(TokenType.RBracket);
     this.expect(TokenType.RParen);
     this.expect(TokenType.Dot);
 
