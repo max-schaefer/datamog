@@ -1,0 +1,19 @@
+{
+  "name": "datamog",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "test": "bun test --recursive",
+    "check": "bunx biome check .",
+    "check:fix": "bunx biome check --fix .",
+    "demo": "bun run index.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1",
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}

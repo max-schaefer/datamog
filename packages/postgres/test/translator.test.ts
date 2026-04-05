@@ -1,0 +1,142 @@
+import { describe, expect, test } from "bun:test";
+import { parse } from "datamog-parser";
+import { analyze } from "../src/analyzer.ts";
+import { translate } from "../src/translator.ts";
+
+function translateSource(source: string) {
+  return translate(analyze(parse(source)));
+}
+
+/** Normalize whitespace for comparison */
+function norm(sql: string): string {
+  return sql.replace(/\s+/g, " ").trim();
+}
+
+describe("translator", () => {
+  test("generates CREATE TABLE for ext declaration", () => {
+    const result = translateSource(".ext(parent, [name: text, child: text]).");
+    expect(result.createTables).toHaveLength(1);
+    expect(norm(result.createTables[0]!)).toBe(
+      'CREATE TABLE IF NOT EXISTS "parent" ( "name" TEXT NOT NULL, "child" TEXT NOT NULL );',
+    );
+  });
+
+  test("maps SQL types correctly", () => {
+    const result = translateSource(".ext(t, [a: text, b: integer, c: real, d: boolean]).");
+    const sql = norm(result.createTables[0]!);
+    expect(sql).toContain('"a" TEXT NOT NULL');
+    expect(sql).toContain('"b" INTEGER NOT NULL');
+    expect(sql).toContain('"c" REAL NOT NULL');
+    expect(sql).toContain('"d" BOOLEAN NOT NULL');
+  });
+
+  test("generates CREATE VIEW for non-recursive rule", () => {
+    const result = translateSource(`
+      .ext(parent, [name: text, child: text]).
+      grandparent(X, Y) :- parent(X, Z), parent(Z, Y).
+    `);
+    expect(result.createViews).toHaveLength(1);
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain('CREATE OR REPLACE VIEW "grandparent"');
+    expect(sql).toContain("FROM");
+    expect(sql).not.toContain("RECURSIVE");
+  });
+
+  test("generates join conditions from shared variables", () => {
+    const result = translateSource(`
+      .ext(parent, [name: text, child: text]).
+      grandparent(X, Y) :- parent(X, Z), parent(Z, Y).
+    `);
+    const sql = norm(result.createViews[0]!);
+    // Z is shared between parent(X, Z) and parent(Z, Y)
+    // Should produce a join condition on the child column of b0 and name column of b1
+    expect(sql).toContain('__b0."child" = __b1."name"');
+  });
+
+  test("generates WHERE for constants in rule body", () => {
+    const result = translateSource(`
+      .ext(parent, [name: text, child: text]).
+      alice_child(X) :- parent("alice", X).
+    `);
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("__b0.\"name\" = 'alice'");
+  });
+
+  test("generates UNION for multiple rules with same head", () => {
+    const result = translateSource(`
+      .ext(parent, [name: text, child: text]).
+      related(X, Y) :- parent(X, Y).
+      related(X, Y) :- parent(Y, X).
+    `);
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("UNION");
+  });
+
+  test("generates CREATE RECURSIVE VIEW for recursive rules", () => {
+    const result = translateSource(`
+      .ext(parent, [name: text, child: text]).
+      ancestor(X, Y) :- parent(X, Y).
+      ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
+    `);
+    expect(result.createViews).toHaveLength(1);
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("CREATE RECURSIVE VIEW");
+    expect(sql).toContain("UNION");
+  });
+
+  test("generates SELECT for query with constants", () => {
+    const result = translateSource(`
+      .ext(parent, [name: text, child: text]).
+      ancestor(X, Y) :- parent(X, Y).
+      ?- ancestor("alice", X).
+    `);
+    expect(result.queries).toHaveLength(1);
+    const sql = norm(result.queries[0]!);
+    expect(sql).toContain("SELECT");
+    expect(sql).toContain("'alice'");
+  });
+
+  test("generates SELECT for query with all variables", () => {
+    const result = translateSource(`
+      .ext(parent, [name: text, child: text]).
+      ancestor(X, Y) :- parent(X, Y).
+      ?- ancestor(X, Y).
+    `);
+    const sql = norm(result.queries[0]!);
+    expect(sql).toContain("SELECT");
+    // Should select all columns
+    expect(sql).toContain("col1");
+    expect(sql).toContain("col2");
+  });
+
+  test("handles facts (rules with empty body)", () => {
+    const result = translateSource('base("hello").');
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("SELECT");
+    expect(sql).toContain("'hello'");
+  });
+
+  test("views are ordered by dependencies", () => {
+    const result = translateSource(`
+      .ext(edge, [src: text, dst: text]).
+      path(X, Y) :- edge(X, Y).
+      path(X, Y) :- edge(X, Z), path(Z, Y).
+      reachable(X) :- path("start", X).
+    `);
+    expect(result.createViews).toHaveLength(2);
+    const firstView = norm(result.createViews[0]!);
+    const secondView = norm(result.createViews[1]!);
+    expect(firstView).toContain('"path"');
+    expect(secondView).toContain('"reachable"');
+  });
+
+  test("number constants in queries", () => {
+    const result = translateSource(`
+      .ext(scores, [name: text, score: integer]).
+      high(X) :- scores(X, 100).
+      ?- high(X).
+    `);
+    const viewSql = norm(result.createViews[0]!);
+    expect(viewSql).toContain('__b0."score" = 100');
+  });
+});

@@ -1,0 +1,8 @@
+{
+  "references": [
+    { "path": "packages/parser" },
+    { "path": "packages/postgres" },
+    { "path": "packages/csv" }
+  ],
+  "files": []
+}
