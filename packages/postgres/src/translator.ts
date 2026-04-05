@@ -1,14 +1,24 @@
 import type { AnalyzedProgram, Atom, ExtDecl, Rule, Term } from "datamog-core";
 
+export type Dialect = "postgres" | "sqlite";
+
+export interface TranslateOptions {
+  dialect?: Dialect;
+}
+
 export interface TranslationResult {
   createTables: string[];
   createViews: string[];
   queries: string[];
 }
 
-export function translate(analyzed: AnalyzedProgram): TranslationResult {
+export function translate(
+  analyzed: AnalyzedProgram,
+  options: TranslateOptions = {},
+): TranslationResult {
+  const dialect = options.dialect ?? "postgres";
   const createTables = translateTables(analyzed);
-  const createViews = translateViews(analyzed);
+  const createViews = translateViews(analyzed, dialect);
   const queries = translateQueries(analyzed);
   return { createTables, createViews, queries };
 }
@@ -33,7 +43,7 @@ function translateTables(analyzed: AnalyzedProgram): string[] {
 
 // --- Views ---
 
-function translateViews(analyzed: AnalyzedProgram): string[] {
+function translateViews(analyzed: AnalyzedProgram, dialect: Dialect): string[] {
   const views: string[] = [];
   for (const predicate of analyzed.sortedPredicates) {
     const rules = analyzed.rules.get(predicate)!;
@@ -45,11 +55,21 @@ function translateViews(analyzed: AnalyzedProgram): string[] {
 
     if (isRecursive) {
       const colNames = colList(arity);
-      views.push(
-        `CREATE RECURSIVE VIEW ${ident(predicate)} (${colNames}) AS (\n  ${unionBody}\n);`,
-      );
+      if (dialect === "sqlite") {
+        views.push(
+          `CREATE VIEW IF NOT EXISTS ${ident(predicate)} AS\n  WITH RECURSIVE ${ident(predicate)}(${colNames}) AS (\n  ${unionBody}\n  )\n  SELECT * FROM ${ident(predicate)}\n;`,
+        );
+      } else {
+        views.push(
+          `CREATE RECURSIVE VIEW ${ident(predicate)} (${colNames}) AS (\n  ${unionBody}\n);`,
+        );
+      }
     } else {
-      views.push(`CREATE OR REPLACE VIEW ${ident(predicate)} AS\n  ${unionBody}\n;`);
+      if (dialect === "sqlite") {
+        views.push(`CREATE VIEW IF NOT EXISTS ${ident(predicate)} AS\n  ${unionBody}\n;`);
+      } else {
+        views.push(`CREATE OR REPLACE VIEW ${ident(predicate)} AS\n  ${unionBody}\n;`);
+      }
     }
   }
   return views;

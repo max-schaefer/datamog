@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import { analyze } from "datamog-core";
 import { CsvLoader } from "datamog-csv";
 import { parse } from "datamog-parser";
-import { DatamogExecutor, translate } from "datamog-postgres";
+import { DatamogExecutor, createInMemoryDatabase, translate } from "datamog-postgres";
 
 function usage(): never {
   console.error("Usage: datamog <program.dl> [csv-directory]");
@@ -13,7 +13,7 @@ function usage(): never {
   console.error("                  (defaults to the directory containing the .dl file)");
   console.error();
   console.error("Environment:");
-  console.error("  DATABASE_URL   Postgres connection string (required)");
+  console.error("  DATABASE_URL   Postgres connection string (uses in-memory SQLite if not set)");
   console.error();
   console.error("Options:");
   console.error("  --dry-run      Print generated SQL without executing");
@@ -54,11 +54,13 @@ async function main() {
 
   csvDir = csvDir ? resolve(csvDir) : dirname(resolve(dlPath));
   const source = await dlFile.text();
+  const usePostgres = !!process.env.DATABASE_URL;
+  const dialect = usePostgres ? "postgres" : "sqlite";
 
   if (dryRun) {
     const program = parse(source);
     const analyzed = analyze(program);
-    const translation = translate(analyzed);
+    const translation = translate(analyzed, { dialect });
 
     for (const stmt of translation.createTables) {
       console.log(stmt);
@@ -75,30 +77,39 @@ async function main() {
     return;
   }
 
-  if (!process.env.DATABASE_URL) {
-    console.error("Error: DATABASE_URL environment variable is required");
-    console.error("  Set it to a Postgres connection string, e.g.:");
-    console.error("  DATABASE_URL=postgres://localhost:5432/mydb datamog program.dl");
-    process.exit(1);
-  }
+  const loaders = [new CsvLoader({ directory: csvDir })];
 
-  const sql = Bun.sql;
-  const executor = new DatamogExecutor(sql, [new CsvLoader({ directory: csvDir })]);
+  let closeFn: (() => void) | undefined;
 
-  try {
-    const results = await executor.execute(source);
-    for (const result of results) {
-      console.log(`-- ${result.sql}`);
-      if (result.rows.length === 0) {
-        console.log("(no rows)");
-      } else {
-        console.table(result.rows);
-      }
-      console.log();
+  if (usePostgres) {
+    const sql = Bun.sql;
+    const executor = new DatamogExecutor(sql, loaders, { dialect: "postgres" });
+    try {
+      await printResults(await executor.execute(source));
+    } finally {
+      await sql.close();
     }
-  } finally {
-    // Close the connection pool
-    await sql.close();
+  } else {
+    const { sql, close } = createInMemoryDatabase();
+    closeFn = close;
+    const executor = new DatamogExecutor(sql, loaders, { dialect: "sqlite" });
+    try {
+      await printResults(await executor.execute(source));
+    } finally {
+      closeFn();
+    }
+  }
+}
+
+async function printResults(results: { sql: string; rows: Record<string, unknown>[] }[]) {
+  for (const result of results) {
+    console.log(`-- ${result.sql}`);
+    if (result.rows.length === 0) {
+      console.log("(no rows)");
+    } else {
+      console.table(result.rows);
+    }
+    console.log();
   }
 }
 

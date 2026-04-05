@@ -1,7 +1,11 @@
 import { analyze } from "datamog-core";
 import { parse } from "datamog-parser";
 import type { BunSQL, ExtensionalLoader } from "./loader.ts";
-import { translate } from "./translator.ts";
+import { type Dialect, translate } from "./translator.ts";
+
+export interface ExecutorOptions {
+  dialect?: Dialect;
+}
 
 export interface QueryResult {
   sql: string;
@@ -10,12 +14,15 @@ export interface QueryResult {
 
 export class DatamogExecutor {
   private loaders: ExtensionalLoader[] = [];
+  private dialect: Dialect;
 
   constructor(
     private sql: BunSQL,
     loaders: ExtensionalLoader[] = [],
+    options: ExecutorOptions = {},
   ) {
     this.loaders = [...loaders];
+    this.dialect = options.dialect ?? "postgres";
   }
 
   addLoader(loader: ExtensionalLoader): void {
@@ -25,7 +32,7 @@ export class DatamogExecutor {
   async execute(source: string): Promise<QueryResult[]> {
     const program = parse(source);
     const analyzed = analyze(program);
-    const translation = translate(analyzed);
+    const translation = translate(analyzed, { dialect: this.dialect });
 
     // 1. Create tables
     for (const stmt of translation.createTables) {

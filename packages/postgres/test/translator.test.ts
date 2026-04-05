@@ -3,8 +3,10 @@ import { analyze } from "datamog-core";
 import { parse } from "datamog-parser";
 import { translate } from "../src/translator.ts";
 
-function translateSource(source: string) {
-  return translate(analyze(parse(source)));
+import type { Dialect } from "../src/translator.ts";
+
+function translateSource(source: string, dialect: Dialect = "postgres") {
+  return translate(analyze(parse(source)), { dialect });
 }
 
 /** Normalize whitespace for comparison */
@@ -138,5 +140,36 @@ describe("translator", () => {
     `);
     const viewSql = norm(result.createViews[0]!);
     expect(viewSql).toContain('__b0."score" = 100');
+  });
+});
+
+describe("translator (sqlite dialect)", () => {
+  test("generates CREATE VIEW IF NOT EXISTS for non-recursive rule", () => {
+    const result = translateSource(
+      `
+      extensional parent(name: text, child: text).
+      grandparent(X, Y) :- parent(X, Z), parent(Z, Y).
+    `,
+      "sqlite",
+    );
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("CREATE VIEW IF NOT EXISTS");
+    expect(sql).not.toContain("OR REPLACE");
+    expect(sql).not.toContain("RECURSIVE");
+  });
+
+  test("generates WITH RECURSIVE inside CREATE VIEW for recursive rule", () => {
+    const result = translateSource(
+      `
+      extensional parent(name: text, child: text).
+      ancestor(X, Y) :- parent(X, Y).
+      ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
+    `,
+      "sqlite",
+    );
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("CREATE VIEW IF NOT EXISTS");
+    expect(sql).toContain("WITH RECURSIVE");
+    expect(sql).toContain('SELECT * FROM "ancestor"');
   });
 });
