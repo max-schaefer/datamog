@@ -54,20 +54,27 @@ bob,carol
 bob,dave
 ```
 
-Run it with the CLI (a complete example lives in `packages/cli/example/`):
+Run it with the CLI (no database setup needed — uses in-memory SQLite by default):
 
 ```bash
-# Preview the generated SQL without connecting to Postgres
-bun run datamog --dry-run packages/cli/example/family.dl
-
-# Execute against Postgres, loading CSVs from the same directory as the .dl file
-DATABASE_URL=postgres://localhost:5432/mydb bun run datamog packages/cli/example/family.dl
-
-# Or specify a separate CSV directory
-DATABASE_URL=postgres://localhost:5432/mydb bun run datamog family.dl ./data
+bun run datamog packages/cli/examples/family/family.dl
 ```
 
-The CLI looks for `<predicate>.csv` files (e.g. `parent.csv`) in the CSV directory, which defaults to the directory containing the `.dl` file.
+Or preview the generated SQL:
+
+```bash
+bun run datamog --dry-run packages/cli/examples/family/family.dl
+```
+
+The CLI looks for `<predicate>.csv` files (e.g. `parent.csv`) in the same directory as the `.dl` file. Set `DATABASE_URL` to use Postgres instead of SQLite.
+
+### More Examples
+
+| Example | Description | Command |
+|---------|-------------|---------|
+| `family` | Ancestor relation via transitive closure | `bun run datamog packages/cli/examples/family/family.dl` |
+| `graph` | Reachability in a directed graph | `bun run datamog packages/cli/examples/graph/graph.dl` |
+| `courses` | Transitive course prerequisites | `bun run datamog packages/cli/examples/courses/courses.dl` |
 
 ### Programmatic API
 

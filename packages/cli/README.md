@@ -32,10 +32,12 @@ The CLI looks for `<predicate>.csv` files in the CSV directory, which defaults t
 | `--dialect <postgres\|sqlite>` | SQL dialect (default: auto-detected from `DATABASE_URL`) |
 | `-h`, `--help` | Show help message |
 
-## Example
+## Examples
 
-A complete example is included in `example/`:
+Several examples are included in `examples/`:
 
-```bash
-bun run datamog packages/cli/example/family.dl
-```
+| Example | Description | Command |
+|---------|-------------|---------|
+| `family` | Ancestor relation via transitive closure | `bun run datamog packages/cli/examples/family/family.dl` |
+| `graph` | Reachability in a directed graph | `bun run datamog packages/cli/examples/graph/graph.dl` |
+| `courses` | Transitive course prerequisites | `bun run datamog packages/cli/examples/courses/courses.dl` |
