@@ -58,13 +58,13 @@ Run it with the CLI (a complete example lives in `packages/cli/example/`):
 
 ```bash
 # Preview the generated SQL without connecting to Postgres
-bun datamog --dry-run packages/cli/example/family.dl
+bun run datamog --dry-run packages/cli/example/family.dl
 
 # Execute against Postgres, loading CSVs from the same directory as the .dl file
-DATABASE_URL=postgres://localhost:5432/mydb bun datamog packages/cli/example/family.dl
+DATABASE_URL=postgres://localhost:5432/mydb bun run datamog packages/cli/example/family.dl
 
 # Or specify a separate CSV directory
-DATABASE_URL=postgres://localhost:5432/mydb bun datamog family.dl ./data
+DATABASE_URL=postgres://localhost:5432/mydb bun run datamog family.dl ./data
 ```
 
 The CLI looks for `<predicate>.csv` files (e.g. `parent.csv`) in the CSV directory, which defaults to the directory containing the `.dl` file.
