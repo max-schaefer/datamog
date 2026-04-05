@@ -10,6 +10,8 @@
     { "path": "../core" },
     { "path": "../parser" },
     { "path": "../postgres" },
-    { "path": "../csv" }
+    { "path": "../csv" },
+    { "path": "../backend-postgres" },
+    { "path": "../backend-sqlite" }
   ]
 }

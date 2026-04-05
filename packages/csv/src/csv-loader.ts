@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import type { ExtDecl, SqlType } from "datamog-core";
-import type { BunSQL, ExtensionalLoader, LoadResult } from "datamog-postgres";
+import type { Backend, ExtensionalLoader, LoadResult } from "datamog-postgres";
 
 export interface CsvLoaderOptions {
   directory: string;
@@ -24,16 +24,16 @@ export class CsvLoader implements ExtensionalLoader {
     return Bun.file(this.filePath(decl)).exists();
   }
 
-  async load(decl: ExtDecl, sql: BunSQL): Promise<LoadResult> {
+  async load(decl: ExtDecl, backend: Backend): Promise<LoadResult> {
     const rows = await this.readRows(decl);
 
     for (const row of rows) {
       const columns = decl.columns.map((c) => `"${c.name}"`).join(", ");
       const placeholders = decl.columns.map((_, i) => `$${i + 1}`).join(", ");
       const values = decl.columns.map((c) => row[c.name]);
-      await sql.unsafe(
+      await backend.execute(
         `INSERT INTO "${decl.predicate}" (${columns}) VALUES (${placeholders})`,
-        values,
+        values as unknown[],
       );
     }
 

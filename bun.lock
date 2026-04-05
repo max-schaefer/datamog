@@ -12,6 +12,20 @@
         "typescript": "^5",
       },
     },
+    "packages/backend-postgres": {
+      "name": "datamog-backend-postgres",
+      "version": "0.1.0",
+      "dependencies": {
+        "datamog-postgres": "workspace:*",
+      },
+    },
+    "packages/backend-sqlite": {
+      "name": "datamog-backend-sqlite",
+      "version": "0.1.0",
+      "dependencies": {
+        "datamog-postgres": "workspace:*",
+      },
+    },
     "packages/cli": {
       "name": "datamog-cli",
       "version": "0.1.0",
@@ -19,6 +33,8 @@
         "datamog": "./src/main.ts",
       },
       "dependencies": {
+        "datamog-backend-postgres": "workspace:*",
+        "datamog-backend-sqlite": "workspace:*",
         "datamog-core": "workspace:*",
         "datamog-csv": "workspace:*",
         "datamog-parser": "workspace:*",
@@ -80,6 +96,10 @@
     "@types/node": ["@types/node@25.5.2", "", { "dependencies": { "undici-types": "~7.18.0" } }, "sha512-tO4ZIRKNC+MDWV4qKVZe3Ql/woTnmHDr5JD8UI5hn2pwBrHEwOEMZK7WlNb5RKB6EoJ02gwmQS9OrjuFnZYdpg=="],
 
     "bun-types": ["bun-types@1.3.11", "", { "dependencies": { "@types/node": "*" } }, "sha512-1KGPpoxQWl9f6wcZh57LvrPIInQMn2TQ7jsgxqpRzg+l0QPOFvJVH7HmvHo/AiPgwXy+/Thf6Ov3EdVn1vOabg=="],
+
+    "datamog-backend-postgres": ["datamog-backend-postgres@workspace:packages/backend-postgres"],
+
+    "datamog-backend-sqlite": ["datamog-backend-sqlite@workspace:packages/backend-sqlite"],
 
     "datamog-cli": ["datamog-cli@workspace:packages/cli"],
 

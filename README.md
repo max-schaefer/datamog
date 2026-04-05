@@ -1,6 +1,6 @@
 # Datamog
 
-Datamog is an educational Datalog dialect that translates into Postgres. It supports negation-free Horn clauses with extensional predicate declarations, and compiles rules into Postgres views (including recursive views for recursive predicates).
+Datamog is an educational Datalog dialect that translates into SQL. It supports negation-free Horn clauses with extensional predicate declarations, and compiles rules into views (including recursive views for recursive predicates). It ships with Postgres and SQLite backends.
 
 ## Syntax
 
@@ -16,8 +16,8 @@ ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
 ?- ancestor("alice", X).
 ```
 
-- **Extensional declarations** (`extensional`) define predicates backed by Postgres tables with typed columns (`text`, `integer`, `real`, `boolean`).
-- **Rules** define intensional predicates. Multiple rules for the same predicate are combined with `UNION`. Recursive predicates use `CREATE RECURSIVE VIEW`.
+- **Extensional declarations** (`extensional`) define predicates backed by tables with typed columns (`text`, `integer`, `real`, `boolean`).
+- **Rules** define intensional predicates. Multiple rules for the same predicate are combined with `UNION`. Recursive predicates use recursive views.
 - **Facts** are rules with no body: `base_case("x").`
 - **Queries** (`?-`) execute `SELECT` statements against the generated views.
 - **Comments** start with `%` and run to end of line.
@@ -28,33 +28,15 @@ ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
 |---------|-------------|
 | `datamog-core` | AST type definitions and program analyzer (dependency graph, recursion detection) |
 | `datamog-parser` | Lexer and recursive-descent parser producing a typed AST |
-| `datamog-postgres` | SQL translator with pluggable extensional loading |
+| `datamog-postgres` | SQL translator, executor, and pluggable loader interface |
+| `datamog-backend-postgres` | Postgres backend (via `Bun.sql`) |
+| `datamog-backend-sqlite` | SQLite backend (via `bun:sqlite`, in-memory by default) |
 | `datamog-csv` | Loader plugin for populating extensional predicates from CSV files |
 | `datamog-cli` | Command-line interface for running Datamog programs |
 
 ## Usage
 
-Given a Datalog program `family.dl`:
-
-```datalog
-extensional parent(name: text, child: text).
-
-ancestor(X, Y) :- parent(X, Y).
-ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
-
-?- ancestor("alice", X).
-```
-
-And a CSV file `data/parent.csv` (matching the extensional predicate name):
-
-```csv
-name,child
-alice,bob
-bob,carol
-bob,dave
-```
-
-Run it with the CLI (no database setup needed — uses in-memory SQLite by default):
+Run with the CLI (no database setup needed — uses in-memory SQLite by default):
 
 ```bash
 bun run datamog packages/cli/examples/family/family.dl
@@ -66,9 +48,16 @@ Or preview the generated SQL:
 bun run datamog --dry-run packages/cli/examples/family/family.dl
 ```
 
-The CLI looks for `<predicate>.csv` files (e.g. `parent.csv`) in the same directory as the `.dl` file. Set `DATABASE_URL` to use Postgres instead of SQLite.
+Select a backend explicitly:
 
-### More Examples
+```bash
+bun run datamog --backend sqlite packages/cli/examples/family/family.dl
+DATABASE_URL=postgres://localhost:5432/mydb bun run datamog --backend postgres program.dl
+```
+
+The CLI looks for `<predicate>.csv` files (e.g. `parent.csv`) in the same directory as the `.dl` file.
+
+### Examples
 
 | Example | Description | Command |
 |---------|-------------|---------|
@@ -78,14 +67,13 @@ The CLI looks for `<predicate>.csv` files (e.g. `parent.csv`) in the same direct
 
 ### Programmatic API
 
-You can also use the packages directly:
-
 ```ts
 import { DatamogExecutor } from "datamog-postgres";
 import { CsvLoader } from "datamog-csv";
+import { createSqliteBackend } from "datamog-backend-sqlite";
 
-const sql = Bun.sql;
-const executor = new DatamogExecutor(sql, [
+const backend = createSqliteBackend();
+const executor = new DatamogExecutor(backend, [
   new CsvLoader({ directory: "./data" }),
 ]);
 
@@ -96,6 +84,8 @@ for (const result of results) {
   console.log(result.sql);
   console.table(result.rows);
 }
+
+await backend.close();
 ```
 
 ## Development

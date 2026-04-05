@@ -1,11 +1,8 @@
 import { analyze } from "datamog-core";
 import { parse } from "datamog-parser";
-import type { BunSQL, ExtensionalLoader } from "./loader.ts";
-import { type Dialect, translate } from "./translator.ts";
-
-export interface ExecutorOptions {
-  dialect?: Dialect;
-}
+import type { Backend } from "./backend.ts";
+import type { ExtensionalLoader } from "./loader.ts";
+import { translate } from "./translator.ts";
 
 export interface QueryResult {
   sql: string;
@@ -14,15 +11,12 @@ export interface QueryResult {
 
 export class DatamogExecutor {
   private loaders: ExtensionalLoader[] = [];
-  private dialect: Dialect;
 
   constructor(
-    private sql: BunSQL,
+    private backend: Backend,
     loaders: ExtensionalLoader[] = [],
-    options: ExecutorOptions = {},
   ) {
     this.loaders = [...loaders];
-    this.dialect = options.dialect ?? "postgres";
   }
 
   addLoader(loader: ExtensionalLoader): void {
@@ -32,18 +26,18 @@ export class DatamogExecutor {
   async execute(source: string): Promise<QueryResult[]> {
     const program = parse(source);
     const analyzed = analyze(program);
-    const translation = translate(analyzed, { dialect: this.dialect });
+    const translation = translate(analyzed, { dialect: this.backend.dialect });
 
     // 1. Create tables
     for (const stmt of translation.createTables) {
-      await this.sql.unsafe(stmt);
+      await this.backend.execute(stmt);
     }
 
     // 2. Load extensional data
     for (const decl of analyzed.extDecls.values()) {
       for (const loader of this.loaders) {
         if (await loader.canLoad(decl)) {
-          await loader.load(decl, this.sql);
+          await loader.load(decl, this.backend);
           break;
         }
       }
@@ -51,14 +45,14 @@ export class DatamogExecutor {
 
     // 3. Create views
     for (const stmt of translation.createViews) {
-      await this.sql.unsafe(stmt);
+      await this.backend.execute(stmt);
     }
 
     // 4. Execute queries
     const results: QueryResult[] = [];
     const settledResults = await Promise.allSettled(
       translation.queries.map(async (querySql) => {
-        const rows = (await this.sql.unsafe(querySql)) as Record<string, unknown>[];
+        const rows = await this.backend.execute(querySql);
         return { sql: querySql, rows };
       }),
     );

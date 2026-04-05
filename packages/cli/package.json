@@ -6,6 +6,8 @@
     "datamog": "./src/main.ts"
   },
   "dependencies": {
+    "datamog-backend-postgres": "workspace:*",
+    "datamog-backend-sqlite": "workspace:*",
     "datamog-core": "workspace:*",
     "datamog-csv": "workspace:*",
     "datamog-parser": "workspace:*",

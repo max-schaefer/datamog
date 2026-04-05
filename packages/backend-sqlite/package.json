@@ -1,0 +1,11 @@
+{
+  "name": "datamog-backend-sqlite",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "datamog-postgres": "workspace:*"
+  }
+}

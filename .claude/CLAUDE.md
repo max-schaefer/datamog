@@ -3,11 +3,12 @@
 ## Commands
 
 ```bash
-bun test                    # run all tests (62 tests across 5 packages)
+bun test                    # run all tests (62 tests across 7 packages)
 bun run check               # biome lint + format check
 bun run check:fix           # auto-fix lint + format
 bun run datamog <file.dl>   # run a Datamog program (in-memory SQLite)
 bun run datamog --dry-run <file.dl>  # preview generated SQL
+bun run datamog --backend postgres <file.dl>  # use Postgres backend
 ```
 
 ## Architecture
@@ -19,11 +20,14 @@ core (AST types, analyzer)
   ↑
 parser (lexer, recursive descent parser)
   ↑
-postgres (SQL translator, executor, loader interface, SQLite adapter)
+postgres (SQL translator, executor, Backend interface, loader interface)
+  ↑        ↑
+  |    backend-postgres (Bun.sql)
+  |    backend-sqlite (bun:sqlite)
   ↑
 csv (CSV loader plugin)
   ↑
-cli (command-line interface)
+cli (imports all packages, selects backend via --backend flag)
 ```
 
 ### Key modules
@@ -32,9 +36,11 @@ cli (command-line interface)
 - `packages/core/src/analyzer.ts` — EDB/IDB classification, dependency graph, Tarjan's SCC for recursion detection, topological sort
 - `packages/parser/src/lexer.ts` — hand-written tokenizer
 - `packages/parser/src/parser.ts` — recursive descent parser
+- `packages/postgres/src/backend.ts` — `Backend` interface (implement to add new databases)
 - `packages/postgres/src/translator.ts` — AST → SQL generation with `postgres` and `sqlite` dialects
 - `packages/postgres/src/loader.ts` — `ExtensionalLoader` plugin interface
-- `packages/postgres/src/sqlite-adapter.ts` — wraps `bun:sqlite` to match `BunSQL` interface
+- `packages/backend-postgres/src/index.ts` — `createPostgresBackend()` using `Bun.sql`
+- `packages/backend-sqlite/src/index.ts` — `createSqliteBackend()` using `bun:sqlite`
 
 ## Datalog semantics
 
@@ -53,4 +59,4 @@ cli (command-line interface)
 - `Span` on every AST node for source location tracking
 - `ParseError` with line/column for user-facing error messages
 - Tests use `bun:test` with TDD approach (tests written before implementation)
-- `BunSQL` is a minimal interface type so the executor works with both `Bun.sql` (Postgres) and `bun:sqlite` (via adapter)
+- `Backend` is the abstraction for database connections — implement it to add new databases

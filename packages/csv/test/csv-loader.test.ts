@@ -110,18 +110,20 @@ describe("CsvLoader", () => {
     const loader = new CsvLoader({ directory: tempDir });
     const decl = getExtDecl("extensional parent(name: text, child: text).");
 
-    const insertedQueries: { query: string; values: unknown[] }[] = [];
-    const mockSql = {
-      async unsafe(query: string, values?: unknown[]) {
-        insertedQueries.push({ query, values: values ?? [] });
+    const insertedQueries: { query: string; params: unknown[] }[] = [];
+    const mockBackend = {
+      dialect: "sqlite" as const,
+      async execute(query: string, params?: unknown[]) {
+        insertedQueries.push({ query, params: params ?? [] });
         return [];
       },
+      close() {},
     };
 
-    const result = await loader.load(decl, mockSql as never);
+    const result = await loader.load(decl, mockBackend);
     expect(result.rowsLoaded).toBe(1);
     expect(insertedQueries).toHaveLength(1);
     expect(insertedQueries[0]?.query).toContain("INSERT INTO");
-    expect(insertedQueries[0]?.values).toEqual(["alice", "bob"]);
+    expect(insertedQueries[0]?.params).toEqual(["alice", "bob"]);
   });
 });
