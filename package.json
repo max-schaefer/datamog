@@ -2,7 +2,7 @@
   "name": "datamog",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*"],
+  "workspaces": ["packages/*", "packages/backend/*", "packages/loader/*"],
   "scripts": {
     "test": "bun test --recursive",
     "check": "bunx biome check .",

@@ -8,5 +8,8 @@
   "dependencies": {
     "datamog-core": "workspace:*",
     "datamog-engine": "workspace:*"
+  },
+  "devDependencies": {
+    "datamog-parser": "workspace:*"
   }
 }

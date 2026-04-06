@@ -20,12 +20,12 @@ core (AST types, analyzer)
   ↑
 parser (lexer, recursive descent parser)
   ↑
-postgres (SQL translator, executor, Backend interface, loader interface)
+engine (SQL translator, executor, Backend interface, loader interface)
   ↑        ↑
-  |    backend-postgres (Bun.sql)
-  |    backend-sqlite (bun:sqlite)
+  |    backend/postgres (Bun.sql)
+  |    backend/sqlite (bun:sqlite)
   ↑
-csv (CSV loader plugin)
+loader/csv (CSV loader plugin)
   ↑
 cli (imports all packages, selects backend via --backend flag)
 ```
@@ -39,8 +39,8 @@ cli (imports all packages, selects backend via --backend flag)
 - `packages/engine/src/backend.ts` — `Backend` interface (implement to add new databases)
 - `packages/engine/src/translator.ts` — AST → SQL generation with `postgres` and `sqlite` dialects
 - `packages/engine/src/loader.ts` — `ExtensionalLoader` plugin interface
-- `packages/backend-postgres/src/index.ts` — `createPostgresBackend()` using `Bun.sql`
-- `packages/backend-sqlite/src/index.ts` — `createSqliteBackend()` using `bun:sqlite`
+- `packages/backend/postgres/src/index.ts` — `createPostgresBackend()` using `Bun.sql`
+- `packages/backend/sqlite/src/index.ts` — `createSqliteBackend()` using `bun:sqlite`
 
 ## Datalog semantics
 

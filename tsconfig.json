@@ -3,9 +3,9 @@
     { "path": "packages/core" },
     { "path": "packages/parser" },
     { "path": "packages/engine" },
-    { "path": "packages/csv" },
-    { "path": "packages/backend-postgres" },
-    { "path": "packages/backend-sqlite" },
+    { "path": "packages/backend/postgres" },
+    { "path": "packages/backend/sqlite" },
+    { "path": "packages/loader/csv" },
     { "path": "packages/cli" }
   ],
   "files": []
