@@ -7,6 +7,7 @@
     { "path": "packages/backend/sqlite" },
     { "path": "packages/loader/csv" },
     { "path": "packages/loader/jsonl" },
+    { "path": "packages/loader/gsheet" },
     { "path": "packages/cli" }
   ],
   "files": []

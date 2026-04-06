@@ -33,6 +33,7 @@ ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
 | `datamog-backend-sqlite` | SQLite backend (via `bun:sqlite`, in-memory by default) |
 | `datamog-csv` | Loader plugin for populating extensional predicates from CSV files |
 | `datamog-jsonl` | Loader plugin for populating extensional predicates from JSONL files |
+| `datamog-gsheet` | Loader plugin for populating extensional predicates from Google Sheets |
 | `datamog-cli` | Command-line interface for running Datamog programs |
 
 ## Usage
