@@ -38,6 +38,7 @@
         "datamog-core": "workspace:*",
         "datamog-csv": "workspace:*",
         "datamog-engine": "workspace:*",
+        "datamog-jsonl": "workspace:*",
         "datamog-parser": "workspace:*",
       },
     },
@@ -58,6 +59,17 @@
     },
     "packages/loader/csv": {
       "name": "datamog-csv",
+      "version": "0.1.0",
+      "dependencies": {
+        "datamog-core": "workspace:*",
+        "datamog-engine": "workspace:*",
+      },
+      "devDependencies": {
+        "datamog-parser": "workspace:*",
+      },
+    },
+    "packages/loader/jsonl": {
+      "name": "datamog-jsonl",
       "version": "0.1.0",
       "dependencies": {
         "datamog-core": "workspace:*",
@@ -111,6 +123,8 @@
     "datamog-csv": ["datamog-csv@workspace:packages/loader/csv"],
 
     "datamog-engine": ["datamog-engine@workspace:packages/engine"],
+
+    "datamog-jsonl": ["datamog-jsonl@workspace:packages/loader/jsonl"],
 
     "datamog-parser": ["datamog-parser@workspace:packages/parser"],
 

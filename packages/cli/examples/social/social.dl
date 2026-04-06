@@ -1,0 +1,8 @@
+% Social network: find mutual friends
+% Uses JSONL for extensional data.
+
+extensional follows(user: text, friend: text).
+
+mutual(X, Y) :- follows(X, Y), follows(Y, X).
+
+?- mutual("alice", X).

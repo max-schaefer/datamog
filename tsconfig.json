@@ -6,6 +6,7 @@
     { "path": "packages/backend/postgres" },
     { "path": "packages/backend/sqlite" },
     { "path": "packages/loader/csv" },
+    { "path": "packages/loader/jsonl" },
     { "path": "packages/cli" }
   ],
   "files": []

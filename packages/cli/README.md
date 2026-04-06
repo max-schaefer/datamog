@@ -41,3 +41,4 @@ Several examples are included in `examples/`:
 | `family` | Ancestor relation via transitive closure | `bun run datamog packages/cli/examples/family/family.dl` |
 | `graph` | Reachability in a directed graph | `bun run datamog packages/cli/examples/graph/graph.dl` |
 | `courses` | Transitive course prerequisites | `bun run datamog packages/cli/examples/courses/courses.dl` |
+| `social` | Mutual friends (JSONL data) | `bun run datamog packages/cli/examples/social/social.dl` |

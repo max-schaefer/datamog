@@ -1,0 +1,5 @@
+{"user":"alice","friend":"bob"}
+{"user":"alice","friend":"carol"}
+{"user":"bob","friend":"alice"}
+{"user":"carol","friend":"dave"}
+{"user":"dave","friend":"carol"}

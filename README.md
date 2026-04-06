@@ -32,6 +32,7 @@ ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
 | `datamog-backend-postgres` | Postgres backend (via `Bun.sql`) |
 | `datamog-backend-sqlite` | SQLite backend (via `bun:sqlite`, in-memory by default) |
 | `datamog-csv` | Loader plugin for populating extensional predicates from CSV files |
+| `datamog-jsonl` | Loader plugin for populating extensional predicates from JSONL files |
 | `datamog-cli` | Command-line interface for running Datamog programs |
 
 ## Usage
@@ -64,6 +65,7 @@ The CLI looks for `<predicate>.csv` files (e.g. `parent.csv`) in the same direct
 | `family` | Ancestor relation via transitive closure | `bun run datamog packages/cli/examples/family/family.dl` |
 | `graph` | Reachability in a directed graph | `bun run datamog packages/cli/examples/graph/graph.dl` |
 | `courses` | Transitive course prerequisites | `bun run datamog packages/cli/examples/courses/courses.dl` |
+| `social` | Mutual friends (JSONL data) | `bun run datamog packages/cli/examples/social/social.dl` |
 
 ### Programmatic API
 

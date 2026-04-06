@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import { analyze } from "datamog-core";
 import { CsvLoader } from "datamog-csv";
 import { type Backend, DatamogExecutor, translate } from "datamog-engine";
+import { JsonlLoader } from "datamog-jsonl";
 import { parse } from "datamog-parser";
 
 function usage(): never {
@@ -109,7 +110,10 @@ async function main() {
   }
 
   const backend = await createBackend(backendName);
-  const executor = new DatamogExecutor(backend, [new CsvLoader({ directory: csvDir })]);
+  const executor = new DatamogExecutor(backend, [
+    new CsvLoader({ directory: csvDir }),
+    new JsonlLoader({ directory: csvDir }),
+  ]);
 
   try {
     const results = await executor.execute(source);
