@@ -40,9 +40,9 @@ result.queries;      // SELECT statements for queries
 
 ```ts
 import { DatamogExecutor } from "datamog-engine";
-import { createSqliteBackend } from "datamog-backend-sqlite";
+import { create as createBackend } from "datamog-backend-sqlite";
 
-const backend = createSqliteBackend();
+const backend = createBackend();
 const executor = new DatamogExecutor(backend, [loader1, loader2]);
 const results = await executor.execute(source);
 await backend.close();

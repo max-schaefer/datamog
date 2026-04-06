@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
 import type { Backend } from "datamog-engine";
 
-export function createSqliteBackend(path = ":memory:"): Backend {
+export function create(path = ":memory:"): Backend {
   const db = new Database(path);
   return {
     dialect: "sqlite",

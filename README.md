@@ -70,9 +70,9 @@ The CLI looks for `<predicate>.csv` files (e.g. `parent.csv`) in the same direct
 ```ts
 import { DatamogExecutor } from "datamog-engine";
 import { CsvLoader } from "datamog-csv";
-import { createSqliteBackend } from "datamog-backend-sqlite";
+import { create as createBackend } from "datamog-backend-sqlite";
 
-const backend = createSqliteBackend();
+const backend = createBackend();
 const executor = new DatamogExecutor(backend, [
   new CsvLoader({ directory: "./data" }),
 ]);

@@ -1,6 +1,6 @@
 import type { Backend } from "datamog-engine";
 
-export function createPostgresBackend(): Backend {
+export function create(): Backend {
   const sql = Bun.sql;
   return {
     dialect: "postgres",

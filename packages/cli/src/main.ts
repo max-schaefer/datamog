@@ -26,11 +26,11 @@ type BackendName = "postgres" | "sqlite";
 
 async function createBackend(name: BackendName): Promise<Backend> {
   if (name === "postgres") {
-    const { createPostgresBackend } = await import("datamog-backend-postgres");
-    return createPostgresBackend();
+    const { create } = await import("datamog-backend-postgres");
+    return create();
   }
-  const { createSqliteBackend } = await import("datamog-backend-sqlite");
-  return createSqliteBackend();
+  const { create } = await import("datamog-backend-sqlite");
+  return create();
 }
 
 async function main() {
