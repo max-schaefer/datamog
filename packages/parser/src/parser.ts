@@ -97,10 +97,10 @@ export class Parser {
     let body: Atom[] = [];
     if (this.isAt(TokenType.Turnstile)) {
       this.advance();
-      body = [this.parseAtom()];
+      body = [this.parseBodyAtom()];
       while (this.isAt(TokenType.Comma)) {
         this.advance();
-        body.push(this.parseAtom());
+        body.push(this.parseBodyAtom());
       }
     }
 
@@ -124,6 +124,18 @@ export class Parser {
       atom,
       span: { ...start.span, end: this.tokens[this.pos - 1]!.span.end },
     };
+  }
+
+  private parseBodyAtom(): Atom {
+    const negated = this.isAt(TokenType.Not);
+    if (negated) {
+      this.advance();
+    }
+    const atom = this.parseAtom();
+    if (negated) {
+      return { ...atom, negated: true };
+    }
+    return atom;
   }
 
   private parseAtom(): Atom {

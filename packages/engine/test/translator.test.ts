@@ -163,6 +163,23 @@ describe("translator", () => {
     expect(viewSql).toContain('__b0."score" = 100');
   });
 
+  test("generates NOT EXISTS for negated atoms", () => {
+    const result = translateSource(`
+      extensional node(name: text).
+      extensional edge(src: text, dst: text).
+      reachable(X) :- edge("start", X).
+      unreachable(X) :- node(X), not reachable(X).
+    `);
+    const views = result.createViews;
+    const unreachableView = views.find((v) => norm(v).includes('"unreachable"'));
+    expect(unreachableView).toBeDefined();
+    const sql = norm(unreachableView!);
+    expect(sql).toContain("NOT EXISTS");
+    expect(sql).toContain('SELECT 1 FROM "reachable"');
+    // The subquery should bind to the outer variable
+    expect(sql).toContain('"col1" = __b0."name"');
+  });
+
   test("generates views with shared WITH RECURSIVE for mutual recursion", () => {
     const result = translateSource(`
       extensional base(x: integer).

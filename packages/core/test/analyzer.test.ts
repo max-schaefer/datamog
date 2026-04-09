@@ -124,6 +124,44 @@ describe("analyzer", () => {
     expect(result.queries[0]?.atom.predicate).toBe("ancestor");
   });
 
+  test("accepts stratified negation", () => {
+    const program = parse(`
+      extensional node(name: text).
+      extensional edge(src: text, dst: text).
+      reachable(X) :- edge("start", X).
+      reachable(X) :- edge(Y, X), reachable(Y).
+      unreachable(X) :- node(X), not reachable(X).
+    `);
+    const result = analyze(program);
+    expect(result.rules.has("unreachable")).toBe(true);
+    expect(result.negativeDependencies.get("unreachable")).toEqual(new Set(["reachable"]));
+  });
+
+  test("rejects unstratifiable negation", () => {
+    const program = parse(`
+      extensional base(x: text).
+      foo(X) :- base(X), not bar(X).
+      bar(X) :- base(X), not foo(X).
+    `);
+    expect(() => analyze(program)).toThrow(/not stratifiable/);
+  });
+
+  test("rejects self-negation", () => {
+    const program = parse(`
+      extensional base(x: text).
+      foo(X) :- base(X), not foo(X).
+    `);
+    expect(() => analyze(program)).toThrow(/not stratifiable/);
+  });
+
+  test("rejects unsafe negation", () => {
+    const program = parse(`
+      extensional base(x: text).
+      foo(X) :- base(X), not bar(X, Y).
+    `);
+    expect(() => analyze(program)).toThrow(/Unsafe negation.*Y/);
+  });
+
   test("handles facts (rules with empty body)", () => {
     const program = parse(`
       base("hello").

@@ -111,14 +111,25 @@ function translateRule(rule: Rule, analyzed: AnalyzedProgram): string {
     return translateFact(rule);
   }
 
-  const aliases = rule.body.map((_, i) => `__b${i}`);
-
-  // Build variable bindings: variable name -> list of (alias, column expression)
-  const bindings = new Map<string, { alias: string; col: string }[]>();
-
+  // Separate positive and negated body atoms
+  const positiveAtoms: { atom: (typeof rule.body)[number]; index: number }[] = [];
+  const negatedAtoms: { atom: (typeof rule.body)[number]; index: number }[] = [];
   for (let i = 0; i < rule.body.length; i++) {
     const atom = rule.body[i]!;
-    const alias = aliases[i]!;
+    if (atom.negated) {
+      negatedAtoms.push({ atom, index: i });
+    } else {
+      positiveAtoms.push({ atom, index: i });
+    }
+  }
+
+  const aliases = rule.body.map((_, i) => `__b${i}`);
+
+  // Build variable bindings from positive atoms only
+  const bindings = new Map<string, { alias: string; col: string }[]>();
+
+  for (const { atom, index } of positiveAtoms) {
+    const alias = aliases[index]!;
     for (let j = 0; j < atom.args.length; j++) {
       const term = atom.args[j]!;
       if (term.kind === "variable") {
@@ -148,13 +159,15 @@ function translateRule(rule: Rule, analyzed: AnalyzedProgram): string {
     }
   }
 
-  // FROM clause
-  const fromParts = rule.body.map((atom, i) => `${ident(atom.predicate)} AS ${aliases[i]}`);
+  // FROM clause: only positive atoms
+  const fromParts = positiveAtoms.map(
+    ({ atom, index }) => `${ident(atom.predicate)} AS ${aliases[index]}`,
+  );
 
   // WHERE clause: join conditions (shared variables) + constant conditions
   const conditions: string[] = [];
 
-  // Join conditions from shared variables
+  // Join conditions from shared variables (positive atoms only)
   for (const [, refs] of bindings) {
     for (let i = 1; i < refs.length; i++) {
       conditions.push(
@@ -163,10 +176,9 @@ function translateRule(rule: Rule, analyzed: AnalyzedProgram): string {
     }
   }
 
-  // Constant conditions
-  for (let i = 0; i < rule.body.length; i++) {
-    const atom = rule.body[i]!;
-    const alias = aliases[i]!;
+  // Constant conditions (positive atoms only)
+  for (const { atom, index } of positiveAtoms) {
+    const alias = aliases[index]!;
     for (let j = 0; j < atom.args.length; j++) {
       const term = atom.args[j]!;
       if (term.kind !== "variable") {
@@ -174,6 +186,29 @@ function translateRule(rule: Rule, analyzed: AnalyzedProgram): string {
         conditions.push(`${alias}.${ident(col)} = ${literalSql(term)}`);
       }
     }
+  }
+
+  // NOT EXISTS subqueries for negated atoms
+  for (const { atom } of negatedAtoms) {
+    const subConditions: string[] = [];
+    for (let j = 0; j < atom.args.length; j++) {
+      const term = atom.args[j]!;
+      const col = resolveColumnRef(atom.predicate, j, analyzed);
+      if (term.kind === "variable") {
+        // Bind to the outer query's variable
+        const refs = bindings.get(term.name);
+        if (refs && refs.length > 0) {
+          subConditions.push(`${ident(col)} = ${refs[0]!.alias}.${ident(refs[0]!.col)}`);
+        }
+      } else {
+        subConditions.push(`${ident(col)} = ${literalSql(term)}`);
+      }
+    }
+    let subquery = `SELECT 1 FROM ${ident(atom.predicate)}`;
+    if (subConditions.length > 0) {
+      subquery += ` WHERE ${subConditions.join(" AND ")}`;
+    }
+    conditions.push(`NOT EXISTS (${subquery})`);
   }
 
   let sql = `SELECT ${selectParts.join(", ")} FROM ${fromParts.join(", ")}`;

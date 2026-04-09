@@ -1,4 +1,4 @@
-import type { ExtDecl, Program, Query, Rule } from "./ast.ts";
+import type { Atom, ExtDecl, Program, Query, Rule } from "./ast.ts";
 
 export class AnalyzerError extends Error {
   constructor(message: string) {
@@ -14,6 +14,8 @@ export interface AnalyzedProgram {
   arities: Map<string, number>;
   queries: Query[];
   dependencies: Map<string, Set<string>>;
+  /** Negative dependencies: predicate p negatively depends on q if some rule for p has `not q(...)` in its body. */
+  negativeDependencies: Map<string, Set<string>>;
   recursivePredicates: Set<string>;
   /** Predicates grouped into strata (SCCs) in dependency order. */
   sortedStrata: string[][];
@@ -90,16 +92,29 @@ export function analyze(program: Program): AnalyzedProgram {
     checkAtomArity(query.atom.predicate, query.atom.args.length);
   }
 
-  // Build dependency graph (IDB predicates only)
+  // Safety check: every variable in a negated atom must appear in a positive body atom
+  for (const predicateRules of rules.values()) {
+    for (const rule of predicateRules) {
+      checkNegationSafety(rule);
+    }
+  }
+
+  // Build dependency graph (IDB predicates only), tracking positive and negative deps
   const dependencies = new Map<string, Set<string>>();
+  const negativeDependencies = new Map<string, Set<string>>();
   for (const [predicate, predicateRules] of rules) {
     const deps = new Set<string>();
+    const negDeps = new Set<string>();
     for (const rule of predicateRules) {
       for (const atom of rule.body) {
         deps.add(atom.predicate);
+        if (atom.negated) {
+          negDeps.add(atom.predicate);
+        }
       }
     }
     dependencies.set(predicate, deps);
+    negativeDependencies.set(predicate, negDeps);
   }
 
   // Find SCCs using Tarjan's algorithm
@@ -121,6 +136,26 @@ export function analyze(program: Program): AnalyzedProgram {
     }
   }
 
+  // Stratification check: no negation within an SCC
+  const sccOf = new Map<string, Set<string>>();
+  for (const scc of sccs) {
+    const sccSet = new Set(scc);
+    for (const pred of scc) {
+      sccOf.set(pred, sccSet);
+    }
+  }
+
+  for (const [predicate, negDeps] of negativeDependencies) {
+    const myScc = sccOf.get(predicate);
+    for (const dep of negDeps) {
+      if (myScc?.has(dep)) {
+        throw new AnalyzerError(
+          `Negation of '${dep}' in rules for '${predicate}' is not stratifiable (they are mutually recursive)`,
+        );
+      }
+    }
+  }
+
   // Tarjan's outputs SCCs with dependencies before dependents
   const sortedStrata = sccs;
 
@@ -130,9 +165,38 @@ export function analyze(program: Program): AnalyzedProgram {
     arities,
     queries,
     dependencies,
-    recursivePredicates,
+    negativeDependencies,
     sortedStrata,
+    recursivePredicates,
   };
+}
+
+/** Check that every variable in a negated atom also appears in a positive body atom. */
+function checkNegationSafety(rule: Rule) {
+  const negatedAtoms: Atom[] = [];
+  const positiveVars = new Set<string>();
+
+  for (const atom of rule.body) {
+    if (atom.negated) {
+      negatedAtoms.push(atom);
+    } else {
+      for (const arg of atom.args) {
+        if (arg.kind === "variable") {
+          positiveVars.add(arg.name);
+        }
+      }
+    }
+  }
+
+  for (const atom of negatedAtoms) {
+    for (const arg of atom.args) {
+      if (arg.kind === "variable" && !positiveVars.has(arg.name)) {
+        throw new AnalyzerError(
+          `Unsafe negation: variable '${arg.name}' in 'not ${atom.predicate}(...)' does not appear in a positive body atom`,
+        );
+      }
+    }
+  }
 }
 
 function tarjanSCC(rules: Map<string, Rule[]>, dependencies: Map<string, Set<string>>): string[][] {

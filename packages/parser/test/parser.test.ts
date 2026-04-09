@@ -120,6 +120,15 @@ describe("parser", () => {
     expect(rule.body[0]!.args[1]).toMatchObject({ kind: "variable", name: "X" });
   });
 
+  test("negated atom in rule body", () => {
+    const program = parse("foo(X) :- bar(X), not baz(X).");
+    const rule = program.statements[0] as Rule;
+    expect(rule.body).toHaveLength(2);
+    expect(rule.body[0]?.negated).toBeFalsy();
+    expect(rule.body[1]?.negated).toBe(true);
+    expect(rule.body[1]?.predicate).toBe("baz");
+  });
+
   test("preserves span on rule", () => {
     const program = parse("foo(X).");
     const rule = program.statements[0] as Rule;

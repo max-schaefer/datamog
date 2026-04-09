@@ -47,6 +47,7 @@ export interface Atom extends SourceElement {
   kind: "atom";
   predicate: string;
   args: Term[];
+  negated?: boolean;
 }
 
 // --- Statements ---

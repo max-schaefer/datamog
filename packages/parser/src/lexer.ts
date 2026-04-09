@@ -23,7 +23,9 @@ export enum TokenType {
   Turnstile = 16,
   QueryMark = 17,
 
-  EOF = 18,
+  Not = 19,
+
+  EOF = 20,
 }
 
 export interface Token {
@@ -34,6 +36,7 @@ export interface Token {
 
 const KEYWORDS: Record<string, TokenType> = {
   extensional: TokenType.Extensional,
+  not: TokenType.Not,
   text: TokenType.TextType,
   integer: TokenType.IntegerType,
   real: TokenType.RealType,

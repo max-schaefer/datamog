@@ -147,6 +147,12 @@ describe("lexer", () => {
     expect(tokens[2]?.value).toBe("_");
   });
 
+  test("not keyword is tokenized", () => {
+    const tokens = tokenize("not foo(X)");
+    expect(tokens[0]?.type).toBe(TokenType.Not);
+    expect(tokens[0]?.value).toBe("not");
+  });
+
   test("underscore-prefixed identifier is an ident", () => {
     const tokens = tokenize("_foo(X)");
     expect(tokens[0]?.type).toBe(TokenType.Ident);

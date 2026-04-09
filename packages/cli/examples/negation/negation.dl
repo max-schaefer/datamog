@@ -1,0 +1,14 @@
+% Stratified negation example
+% Find the "frontier" of a directed graph: nodes reachable from "a"
+% that have no outgoing edges.
+
+extensional edge(src: text, dst: text).
+
+reachable(X) :- edge("a", X).
+reachable(X) :- edge(Y, X), reachable(Y).
+
+has_outgoing(X) :- edge(X, _).
+
+frontier(X) :- reachable(X), not has_outgoing(X).
+
+?- frontier(X).
