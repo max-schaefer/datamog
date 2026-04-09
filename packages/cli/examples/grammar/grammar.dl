@@ -1,0 +1,20 @@
+% Recognizing a left-recursive grammar
+% Based on [Fitting & Doets, 1992]
+%
+% The recognizer parses the following grammar rules:
+%   A -> a
+%   A -> Ab
+%   A -> Aa
+%
+% The input string "ababa" is encoded as a sequence of transitions
+% t(position, symbol, next_position), where positions are numbered 1..6.
+%
+% Query: does the grammar accept the full string?
+
+extensional t(pos: integer, sym: text, next: integer).
+
+a(F, L) :- t(F, "a", L).
+a(F, L) :- a(F, M), t(M, "b", L).
+a(F, L) :- a(F, M), t(M, "a", L).
+
+?- a(1, 6).

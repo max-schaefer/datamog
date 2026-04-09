@@ -1,0 +1,38 @@
+% Farmer, Wolf, Goat, and Cabbage puzzle
+%
+% A farmer needs to ferry a wolf, a goat, and a cabbage across a river.
+% The boat can carry the farmer plus at most one item. If left unattended:
+%   - the wolf eats the goat
+%   - the goat eats the cabbage
+%
+% state(Farmer, Wolf, Goat, Cabbage) encodes the shore ("n" or "s") of each.
+% The puzzle starts with everyone on the north shore.
+%
+% A state is safe if:
+%   - the farmer is with the goat (so neither threat applies), OR
+%   - the farmer is not with the goat, but then wolf and cabbage are with farmer
+
+shore("n").
+shore("s").
+
+opp("n", "s").
+opp("s", "n").
+
+% Initial state: everyone on the north shore
+state("n", "n", "n", "n").
+
+% Farmer takes the wolf
+state(X, X, U, V) :- safe(X, X, U, V), opp(X, X1), state(X1, X1, U, V).
+% Farmer takes the goat
+state(X, Y, X, V) :- safe(X, Y, X, V), opp(X, X1), state(X1, Y, X1, V).
+% Farmer takes the cabbage
+state(X, Y, U, X) :- safe(X, Y, U, X), opp(X, X1), state(X1, Y, U, X1).
+% Farmer crosses alone
+state(X, Y, U, V) :- safe(X, Y, U, V), opp(X, X1), state(X1, Y, U, V).
+
+% Safety: farmer is with the goat — wolf and cabbage can be anywhere
+safe(X, Y, X, V) :- shore(X), shore(Y), shore(V).
+% Safety: farmer is not with the goat — wolf and cabbage must be with farmer
+safe(X, X, G, X) :- opp(X, G).
+
+?- state("s", "s", "s", "s").
