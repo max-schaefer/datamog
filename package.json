@@ -5,6 +5,7 @@
   "workspaces": ["packages/*", "packages/backend/*", "packages/loader/*"],
   "scripts": {
     "test": "bun test --recursive",
+    "typecheck": "tsc -b",
     "check": "bunx biome check .",
     "check:fix": "bunx biome check --fix .",
     "datamog": "bun packages/cli/src/main.ts"

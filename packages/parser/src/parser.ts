@@ -59,7 +59,7 @@ export class Parser {
       kind: "ext_decl",
       predicate,
       columns,
-      span: { ...start.span, end: this.tokens[this.pos - 1]?.span.end },
+      span: { ...start.span, end: this.tokens[this.pos - 1]!.span.end },
     };
   }
 
@@ -109,7 +109,7 @@ export class Parser {
       kind: "rule",
       head,
       body,
-      span: { ...head.span, end: this.tokens[this.pos - 1]?.span.end },
+      span: { ...head.span, end: this.tokens[this.pos - 1]!.span.end },
     };
   }
 
@@ -121,7 +121,7 @@ export class Parser {
     return {
       kind: "query",
       atom,
-      span: { ...start.span, end: this.tokens[this.pos - 1]?.span.end },
+      span: { ...start.span, end: this.tokens[this.pos - 1]!.span.end },
     };
   }
 

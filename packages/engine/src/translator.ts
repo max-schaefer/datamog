@@ -47,7 +47,7 @@ function translateViews(analyzed: AnalyzedProgram, dialect: Dialect): string[] {
   const views: string[] = [];
   for (const predicate of analyzed.sortedPredicates) {
     const rules = analyzed.rules.get(predicate)!;
-    const arity = rules[0]?.head.args.length;
+    const arity = rules[0]!.head.args.length;
     const isRecursive = analyzed.recursivePredicates.has(predicate);
 
     const ruleQueries = rules.map((rule) => translateRule(rule, analyzed));
@@ -111,7 +111,7 @@ function translateRule(rule: Rule, analyzed: AnalyzedProgram): string {
           `Unbound variable '${term.name}' in head of rule for '${rule.head.predicate}'`,
         );
       }
-      selectParts.push(`${refs[0]?.alias}.${ident(refs[0]?.col)} AS ${targetCol}`);
+      selectParts.push(`${refs[0]!.alias}.${ident(refs[0]!.col)} AS ${targetCol}`);
     } else {
       selectParts.push(`${literalSql(term)} AS ${targetCol}`);
     }
@@ -127,7 +127,7 @@ function translateRule(rule: Rule, analyzed: AnalyzedProgram): string {
   for (const [, refs] of bindings) {
     for (let i = 1; i < refs.length; i++) {
       conditions.push(
-        `${refs[0]?.alias}.${ident(refs[0]?.col)} = ${refs[i]?.alias}.${ident(refs[i]?.col)}`,
+        `${refs[0]!.alias}.${ident(refs[0]!.col)} = ${refs[i]!.alias}.${ident(refs[i]!.col)}`,
       );
     }
   }
@@ -197,7 +197,7 @@ function translateQueries(analyzed: AnalyzedProgram): string[] {
 function resolveColumnRef(predicate: string, argIndex: number, analyzed: AnalyzedProgram): string {
   const extDecl = analyzed.extDecls.get(predicate);
   if (extDecl) {
-    return extDecl.columns[argIndex]?.name;
+    return extDecl.columns[argIndex]!.name;
   }
   // IDB predicate: use positional column names
   return `col${argIndex + 1}`;
