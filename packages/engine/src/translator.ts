@@ -77,22 +77,57 @@ function translateViews(analyzed: AnalyzedProgram, dialect: Dialect): string[] {
         );
       }
     } else {
-      const cteParts = stratum.map((predicate) => {
-        const rules = analyzed.rules.get(predicate)!;
-        const arity = analyzed.arities.get(predicate)!;
-        const ruleQueries = rules.map((rule) => translateRule(rule, analyzed));
-        const unionBody = ruleQueries.join("\n    UNION\n  ");
-        const colNames = colList(arity);
-        return `  ${ident(predicate)}(${colNames}) AS (\n  ${unionBody}\n  )`;
-      });
-      const withBlock = `WITH RECURSIVE\n${cteParts.join(",\n")}`;
+      if (dialect === "sqlite") {
+        // SQLite does not support mutually recursive CTEs. We merge all
+        // predicates in the SCC into a single self-recursive CTE with a
+        // discriminator tag column, then create views that filter by tag.
+        const maxArity = Math.max(...stratum.map((p) => analyzed.arities.get(p)!));
+        const combinedName = `__mutual_${stratum.join("_")}`;
+        const combinedCols = `__tag, ${colList(maxArity)}`;
 
-      for (const predicate of stratum) {
-        if (dialect === "sqlite") {
+        // Build UNION of all rules, each tagged with its predicate name.
+        // References to sibling predicates in the SCC are rewritten to
+        // query the combined CTE with a tag filter.
+        const renameMap = new Map(stratum.map((p) => [p, combinedName]));
+        const tagMap = new Map(stratum.map((p) => [p, p]));
+
+        const unionParts: string[] = [];
+        for (const predicate of stratum) {
+          const rules = analyzed.rules.get(predicate)!;
+          const arity = analyzed.arities.get(predicate)!;
+          const padding = maxArity - arity;
+          const nullPad = padding > 0 ? `, ${Array(padding).fill("NULL").join(", ")}` : "";
+
+          for (const rule of rules) {
+            const ruleSql = translateRule(rule, analyzed, renameMap, tagMap);
+            unionParts.push(
+              `SELECT '${predicate}' AS __tag, ${ruleSql.replace(/^SELECT /, "")}${nullPad}`,
+            );
+          }
+        }
+
+        const unionBody = unionParts.join("\n    UNION\n  ");
+        const withBlock = `WITH RECURSIVE ${ident(combinedName)}(${combinedCols}) AS (\n  ${unionBody}\n  )`;
+
+        for (const predicate of stratum) {
+          const arity = analyzed.arities.get(predicate)!;
+          const selectCols = colList(arity);
           views.push(
-            `CREATE VIEW IF NOT EXISTS ${ident(predicate)} AS\n  ${withBlock}\n  SELECT * FROM ${ident(predicate)}\n;`,
+            `CREATE VIEW IF NOT EXISTS ${ident(predicate)} AS\n  ${withBlock}\n  SELECT ${selectCols} FROM ${ident(combinedName)} WHERE __tag = '${predicate}'\n;`,
           );
-        } else {
+        }
+      } else {
+        const cteParts = stratum.map((predicate) => {
+          const rules = analyzed.rules.get(predicate)!;
+          const arity = analyzed.arities.get(predicate)!;
+          const ruleQueries = rules.map((rule) => translateRule(rule, analyzed));
+          const unionBody = ruleQueries.join("\n    UNION\n  ");
+          const colNames = colList(arity);
+          return `  ${ident(predicate)}(${colNames}) AS (\n  ${unionBody}\n  )`;
+        });
+        const withBlock = `WITH RECURSIVE\n${cteParts.join(",\n")}`;
+
+        for (const predicate of stratum) {
           views.push(
             `CREATE OR REPLACE VIEW ${ident(predicate)} AS\n  ${withBlock}\n  SELECT * FROM ${ident(predicate)}\n;`,
           );
@@ -106,7 +141,17 @@ function translateViews(analyzed: AnalyzedProgram, dialect: Dialect): string[] {
 /** Variable binding: either a column reference or an SQL expression (from equality). */
 type Binding = { kind: "col"; alias: string; col: string } | { kind: "expr"; sql: string };
 
-function translateRule(rule: Rule, analyzed: AnalyzedProgram): string {
+/**
+ * Translate a single rule to a SQL SELECT statement.
+ * @param renameMap - Optional map from predicate name to table/CTE name (for SQLite mutual recursion)
+ * @param tagMap - Optional map from predicate name to tag value (for SQLite combined CTE discrimination)
+ */
+function translateRule(
+  rule: Rule,
+  analyzed: AnalyzedProgram,
+  renameMap?: Map<string, string>,
+  tagMap?: Map<string, string>,
+): string {
   if (rule.body.length === 0) {
     return translateFact(rule);
   }
@@ -181,17 +226,29 @@ function translateRule(rule: Rule, analyzed: AnalyzedProgram): string {
 
   // FROM clause: only positive atoms
   const fromParts = positiveAtoms.map(
-    ({ atom, index }) => `${ident(atom.predicate)} AS ${aliases[index]}`,
+    ({ atom, index }) =>
+      `${ident(renameMap?.get(atom.predicate) ?? atom.predicate)} AS ${aliases[index]}`,
   );
 
   // WHERE conditions
   const conditions: string[] = [];
 
-  // Join conditions from shared variables (column bindings only)
+  // Join conditions from shared variables
   for (const [, refs] of bindings) {
-    const colRefs = refs.filter((r) => r.kind === "col");
-    for (let i = 1; i < colRefs.length; i++) {
-      conditions.push(`${bindingToSql(colRefs[0]!)} = ${bindingToSql(colRefs[i]!)}`);
+    if (refs.length < 2) continue;
+    const first = refs[0]!;
+    for (let i = 1; i < refs.length; i++) {
+      conditions.push(`${bindingToSql(first)} = ${bindingToSql(refs[i]!)}`);
+    }
+  }
+
+  // Tag filter conditions for combined mutual-recursion CTE
+  if (tagMap) {
+    for (const { atom, index } of positiveAtoms) {
+      const tag = tagMap.get(atom.predicate);
+      if (tag) {
+        conditions.push(`${aliases[index]}."__tag" = '${tag}'`);
+      }
     }
   }
 
@@ -222,7 +279,11 @@ function translateRule(rule: Rule, analyzed: AnalyzedProgram): string {
         subConditions.push(`${ident(col)} = ${termToSql(term, bindings)}`);
       }
     }
-    let subquery = `SELECT 1 FROM ${ident(atom.predicate)}`;
+    const tag = tagMap?.get(atom.predicate);
+    if (tag) {
+      subConditions.push(`"__tag" = '${tag}'`);
+    }
+    let subquery = `SELECT 1 FROM ${ident(renameMap?.get(atom.predicate) ?? atom.predicate)}`;
     if (subConditions.length > 0) {
       subquery += ` WHERE ${subConditions.join(" AND ")}`;
     }

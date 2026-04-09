@@ -306,9 +306,14 @@ describe("translator (sqlite dialect)", () => {
       "sqlite",
     );
     expect(result.createViews).toHaveLength(2);
-    const evenView = result.createViews.find((v) => norm(v).includes('SELECT * FROM "even"'));
+    const evenView = result.createViews.find((v) => norm(v).includes('NOT EXISTS "even"'));
     expect(evenView).toBeDefined();
-    expect(norm(evenView!)).toContain("CREATE VIEW IF NOT EXISTS");
-    expect(norm(evenView!)).toContain("WITH RECURSIVE");
+    const sql = norm(evenView!);
+    expect(sql).toContain("CREATE VIEW IF NOT EXISTS");
+    expect(sql).toContain("WITH RECURSIVE");
+    // SQLite uses a combined CTE with tag discrimination for mutual recursion
+    expect(sql).toContain("__tag");
+    expect(sql).toContain("'even'");
+    expect(sql).toContain("'odd'");
   });
 });
