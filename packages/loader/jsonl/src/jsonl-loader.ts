@@ -1,6 +1,6 @@
 import { join } from "node:path";
-import type { ExtDecl, SqlType } from "datamog-core";
-import type { Backend, ExtensionalLoader, LoadResult } from "datamog-engine";
+import type { ExtDecl } from "datamog-core";
+import { type Backend, type ExtensionalLoader, type LoadResult, checkValue } from "datamog-engine";
 
 export interface JsonlLoaderOptions {
   directory: string;
@@ -48,7 +48,11 @@ export class JsonlLoader implements ExtensionalLoader {
             `${decl.predicate}.jsonl line ${lineIndex + 1}: missing field '${col.name}'`,
           );
         }
-        row[col.name] = coerce(obj[col.name], col.type);
+        row[col.name] = checkValue(
+          obj[col.name],
+          col.type,
+          `${decl.predicate}.jsonl line ${lineIndex + 1}, column '${col.name}'`,
+        );
       }
       return row;
     });
@@ -57,20 +61,4 @@ export class JsonlLoader implements ExtensionalLoader {
   private filePath(decl: ExtDecl): string {
     return join(this.directory, `${decl.predicate}.jsonl`);
   }
-}
-
-function coerce(value: unknown, type: SqlType): unknown {
-  if (typeof value === "string") {
-    switch (type) {
-      case "text":
-        return value;
-      case "integer":
-        return Number.parseInt(value, 10);
-      case "real":
-        return Number.parseFloat(value);
-      case "boolean":
-        return ["true", "1", "yes"].includes(value.toLowerCase());
-    }
-  }
-  return value;
 }

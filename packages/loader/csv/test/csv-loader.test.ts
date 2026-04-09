@@ -112,6 +112,20 @@ describe("CsvLoader", () => {
     expect(loader.readRows(decl)).rejects.toThrow(/expected 2 fields but got 1/);
   });
 
+  test("rejects invalid integer value", async () => {
+    await Bun.write(join(tempDir, "t.csv"), "val\nhello\n");
+    const loader = new CsvLoader({ directory: tempDir });
+    const decl = getExtDecl("extensional t(val: integer).");
+    expect(loader.readRows(decl)).rejects.toThrow(/Invalid integer/);
+  });
+
+  test("rejects invalid real value", async () => {
+    await Bun.write(join(tempDir, "t.csv"), "val\nabc\n");
+    const loader = new CsvLoader({ directory: tempDir });
+    const decl = getExtDecl("extensional t(val: real).");
+    expect(loader.readRows(decl)).rejects.toThrow(/Invalid real/);
+  });
+
   test("load calls sql with correct inserts", async () => {
     await Bun.write(join(tempDir, "parent.csv"), "name,child\nalice,bob\n");
     const loader = new CsvLoader({ directory: tempDir });

@@ -49,15 +49,7 @@ describe("JsonlLoader", () => {
     ]);
   });
 
-  test("coerces types based on ext declaration", async () => {
-    await Bun.write(join(tempDir, "t.jsonl"), '{"a":"hello","b":"42","c":"3.14","d":"true"}\n');
-    const loader = new JsonlLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional t(a: text, b: integer, c: real, d: boolean).");
-    const rows = await loader.readRows(decl);
-    expect(rows).toEqual([{ a: "hello", b: 42, c: 3.14, d: true }]);
-  });
-
-  test("passes through already-typed values", async () => {
+  test("validates native JSON types", async () => {
     await Bun.write(join(tempDir, "t.jsonl"), '{"a":"hello","b":42,"c":3.14,"d":true}\n');
     const loader = new JsonlLoader({ directory: tempDir });
     const decl = getExtDecl("extensional t(a: text, b: integer, c: real, d: boolean).");
@@ -78,6 +70,20 @@ describe("JsonlLoader", () => {
     const loader = new JsonlLoader({ directory: tempDir });
     const decl = getExtDecl("extensional parent(name: text, child: text).");
     expect(loader.readRows(decl)).rejects.toThrow(/missing field 'child'/);
+  });
+
+  test("rejects wrong type in JSONL", async () => {
+    await Bun.write(join(tempDir, "t.jsonl"), '{"val":"hello"}\n');
+    const loader = new JsonlLoader({ directory: tempDir });
+    const decl = getExtDecl("extensional t(val: integer).");
+    expect(loader.readRows(decl)).rejects.toThrow(/Expected integer/);
+  });
+
+  test("rejects stringified number in JSONL", async () => {
+    await Bun.write(join(tempDir, "t.jsonl"), '{"val":"42"}\n');
+    const loader = new JsonlLoader({ directory: tempDir });
+    const decl = getExtDecl("extensional t(val: integer).");
+    expect(loader.readRows(decl)).rejects.toThrow(/Expected integer/);
   });
 
   test("load calls backend with correct inserts", async () => {

@@ -1,6 +1,6 @@
 import { join } from "node:path";
-import type { ExtDecl, SqlType } from "datamog-core";
-import type { Backend, ExtensionalLoader, LoadResult } from "datamog-engine";
+import type { ExtDecl } from "datamog-core";
+import { type Backend, type ExtensionalLoader, type LoadResult, coerceValue } from "datamog-engine";
 
 export interface CsvLoaderOptions {
   directory: string;
@@ -66,7 +66,12 @@ export class CsvLoader implements ExtensionalLoader {
       const row: Record<string, unknown> = {};
       for (let i = 0; i < decl.columns.length; i++) {
         const col = decl.columns[i]!;
-        row[col.name] = coerce(fields[i]!, col.type);
+        const lineNum = this.hasHeader ? lineIndex + 2 : lineIndex + 1;
+        row[col.name] = coerceValue(
+          fields[i]!,
+          col.type,
+          `${decl.predicate}.csv line ${lineNum}, column '${col.name}'`,
+        );
       }
       return row;
     });
@@ -117,18 +122,5 @@ export class CsvLoader implements ExtensionalLoader {
     }
 
     return fields;
-  }
-}
-
-function coerce(value: string, type: SqlType): unknown {
-  switch (type) {
-    case "text":
-      return value;
-    case "integer":
-      return Number.parseInt(value, 10);
-    case "real":
-      return Number.parseFloat(value);
-    case "boolean":
-      return ["true", "1", "yes"].includes(value.toLowerCase());
   }
 }

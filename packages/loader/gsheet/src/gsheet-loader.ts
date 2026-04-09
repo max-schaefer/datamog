@@ -1,5 +1,5 @@
-import type { ExtDecl, SqlType } from "datamog-core";
-import type { Backend, ExtensionalLoader, LoadResult } from "datamog-engine";
+import type { ExtDecl } from "datamog-core";
+import { type Backend, type ExtensionalLoader, type LoadResult, coerceValue } from "datamog-engine";
 
 export interface SheetConfig {
   spreadsheetId: string;
@@ -86,22 +86,13 @@ export class GSheetLoader implements ExtensionalLoader {
         const col = decl.columns[i]!;
         const idx = colIndexes[i]!;
         const raw = idx >= 0 ? (row[idx] ?? "") : "";
-        result[col.name] = coerce(raw, col.type);
+        result[col.name] = coerceValue(
+          raw,
+          col.type,
+          `sheet '${decl.predicate}', column '${col.name}'`,
+        );
       }
       return result;
     });
-  }
-}
-
-function coerce(value: string, type: SqlType): unknown {
-  switch (type) {
-    case "text":
-      return value;
-    case "integer":
-      return Number.parseInt(value, 10);
-    case "real":
-      return Number.parseFloat(value);
-    case "boolean":
-      return ["true", "1", "yes"].includes(value.toLowerCase());
   }
 }
