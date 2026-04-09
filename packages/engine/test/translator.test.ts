@@ -128,6 +128,17 @@ describe("translator", () => {
     expect(sql).toContain('__b0."name" AS col1');
   });
 
+  test("don't-care variables do not create join conditions", () => {
+    const result = translateSource(`
+      extensional parent(name: text, child: text).
+      has_child(X) :- parent(X, _).
+    `);
+    const sql = norm(result.createViews[0]!);
+    // The _ should not produce a join — just select X from parent
+    expect(sql).toContain('__b0."name" AS col1');
+    expect(sql).not.toContain("WHERE");
+  });
+
   test("views are ordered by dependencies", () => {
     const result = translateSource(`
       extensional edge(src: text, dst: text).

@@ -140,4 +140,16 @@ describe("lexer", () => {
   test("unexpected character throws", () => {
     expect(() => tokenize("@")).toThrow();
   });
+
+  test("bare underscore is a variable", () => {
+    const tokens = tokenize("foo(_, X)");
+    expect(tokens[2]?.type).toBe(TokenType.Variable);
+    expect(tokens[2]?.value).toBe("_");
+  });
+
+  test("underscore-prefixed identifier is an ident", () => {
+    const tokens = tokenize("_foo(X)");
+    expect(tokens[0]?.type).toBe(TokenType.Ident);
+    expect(tokens[0]?.value).toBe("_foo");
+  });
 });

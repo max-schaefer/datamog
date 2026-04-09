@@ -104,6 +104,22 @@ describe("parser", () => {
     expect(() => parse("foo(X.")).toThrow();
   });
 
+  test("don't-care variables get unique names", () => {
+    const program = parse("foo(_, _) :- bar(_, X).");
+    const rule = program.statements[0] as Rule;
+    const headArgs = rule.head.args;
+    expect(headArgs[0]).toMatchObject({ kind: "variable" });
+    expect(headArgs[1]).toMatchObject({ kind: "variable" });
+    // Each _ should have a distinct generated name
+    expect((headArgs[0] as { name: string }).name).not.toBe((headArgs[1] as { name: string }).name);
+    // Body _ should also be distinct from head _s
+    const bodyArg = rule.body[0]!.args[0]!;
+    expect(bodyArg).toMatchObject({ kind: "variable" });
+    expect((bodyArg as { name: string }).name).not.toBe((headArgs[0] as { name: string }).name);
+    // Named variable X should be preserved
+    expect(rule.body[0]!.args[1]).toMatchObject({ kind: "variable", name: "X" });
+  });
+
   test("preserves span on rule", () => {
     const program = parse("foo(X).");
     const rule = program.statements[0] as Rule;

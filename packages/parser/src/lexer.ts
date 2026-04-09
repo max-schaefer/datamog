@@ -184,7 +184,7 @@ export function tokenize(source: string): Token[] {
       const kw = KEYWORDS[value];
       if (kw !== undefined) {
         tokens.push({ type: kw, value, span: span(startPos, startLine, startCol) });
-      } else if (isUpper(value[0]!)) {
+      } else if (isUpper(value[0]!) || value === "_") {
         tokens.push({ type: TokenType.Variable, value, span: span(startPos, startLine, startCol) });
       } else {
         tokens.push({ type: TokenType.Ident, value, span: span(startPos, startLine, startCol) });

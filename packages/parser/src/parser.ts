@@ -14,6 +14,7 @@ import { type Token, TokenType } from "./lexer.ts";
 
 export class Parser {
   private pos = 0;
+  private anonCounter = 0;
 
   constructor(private tokens: Token[]) {}
 
@@ -148,9 +149,11 @@ export class Parser {
   private parseTerm(): Term {
     const token = this.peek();
     switch (token.type) {
-      case TokenType.Variable:
+      case TokenType.Variable: {
         this.advance();
-        return { kind: "variable", name: token.value, span: token.span };
+        const name = token.value === "_" ? `_${this.anonCounter++}` : token.value;
+        return { kind: "variable", name, span: token.span };
+      }
       case TokenType.String:
         this.advance();
         return { kind: "string", value: token.value, span: token.span };
