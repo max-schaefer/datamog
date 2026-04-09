@@ -118,6 +118,16 @@ describe("translator", () => {
     expect(sql).toContain("'hello'");
   });
 
+  test("handles constants in rule head", () => {
+    const result = translateSource(`
+      extensional items(name: text).
+      tagged(X, "yes") :- items(X).
+    `);
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("'yes' AS col2");
+    expect(sql).toContain('__b0."name" AS col1');
+  });
+
   test("views are ordered by dependencies", () => {
     const result = translateSource(`
       extensional edge(src: text, dst: text).
