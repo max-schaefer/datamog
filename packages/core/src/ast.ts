@@ -1,28 +1,33 @@
-export interface Span {
+export interface SourcePosition {
+  /** 0-based byte offset of the first character in the source string. */
   start: number;
+  /** 0-based byte offset one past the last character (exclusive). */
   end: number;
+  /** 1-based line number of the first character. */
   line: number;
+  /** 1-based column number of the first character. */
   column: number;
+}
+
+export interface SourceElement {
+  span: SourcePosition;
 }
 
 // --- Terms ---
 
-export interface Variable {
+export interface Variable extends SourceElement {
   kind: "variable";
   name: string;
-  span: Span;
 }
 
-export interface StringLiteral {
+export interface StringLiteral extends SourceElement {
   kind: "string";
   value: string;
-  span: Span;
 }
 
-export interface NumberLiteral {
+export interface NumberLiteral extends SourceElement {
   kind: "number";
   value: number;
-  span: Span;
 }
 
 export type Term = Variable | StringLiteral | NumberLiteral;
@@ -38,33 +43,29 @@ export interface ColumnDecl {
 
 // --- Atoms ---
 
-export interface Atom {
+export interface Atom extends SourceElement {
   kind: "atom";
   predicate: string;
   args: Term[];
-  span: Span;
 }
 
 // --- Statements ---
 
-export interface ExtDecl {
+export interface ExtDecl extends SourceElement {
   kind: "ext_decl";
   predicate: string;
   columns: ColumnDecl[];
-  span: Span;
 }
 
-export interface Rule {
+export interface Rule extends SourceElement {
   kind: "rule";
   head: Atom;
   body: Atom[];
-  span: Span;
 }
 
-export interface Query {
+export interface Query extends SourceElement {
   kind: "query";
   atom: Atom;
-  span: Span;
 }
 
 export type Statement = ExtDecl | Rule | Query;

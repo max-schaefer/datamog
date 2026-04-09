@@ -6,11 +6,12 @@ export type {
   Program,
   Query,
   Rule,
-  Span,
+  SourceElement,
+  SourcePosition,
   SqlType,
   Statement,
   StringLiteral,
   Term,
   Variable,
 } from "./ast.ts";
-export { analyze, type AnalyzedProgram } from "./analyzer.ts";
+export { analyze, AnalyzerError, type AnalyzedProgram } from "./analyzer.ts";

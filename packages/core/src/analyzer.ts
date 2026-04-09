@@ -1,5 +1,12 @@
 import type { ExtDecl, Program, Query, Rule } from "./ast.ts";
 
+export class AnalyzerError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AnalyzerError";
+  }
+}
+
 export interface AnalyzedProgram {
   extDecls: Map<string, ExtDecl>;
   rules: Map<string, Rule[]>;
@@ -18,6 +25,11 @@ export function analyze(program: Program): AnalyzedProgram {
   for (const stmt of program.statements) {
     switch (stmt.kind) {
       case "ext_decl":
+        if (extDecls.has(stmt.predicate)) {
+          throw new AnalyzerError(
+            `Predicate '${stmt.predicate}' is declared as extensional multiple times`,
+          );
+        }
         extDecls.set(stmt.predicate, stmt);
         break;
       case "rule": {
@@ -38,7 +50,9 @@ export function analyze(program: Program): AnalyzedProgram {
   // Check no predicate is both EDB and IDB
   for (const predicate of rules.keys()) {
     if (extDecls.has(predicate)) {
-      throw new Error(`Predicate '${predicate}' is declared as both extensional and intensional`);
+      throw new AnalyzerError(
+        `Predicate '${predicate}' is declared as both extensional and intensional`,
+      );
     }
   }
 
@@ -61,7 +75,7 @@ export function analyze(program: Program): AnalyzedProgram {
   const recursivePredicates = new Set<string>();
   for (const scc of sccs) {
     if (scc.length > 1) {
-      throw new Error(`Mutual recursion is not supported (predicates: ${scc.join(", ")})`);
+      throw new AnalyzerError(`Mutual recursion is not supported (predicates: ${scc.join(", ")})`);
     }
     const pred = scc[0]!;
     const deps = dependencies.get(pred);

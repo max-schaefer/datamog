@@ -19,6 +19,6 @@
     }
   },
   "files": {
-    "ignore": ["node_modules", "dist", "*.lockb"]
+    "ignore": ["node_modules", "dist", "*.lockb", ".claude"]
   }
 }

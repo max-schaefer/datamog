@@ -43,6 +43,14 @@ describe("analyzer", () => {
     expect(result.recursivePredicates.has("grandparent")).toBe(false);
   });
 
+  test("errors on duplicate extensional declaration", () => {
+    const program = parse(`
+      extensional parent(name: text, child: text).
+      extensional parent(name: text, child: text).
+    `);
+    expect(() => analyze(program)).toThrow(/multiple times/);
+  });
+
   test("errors on predicate that is both EDB and IDB", () => {
     const program = parse(`
       extensional parent(name: text, child: text).

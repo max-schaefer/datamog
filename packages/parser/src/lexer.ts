@@ -1,4 +1,4 @@
-import type { Span } from "datamog-core";
+import type { SourcePosition } from "datamog-core";
 import { ParseError } from "./errors.ts";
 
 export enum TokenType {
@@ -29,7 +29,7 @@ export enum TokenType {
 export interface Token {
   type: TokenType;
   value: string;
-  span: Span;
+  span: SourcePosition;
 }
 
 const KEYWORDS: Record<string, TokenType> = {
@@ -62,7 +62,7 @@ export function tokenize(source: string): Token[] {
   let line = 1;
   let column = 1;
 
-  function span(start: number, startLine: number, startCol: number): Span {
+  function span(start: number, startLine: number, startCol: number): SourcePosition {
     return { start, end: pos, line: startLine, column: startCol };
   }
 
