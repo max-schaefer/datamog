@@ -1,0 +1,48 @@
+% Bill of Materials — bicycle supply chain
+% Adapted from [Zaniolo, Ceri, Faloutsos, Snodgrass, Subrahmanian, Zicari, 1997]
+%
+% Models a bicycle as a hierarchy of assemblies and parts, with supplier
+% costs and delivery times. Demonstrates transitive closure, negation
+% for extremal queries, and arithmetic comparisons.
+
+extensional assembly(part: text, subpart: text, qty: integer).
+extensional part_cost(part: text, supplier: text, cost: real, time: integer).
+
+% Transitive closure: find all subparts of a given assembly
+all_subparts(Part, Sub) :- assembly(Part, Sub, _).
+all_subparts(Part, Sub2) :- all_subparts(Part, Sub1), assembly(Sub1, Sub2, _).
+
+% A basic subpart is a leaf — it appears in part_cost but not as an assembly
+basic_subparts(B, B) :- part_cost(B, _, _, _).
+basic_subparts(Prt, B) :- assembly(Prt, Sub, _), basic_subparts(Sub, B).
+
+% A part has a faster supplier if someone can deliver in less time
+faster(Part, Time) :-
+  part_cost(Part, _, _, Time),
+  part_cost(Part, _, _, Time1),
+  Time1 < Time.
+
+% Fastest delivery: no one is faster
+fastest(Part, Time) :-
+  part_cost(Part, _, _, Time),
+  not faster(Part, Time).
+
+% For each assembly, the delivery times of its basic subparts
+time_for_basic(AssPart, BasicSub, Time) :-
+  basic_subparts(AssPart, BasicSub),
+  fastest(BasicSub, Time).
+
+% A part has a larger delivery time if some basic subpart takes longer
+larger(Part, Time) :-
+  time_for_basic(Part, _, Time),
+  time_for_basic(Part, _, Time1),
+  Time1 > Time.
+
+% How soon can we build an assembly? Limited by the slowest basic subpart.
+how_soon(AssPart, Time) :-
+  time_for_basic(AssPart, _, Time),
+  not larger(AssPart, Time).
+
+?- all_subparts("bike", X).
+?- fastest(Part, Time).
+?- how_soon("bike", Time).

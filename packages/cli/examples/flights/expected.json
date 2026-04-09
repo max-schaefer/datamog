@@ -1,0 +1,24 @@
+[
+  [
+    {
+      "X": "london",
+      "Y": "new_york",
+      "T": 9
+    },
+    {
+      "X": "madrid",
+      "Y": "paris",
+      "T": 1.5
+    },
+    {
+      "X": "paris",
+      "Y": "new_york",
+      "T": 10
+    },
+    {
+      "X": "madrid",
+      "Y": "new_york",
+      "T": 11.5
+    }
+  ]
+]

@@ -91,7 +91,12 @@ function translateViews(analyzed: AnalyzedProgram, dialect: Dialect): string[] {
         const renameMap = new Map(stratum.map((p) => [p, combinedName]));
         const tagMap = new Map(stratum.map((p) => [p, p]));
 
-        const unionParts: string[] = [];
+        // SQLite requires non-recursive (base) terms before recursive terms
+        // in a WITH RECURSIVE UNION, so we partition rules into base cases
+        // (facts / rules that don't reference the SCC) and recursive cases.
+        const stratumSet = new Set(stratum);
+        const baseParts: string[] = [];
+        const recParts: string[] = [];
         for (const predicate of stratum) {
           const rules = analyzed.rules.get(predicate)!;
           const arity = analyzed.arities.get(predicate)!;
@@ -99,12 +104,21 @@ function translateViews(analyzed: AnalyzedProgram, dialect: Dialect): string[] {
           const nullPad = padding > 0 ? `, ${Array(padding).fill("NULL").join(", ")}` : "";
 
           for (const rule of rules) {
+            const isRecursive =
+              rule.body.length > 0 &&
+              rule.body.some(
+                (elem) => elem.kind === "atom" && !elem.negated && stratumSet.has(elem.predicate),
+              );
             const ruleSql = translateRule(rule, analyzed, renameMap, tagMap);
-            unionParts.push(
-              `SELECT '${predicate}' AS __tag, ${ruleSql.replace(/^SELECT /, "")}${nullPad}`,
-            );
+            const part = `SELECT '${predicate}' AS __tag, ${ruleSql.replace(/^SELECT /, "")}${nullPad}`;
+            if (isRecursive) {
+              recParts.push(part);
+            } else {
+              baseParts.push(part);
+            }
           }
         }
+        const unionParts = [...baseParts, ...recParts];
 
         const unionBody = unionParts.join("\n    UNION\n  ");
         const withBlock = `WITH RECURSIVE ${ident(combinedName)}(${combinedCols}) AS (\n  ${unionBody}\n  )`;

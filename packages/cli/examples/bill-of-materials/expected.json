@@ -1,0 +1,97 @@
+[
+  [
+    {
+      "X": "frame"
+    },
+    {
+      "X": "wheel"
+    },
+    {
+      "X": "chain_stay"
+    },
+    {
+      "X": "down_tube"
+    },
+    {
+      "X": "fork"
+    },
+    {
+      "X": "head_tube"
+    },
+    {
+      "X": "seat_mast"
+    },
+    {
+      "X": "seat_stay"
+    },
+    {
+      "X": "top_tube"
+    },
+    {
+      "X": "hub"
+    },
+    {
+      "X": "nipple"
+    },
+    {
+      "X": "rim"
+    },
+    {
+      "X": "spoke"
+    },
+    {
+      "X": "tire"
+    }
+  ],
+  [
+    {
+      "Part": "top_tube",
+      "Time": 6
+    },
+    {
+      "Part": "down_tube",
+      "Time": 6
+    },
+    {
+      "Part": "head_tube",
+      "Time": 6
+    },
+    {
+      "Part": "seat_mast",
+      "Time": 6
+    },
+    {
+      "Part": "seat_stay",
+      "Time": 6
+    },
+    {
+      "Part": "chain_stay",
+      "Time": 6
+    },
+    {
+      "Part": "fork",
+      "Time": 6
+    },
+    {
+      "Part": "spoke",
+      "Time": 15
+    },
+    {
+      "Part": "nipple",
+      "Time": 3
+    },
+    {
+      "Part": "hub",
+      "Time": 5
+    },
+    {
+      "Part": "rim",
+      "Time": 1
+    }
+  ],
+  [
+    {
+      "Time": 15
+    }
+  ]
+]
