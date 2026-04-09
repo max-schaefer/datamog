@@ -1,4 +1,4 @@
-import type { AnalyzedProgram, Atom, ExtDecl, Rule, Term } from "datamog-core";
+import type { AnalyzedProgram, Rule, Term } from "datamog-core";
 
 export type Dialect = "postgres" | "sqlite";
 

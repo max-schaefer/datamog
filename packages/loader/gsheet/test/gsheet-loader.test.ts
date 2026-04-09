@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
 import type { ExtDecl } from "datamog-core";
 import { parse } from "datamog-parser";
 import { GSheetLoader } from "../src/gsheet-loader.ts";
