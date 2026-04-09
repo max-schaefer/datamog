@@ -141,6 +141,42 @@ describe("translator", () => {
     const viewSql = norm(result.createViews[0]!);
     expect(viewSql).toContain('__b0."score" = 100');
   });
+
+  test("generates views with shared WITH RECURSIVE for mutual recursion", () => {
+    const result = translateSource(`
+      extensional base(x: integer).
+      even(X) :- base(X).
+      even(X) :- odd(X).
+      odd(X) :- even(X).
+    `);
+    // One view per predicate in the mutually recursive group
+    expect(result.createViews).toHaveLength(2);
+    const evenView = result.createViews.find((v) => norm(v).includes('VIEW "even"'));
+    const oddView = result.createViews.find((v) => norm(v).includes('VIEW "odd"'));
+    expect(evenView).toBeDefined();
+    expect(oddView).toBeDefined();
+    // Both should contain WITH RECURSIVE with both CTEs
+    expect(norm(evenView!)).toContain("WITH RECURSIVE");
+    expect(norm(evenView!)).toContain('"even"(col1)');
+    expect(norm(evenView!)).toContain('"odd"(col1)');
+    expect(norm(evenView!)).toContain('SELECT * FROM "even"');
+    expect(norm(oddView!)).toContain('SELECT * FROM "odd"');
+  });
+
+  test("mutual recursion with dependent non-recursive predicate", () => {
+    const result = translateSource(`
+      extensional base(x: integer).
+      even(X) :- base(X).
+      even(X) :- odd(X).
+      odd(X) :- even(X).
+      all_even(X) :- even(X).
+    `);
+    // 2 views for even/odd (mutual recursion) + 1 for all_even
+    expect(result.createViews).toHaveLength(3);
+    const allEvenView = result.createViews.find((v) => norm(v).includes('VIEW "all_even"'));
+    expect(allEvenView).toBeDefined();
+    expect(norm(allEvenView!)).not.toContain("RECURSIVE");
+  });
 });
 
 describe("translator (sqlite dialect)", () => {
@@ -171,5 +207,22 @@ describe("translator (sqlite dialect)", () => {
     expect(sql).toContain("CREATE VIEW IF NOT EXISTS");
     expect(sql).toContain("WITH RECURSIVE");
     expect(sql).toContain('SELECT * FROM "ancestor"');
+  });
+
+  test("generates WITH RECURSIVE for mutual recursion", () => {
+    const result = translateSource(
+      `
+      extensional base(x: integer).
+      even(X) :- base(X).
+      even(X) :- odd(X).
+      odd(X) :- even(X).
+    `,
+      "sqlite",
+    );
+    expect(result.createViews).toHaveLength(2);
+    const evenView = result.createViews.find((v) => norm(v).includes('SELECT * FROM "even"'));
+    expect(evenView).toBeDefined();
+    expect(norm(evenView!)).toContain("CREATE VIEW IF NOT EXISTS");
+    expect(norm(evenView!)).toContain("WITH RECURSIVE");
   });
 });

@@ -45,16 +45,30 @@ function translateTables(analyzed: AnalyzedProgram): string[] {
 
 function translateViews(analyzed: AnalyzedProgram, dialect: Dialect): string[] {
   const views: string[] = [];
-  for (const predicate of analyzed.sortedPredicates) {
-    const rules = analyzed.rules.get(predicate)!;
-    const arity = rules[0]!.head.args.length;
-    const isRecursive = analyzed.recursivePredicates.has(predicate);
+  for (const stratum of analyzed.sortedStrata) {
+    const isRecursive = analyzed.recursivePredicates.has(stratum[0]!);
 
-    const ruleQueries = rules.map((rule) => translateRule(rule, analyzed));
-    const unionBody = ruleQueries.join("\n  UNION\n");
+    if (!isRecursive) {
+      // Non-recursive: single predicate, plain view
+      const predicate = stratum[0]!;
+      const rules = analyzed.rules.get(predicate)!;
+      const ruleQueries = rules.map((rule) => translateRule(rule, analyzed));
+      const unionBody = ruleQueries.join("\n  UNION\n");
 
-    if (isRecursive) {
+      if (dialect === "sqlite") {
+        views.push(`CREATE VIEW IF NOT EXISTS ${ident(predicate)} AS\n  ${unionBody}\n;`);
+      } else {
+        views.push(`CREATE OR REPLACE VIEW ${ident(predicate)} AS\n  ${unionBody}\n;`);
+      }
+    } else if (stratum.length === 1) {
+      // Self-recursive: single predicate with WITH RECURSIVE
+      const predicate = stratum[0]!;
+      const rules = analyzed.rules.get(predicate)!;
+      const arity = rules[0]!.head.args.length;
+      const ruleQueries = rules.map((rule) => translateRule(rule, analyzed));
+      const unionBody = ruleQueries.join("\n  UNION\n");
       const colNames = colList(arity);
+
       if (dialect === "sqlite") {
         views.push(
           `CREATE VIEW IF NOT EXISTS ${ident(predicate)} AS\n  WITH RECURSIVE ${ident(predicate)}(${colNames}) AS (\n  ${unionBody}\n  )\n  SELECT * FROM ${ident(predicate)}\n;`,
@@ -65,10 +79,27 @@ function translateViews(analyzed: AnalyzedProgram, dialect: Dialect): string[] {
         );
       }
     } else {
-      if (dialect === "sqlite") {
-        views.push(`CREATE VIEW IF NOT EXISTS ${ident(predicate)} AS\n  ${unionBody}\n;`);
-      } else {
-        views.push(`CREATE OR REPLACE VIEW ${ident(predicate)} AS\n  ${unionBody}\n;`);
+      // Mutually recursive: multiple predicates sharing a WITH RECURSIVE block
+      const cteParts = stratum.map((predicate) => {
+        const rules = analyzed.rules.get(predicate)!;
+        const arity = rules[0]!.head.args.length;
+        const ruleQueries = rules.map((rule) => translateRule(rule, analyzed));
+        const unionBody = ruleQueries.join("\n    UNION\n  ");
+        const colNames = colList(arity);
+        return `  ${ident(predicate)}(${colNames}) AS (\n  ${unionBody}\n  )`;
+      });
+      const withBlock = `WITH RECURSIVE\n${cteParts.join(",\n")}`;
+
+      for (const predicate of stratum) {
+        if (dialect === "sqlite") {
+          views.push(
+            `CREATE VIEW IF NOT EXISTS ${ident(predicate)} AS\n  ${withBlock}\n  SELECT * FROM ${ident(predicate)}\n;`,
+          );
+        } else {
+          views.push(
+            `CREATE OR REPLACE VIEW ${ident(predicate)} AS\n  ${withBlock}\n  SELECT * FROM ${ident(predicate)}\n;`,
+          );
+        }
       }
     }
   }

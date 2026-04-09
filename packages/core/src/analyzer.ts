@@ -13,7 +13,8 @@ export interface AnalyzedProgram {
   queries: Query[];
   dependencies: Map<string, Set<string>>;
   recursivePredicates: Set<string>;
-  sortedPredicates: string[];
+  /** Predicates grouped into strata (SCCs) in dependency order. */
+  sortedStrata: string[][];
 }
 
 export function analyze(program: Program): AnalyzedProgram {
@@ -71,21 +72,24 @@ export function analyze(program: Program): AnalyzedProgram {
   // Find SCCs using Tarjan's algorithm
   const sccs = tarjanSCC(rules, dependencies);
 
-  // Detect recursion
+  // Detect recursion: an SCC is recursive if it has >1 member or a self-loop
   const recursivePredicates = new Set<string>();
   for (const scc of sccs) {
     if (scc.length > 1) {
-      throw new AnalyzerError(`Mutual recursion is not supported (predicates: ${scc.join(", ")})`);
-    }
-    const pred = scc[0]!;
-    const deps = dependencies.get(pred);
-    if (deps?.has(pred)) {
-      recursivePredicates.add(pred);
+      for (const pred of scc) {
+        recursivePredicates.add(pred);
+      }
+    } else {
+      const pred = scc[0]!;
+      const deps = dependencies.get(pred);
+      if (deps?.has(pred)) {
+        recursivePredicates.add(pred);
+      }
     }
   }
 
   // Tarjan's outputs SCCs with dependencies before dependents
-  const sortedPredicates = sccs.map((scc) => scc[0]!);
+  const sortedStrata = sccs;
 
   return {
     extDecls,
@@ -93,7 +97,7 @@ export function analyze(program: Program): AnalyzedProgram {
     queries,
     dependencies,
     recursivePredicates,
-    sortedPredicates,
+    sortedStrata,
   };
 }
 

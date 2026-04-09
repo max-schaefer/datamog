@@ -67,19 +67,25 @@ describe("analyzer", () => {
       reachable(X) :- path("start", X).
     `);
     const result = analyze(program);
-    const pathIdx = result.sortedPredicates.indexOf("path");
-    const reachableIdx = result.sortedPredicates.indexOf("reachable");
+    const strata = result.sortedStrata;
+    const pathIdx = strata.findIndex((s) => s.includes("path"));
+    const reachableIdx = strata.findIndex((s) => s.includes("reachable"));
     expect(pathIdx).toBeLessThan(reachableIdx);
   });
 
-  test("errors on mutual recursion", () => {
+  test("detects mutual recursion", () => {
     const program = parse(`
       extensional base(x: integer).
       even(X) :- base(X).
       even(X) :- odd(X).
       odd(X) :- even(X).
     `);
-    expect(() => analyze(program)).toThrow(/mutual recursion/i);
+    const result = analyze(program);
+    expect(result.recursivePredicates.has("even")).toBe(true);
+    expect(result.recursivePredicates.has("odd")).toBe(true);
+    // even and odd should be in the same stratum
+    const stratum = result.sortedStrata.find((s) => s.includes("even"));
+    expect(stratum).toContain("odd");
   });
 
   test("collects queries", () => {
