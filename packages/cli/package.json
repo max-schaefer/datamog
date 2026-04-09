@@ -10,6 +10,7 @@
     "datamog-backend-sqlite": "workspace:*",
     "datamog-core": "workspace:*",
     "datamog-csv": "workspace:*",
+    "datamog-gsheet": "workspace:*",
     "datamog-jsonl": "workspace:*",
     "datamog-parser": "workspace:*",
     "datamog-engine": "workspace:*"

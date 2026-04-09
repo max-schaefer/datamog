@@ -15,19 +15,69 @@ DATABASE_URL=postgres://localhost:5432/mydb bun run datamog program.dl
 bun run datamog --backend sqlite program.dl
 bun run datamog --backend postgres program.dl
 
-# Specify a separate CSV directory
+# Specify a separate data directory
 bun run datamog program.dl ./data
+
+# Load a predicate from a specific file
+bun run datamog --extensional parent=/path/to/parents.csv program.dl
+
+# Load a predicate from a Google Sheet (requires GOOGLE_API_KEY)
+GOOGLE_API_KEY=... bun run datamog \
+  --extensional scores=https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit \
+  program.dl
+
+# Multiple explicit sources
+bun run datamog \
+  --extensional edges=graph.csv \
+  --extensional weights=weights.jsonl \
+  program.dl
 
 # Preview generated SQL without executing
 bun run datamog --dry-run program.dl
 ```
 
-The CLI looks for `<predicate>.csv` files in the CSV directory, which defaults to the directory containing the `.dl` file.
+## Loading data
+
+By default, the CLI looks for data files in the data directory (the directory containing the `.dl` file, or an explicit second argument). You can override this for individual predicates with `--extensional name=source`.
+
+Three formats are supported:
+
+### CSV
+
+Place a file named `<predicate>.csv` in the data directory. The first row is treated as a header by default.
+
+```
+name,child
+alice,bob
+bob,carol
+```
+
+### JSONL
+
+Place a file named `<predicate>.jsonl` in the data directory. Each line is a JSON object with field names matching the declared columns. Values should use native JSON types (numbers, booleans), not strings.
+
+```jsonl
+{"name": "alice", "follows": "bob"}
+{"name": "bob", "follows": "carol"}
+```
+
+### Google Sheets
+
+Pass a Google Sheets share URL via `--extensional`:
+
+```bash
+GOOGLE_API_KEY=... bun run datamog \
+  --extensional scores=https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit \
+  program.dl
+```
+
+The sheet must have a header row with column names matching the `extensional` declaration. Requires the `GOOGLE_API_KEY` environment variable.
 
 ## Options
 
 | Option | Description |
 |--------|-------------|
+| `--extensional name=source` | Map a predicate to a file (.csv/.jsonl) or Google Sheets URL |
 | `--dry-run` | Print generated SQL without executing |
 | `--backend <postgres\|sqlite>` | Backend (default: auto-detected from `DATABASE_URL`) |
 | `-h`, `--help` | Show help message |
@@ -36,9 +86,19 @@ The CLI looks for `<predicate>.csv` files in the CSV directory, which defaults t
 
 Several examples are included in `examples/`:
 
-| Example | Description | Command |
-|---------|-------------|---------|
-| `family` | Ancestor relation via transitive closure | `bun run datamog packages/cli/examples/family/family.dl` |
-| `graph` | Reachability in a directed graph | `bun run datamog packages/cli/examples/graph/graph.dl` |
-| `courses` | Transitive course prerequisites | `bun run datamog packages/cli/examples/courses/courses.dl` |
-| `social` | Mutual friends (JSONL data) | `bun run datamog packages/cli/examples/social/social.dl` |
+| Example | Description | Data format |
+|---------|-------------|-------------|
+| `family` | Ancestor relation via transitive closure | CSV |
+| `graph` | Reachability in a directed graph | CSV |
+| `courses` | Transitive course prerequisites | CSV |
+| `social` | Mutual friends | JSONL |
+| `grammar` | CYK-style parsing | CSV |
+| `same-generation` | Same-generation query | CSV |
+| `river-crossing` | Farmer/wolf/goat/cabbage puzzle | (facts only) |
+| `negation` | Reachable frontier via stratified negation | CSV |
+
+Run any example with:
+
+```bash
+bun run datamog packages/cli/examples/<name>/<name>.dl
+```

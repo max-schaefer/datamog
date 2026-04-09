@@ -1,25 +1,38 @@
 #!/usr/bin/env bun
-import { dirname, resolve } from "node:path";
+import { dirname, extname, resolve } from "node:path";
+import type { ExtDecl } from "datamog-core";
 import { analyze } from "datamog-core";
 import { CsvLoader } from "datamog-csv";
-import { type Backend, DatamogExecutor, translate } from "datamog-engine";
+import {
+  type Backend,
+  DatamogExecutor,
+  type ExtensionalLoader,
+  type LoadResult,
+  checkValue,
+  coerceValue,
+  translate,
+} from "datamog-engine";
+import { GSheetLoader } from "datamog-gsheet";
 import { JsonlLoader } from "datamog-jsonl";
 import { parse } from "datamog-parser";
 
 function usage(): never {
-  console.error("Usage: datamog [options] <program.dl> [csv-directory]");
+  console.error("Usage: datamog [options] <program.dl> [data-directory]");
   console.error();
-  console.error("  program.dl     Path to a Datamog (.dl) source file");
-  console.error("  csv-directory   Directory containing CSV files for extensional predicates");
-  console.error("                  (defaults to the directory containing the .dl file)");
+  console.error("  program.dl       Path to a Datamog (.dl) source file");
+  console.error("  data-directory   Directory containing data files for extensional predicates");
+  console.error("                   (defaults to the directory containing the .dl file)");
   console.error();
   console.error("Options:");
-  console.error("  --dry-run              Print generated SQL without executing");
-  console.error("  --backend <backend>    Backend: postgres or sqlite (default: auto)");
-  console.error("  -h, --help             Show this help message");
+  console.error("  --extensional name=source  Map a predicate to a file (.csv/.jsonl) or");
+  console.error("                             a Google Sheets URL (requires GOOGLE_API_KEY)");
+  console.error("  --dry-run                  Print generated SQL without executing");
+  console.error("  --backend <backend>        Backend: postgres or sqlite (default: auto)");
+  console.error("  -h, --help                 Show this help message");
   console.error();
   console.error("Environment:");
-  console.error("  DATABASE_URL   Postgres connection string (uses in-memory SQLite if not set)");
+  console.error("  DATABASE_URL     Postgres connection string (uses in-memory SQLite if not set)");
+  console.error("  GOOGLE_API_KEY   API key for Google Sheets");
   process.exit(1);
 }
 
@@ -34,13 +47,145 @@ async function createBackend(name: BackendName): Promise<Backend> {
   return create();
 }
 
+const GSHEET_URL_RE = /^https:\/\/docs\.google\.com\/spreadsheets\/d\/([^/]+)/;
+
+/**
+ * Loader for an explicit file → predicate mapping via --extensional.
+ */
+class ExplicitFileLoader implements ExtensionalLoader {
+  readonly name: string;
+  private predicateName: string;
+  private filePath: string;
+
+  constructor(predicateName: string, filePath: string) {
+    this.predicateName = predicateName;
+    this.filePath = resolve(filePath);
+    this.name = `explicit:${predicateName}`;
+  }
+
+  async canLoad(decl: ExtDecl): Promise<boolean> {
+    return decl.predicate === this.predicateName;
+  }
+
+  async load(decl: ExtDecl, backend: Backend): Promise<LoadResult> {
+    const content = await Bun.file(this.filePath).text();
+    const ext = extname(this.filePath).toLowerCase();
+
+    if (ext === ".csv") {
+      return this.loadCsv(content, decl, backend);
+    }
+    if (ext === ".jsonl") {
+      return this.loadJsonl(content, decl, backend);
+    }
+    throw new Error(`Unsupported file format '${ext}' for predicate '${this.predicateName}'`);
+  }
+
+  private async loadCsv(content: string, decl: ExtDecl, backend: Backend): Promise<LoadResult> {
+    const lines = content.split("\n").filter((line) => line.trim() !== "");
+    const dataLines = lines.slice(1);
+
+    let rowsLoaded = 0;
+    for (const [lineIndex, line] of dataLines.entries()) {
+      const fields = line.split(",");
+      if (fields.length !== decl.columns.length) {
+        throw new Error(
+          `${this.filePath} line ${lineIndex + 2}: expected ${decl.columns.length} fields but got ${fields.length}`,
+        );
+      }
+      const values = decl.columns.map((c, i) =>
+        coerceValue(
+          fields[i]!,
+          c.type,
+          `${this.filePath} line ${lineIndex + 2}, column '${c.name}'`,
+        ),
+      );
+      await this.insertRow(decl, values, backend);
+      rowsLoaded++;
+    }
+    return { rowsLoaded };
+  }
+
+  private async loadJsonl(content: string, decl: ExtDecl, backend: Backend): Promise<LoadResult> {
+    const lines = content.split("\n").filter((line) => line.trim() !== "");
+
+    let rowsLoaded = 0;
+    for (const [lineIndex, line] of lines.entries()) {
+      const obj = JSON.parse(line) as Record<string, unknown>;
+      const values = decl.columns.map((c) => {
+        if (!(c.name in obj)) {
+          throw new Error(`${this.filePath} line ${lineIndex + 1}: missing field '${c.name}'`);
+        }
+        return checkValue(
+          obj[c.name],
+          c.type,
+          `${this.filePath} line ${lineIndex + 1}, column '${c.name}'`,
+        );
+      });
+      await this.insertRow(decl, values, backend);
+      rowsLoaded++;
+    }
+    return { rowsLoaded };
+  }
+
+  private async insertRow(decl: ExtDecl, values: unknown[], backend: Backend) {
+    const columns = decl.columns.map((c) => `"${c.name}"`).join(", ");
+    const placeholders = decl.columns.map((_, i) => `$${i + 1}`).join(", ");
+    await backend.execute(
+      `INSERT INTO "${decl.predicate}" (${columns}) VALUES (${placeholders})`,
+      values,
+    );
+  }
+}
+
+function parseExtensionalArg(arg: string): { name: string; source: string } {
+  const eqIdx = arg.indexOf("=");
+  if (eqIdx === -1) {
+    console.error(`Invalid --extensional: expected name=source, got '${arg}'`);
+    process.exit(1);
+  }
+  return { name: arg.slice(0, eqIdx), source: arg.slice(eqIdx + 1) };
+}
+
+function buildExplicitLoaders(mappings: { name: string; source: string }[]): ExtensionalLoader[] {
+  const loaders: ExtensionalLoader[] = [];
+  const gsheetSheets: Record<string, { spreadsheetId: string }> = {};
+
+  for (const { name, source } of mappings) {
+    const gsheetMatch = GSHEET_URL_RE.exec(source);
+    if (gsheetMatch) {
+      gsheetSheets[name] = { spreadsheetId: gsheetMatch[1]! };
+      continue;
+    }
+
+    const ext = extname(source).toLowerCase();
+    if (ext !== ".csv" && ext !== ".jsonl") {
+      console.error(`Unsupported file format '${ext}' for --extensional ${name}=${source}`);
+      process.exit(1);
+    }
+
+    loaders.push(new ExplicitFileLoader(name, source));
+  }
+
+  if (Object.keys(gsheetSheets).length > 0) {
+    const apiKey = process.env.GOOGLE_API_KEY;
+    if (!apiKey) {
+      console.error("GOOGLE_API_KEY environment variable is required for Google Sheets sources");
+      process.exit(1);
+    }
+    loaders.push(new GSheetLoader({ apiKey, sheets: gsheetSheets }));
+  }
+
+  return loaders;
+}
+
 async function main() {
   const args = process.argv.slice(2);
 
   let dlPath: string | undefined;
-  let csvDir: string | undefined;
+  let dataDir: string | undefined;
   let dryRun = false;
   let backendOverride: BackendName | undefined;
+  const extMappings: { name: string; source: string }[] = [];
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]!;
@@ -53,6 +198,15 @@ async function main() {
         process.exit(1);
       }
       backendOverride = value;
+    } else if (arg === "--extensional") {
+      const value = args[++i];
+      if (!value) {
+        console.error("--extensional requires an argument (name=source)");
+        process.exit(1);
+      }
+      extMappings.push(parseExtensionalArg(value));
+    } else if (arg.startsWith("--extensional=")) {
+      extMappings.push(parseExtensionalArg(arg.slice("--extensional=".length)));
     } else if (arg === "--help" || arg === "-h") {
       usage();
     } else if (arg.startsWith("-")) {
@@ -60,8 +214,8 @@ async function main() {
       usage();
     } else if (!dlPath) {
       dlPath = arg;
-    } else if (!csvDir) {
-      csvDir = arg;
+    } else if (!dataDir) {
+      dataDir = arg;
     } else {
       console.error(`Unexpected argument: ${arg}`);
       usage();
@@ -78,7 +232,7 @@ async function main() {
     process.exit(1);
   }
 
-  csvDir = csvDir ? resolve(csvDir) : dirname(resolve(dlPath));
+  dataDir = dataDir ? resolve(dataDir) : dirname(resolve(dlPath));
   const source = await dlFile.text();
   const backendName: BackendName =
     backendOverride ?? (process.env.DATABASE_URL ? "postgres" : "sqlite");
@@ -109,10 +263,12 @@ async function main() {
     process.exit(1);
   }
 
+  const explicitLoaders = buildExplicitLoaders(extMappings);
   const backend = await createBackend(backendName);
   const executor = new DatamogExecutor(backend, [
-    new CsvLoader({ directory: csvDir }),
-    new JsonlLoader({ directory: csvDir }),
+    ...explicitLoaders,
+    new CsvLoader({ directory: dataDir }),
+    new JsonlLoader({ directory: dataDir }),
   ]);
 
   try {
