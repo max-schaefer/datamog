@@ -163,6 +163,36 @@ describe("translator", () => {
     expect(viewSql).toContain('__b0."score" = 100');
   });
 
+  test("generates SQL for arithmetic expression in head", () => {
+    const result = translateSource(`
+      extensional scores(name: text, score: integer).
+      doubled(X, Y) :- scores(X, S), Y = S * 2.
+    `);
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("AS col2");
+    expect(sql).toContain("* 2");
+  });
+
+  test("generates SQL for expression in atom argument", () => {
+    const result = translateSource(`
+      extensional nums(val: integer).
+      extensional offsets(delta: integer).
+      shifted(X) :- nums(X), offsets(X + 1).
+    `);
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("+ 1)");
+  });
+
+  test("generates SQL for equality binding used in head", () => {
+    const result = translateSource(`
+      extensional base(x: integer).
+      computed(X, Y) :- base(X), Y = X + 10.
+    `);
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("+ 10");
+    expect(sql).toContain("AS col2");
+  });
+
   test("generates NOT EXISTS for negated atoms", () => {
     const result = translateSource(`
       extensional node(name: text).

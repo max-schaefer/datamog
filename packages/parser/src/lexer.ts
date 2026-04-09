@@ -25,7 +25,14 @@ export enum TokenType {
 
   Not = 19,
 
-  EOF = 20,
+  Plus = 21,
+  Minus = 22,
+  Star = 23,
+  Slash = 24,
+  Percent = 25,
+  Equals = 26,
+
+  EOF = 30,
 }
 
 export interface Token {
@@ -36,6 +43,7 @@ export interface Token {
 
 const KEYWORDS: Record<string, TokenType> = {
   extensional: TokenType.Extensional,
+  mod: TokenType.Percent,
   not: TokenType.Not,
   text: TokenType.TextType,
   integer: TokenType.IntegerType,
@@ -135,6 +143,11 @@ export function tokenize(source: string): Token[] {
       ",": TokenType.Comma,
       ".": TokenType.Dot,
       ":": TokenType.Colon,
+      "+": TokenType.Plus,
+      "-": TokenType.Minus,
+      "*": TokenType.Star,
+      "/": TokenType.Slash,
+      "=": TokenType.Equals,
     };
     if (punctMap[ch] !== undefined) {
       advance();

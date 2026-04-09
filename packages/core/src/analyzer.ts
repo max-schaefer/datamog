@@ -1,4 +1,4 @@
-import type { Atom, ExtDecl, Program, Query, Rule } from "./ast.ts";
+import type { ExtDecl, Program, Query, Rule, Term } from "./ast.ts";
 
 export class AnalyzerError extends Error {
   constructor(message: string) {
@@ -19,6 +19,22 @@ export interface AnalyzedProgram {
   recursivePredicates: Set<string>;
   /** Predicates grouped into strata (SCCs) in dependency order. */
   sortedStrata: string[][];
+}
+
+/** Collect all variable names from an expression tree. */
+function collectVars(term: Term, into: Set<string>) {
+  switch (term.kind) {
+    case "variable":
+      into.add(term.name);
+      break;
+    case "binary":
+      collectVars(term.left, into);
+      collectVars(term.right, into);
+      break;
+    case "unary":
+      collectVars(term.operand, into);
+      break;
+  }
 }
 
 export function analyze(program: Program): AnalyzedProgram {
@@ -82,8 +98,10 @@ export function analyze(program: Program): AnalyzedProgram {
 
   for (const predicateRules of rules.values()) {
     for (const rule of predicateRules) {
-      for (const atom of rule.body) {
-        checkAtomArity(atom.predicate, atom.args.length);
+      for (const elem of rule.body) {
+        if (elem.kind === "atom") {
+          checkAtomArity(elem.predicate, elem.args.length);
+        }
       }
     }
   }
@@ -92,10 +110,10 @@ export function analyze(program: Program): AnalyzedProgram {
     checkAtomArity(query.atom.predicate, query.atom.args.length);
   }
 
-  // Safety check: every variable in a negated atom must appear in a positive body atom
+  // Safety check
   for (const predicateRules of rules.values()) {
     for (const rule of predicateRules) {
-      checkNegationSafety(rule);
+      checkSafety(rule);
     }
   }
 
@@ -106,10 +124,12 @@ export function analyze(program: Program): AnalyzedProgram {
     const deps = new Set<string>();
     const negDeps = new Set<string>();
     for (const rule of predicateRules) {
-      for (const atom of rule.body) {
-        deps.add(atom.predicate);
-        if (atom.negated) {
-          negDeps.add(atom.predicate);
+      for (const elem of rule.body) {
+        if (elem.kind === "atom") {
+          deps.add(elem.predicate);
+          if (elem.negated) {
+            negDeps.add(elem.predicate);
+          }
         }
       }
     }
@@ -171,29 +191,95 @@ export function analyze(program: Program): AnalyzedProgram {
   };
 }
 
-/** Check that every variable in a negated atom also appears in a positive body atom. */
-function checkNegationSafety(rule: Rule) {
-  const negatedAtoms: Atom[] = [];
-  const positiveVars = new Set<string>();
+/**
+ * Check safety of a rule:
+ * - A variable is "safe" if it appears in a positive (unnegated) body atom argument,
+ *   or it is the LHS of an equality whose RHS variables are all safe.
+ * - Every variable in the head, in negated atoms, in equality RHS expressions,
+ *   and in complex expressions in positive atom arguments must be safe.
+ */
+function checkSafety(rule: Rule) {
+  // Phase 1: collect variables grounded by positive atoms
+  const safeVars = new Set<string>();
+  const equalities: { variable: string; exprVars: Set<string> }[] = [];
 
-  for (const atom of rule.body) {
-    if (atom.negated) {
-      negatedAtoms.push(atom);
-    } else {
-      for (const arg of atom.args) {
+  for (const elem of rule.body) {
+    if (elem.kind === "atom" && !elem.negated) {
+      for (const arg of elem.args) {
         if (arg.kind === "variable") {
-          positiveVars.add(arg.name);
+          safeVars.add(arg.name);
+        }
+      }
+    } else if (elem.kind === "equality") {
+      const exprVars = new Set<string>();
+      collectVars(elem.expr, exprVars);
+      equalities.push({ variable: elem.variable, exprVars });
+    }
+  }
+
+  // Phase 2: fixed-point — an equality X = expr makes X safe if all vars in expr are safe
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const eq of equalities) {
+      if (!safeVars.has(eq.variable)) {
+        let allSafe = true;
+        for (const v of eq.exprVars) {
+          if (!safeVars.has(v)) {
+            allSafe = false;
+            break;
+          }
+        }
+        if (allSafe) {
+          safeVars.add(eq.variable);
+          changed = true;
         }
       }
     }
   }
 
-  for (const atom of negatedAtoms) {
-    for (const arg of atom.args) {
-      if (arg.kind === "variable" && !positiveVars.has(arg.name)) {
-        throw new AnalyzerError(
-          `Unsafe negation: variable '${arg.name}' in 'not ${atom.predicate}(...)' does not appear in a positive body atom`,
-        );
+  function checkVarSafe(varName: string, context: string) {
+    if (!safeVars.has(varName)) {
+      throw new AnalyzerError(`Unsafe variable '${varName}' in ${context}`);
+    }
+  }
+
+  function checkTermSafe(term: Term, context: string) {
+    const vars = new Set<string>();
+    collectVars(term, vars);
+    for (const v of vars) {
+      checkVarSafe(v, context);
+    }
+  }
+
+  // Check head variables
+  for (const arg of rule.head.args) {
+    checkTermSafe(arg, `head of rule for '${rule.head.predicate}'`);
+  }
+
+  // Check negated atom variables
+  for (const elem of rule.body) {
+    if (elem.kind === "atom" && elem.negated) {
+      for (const arg of elem.args) {
+        checkTermSafe(arg, `'not ${elem.predicate}(...)'`);
+      }
+    }
+  }
+
+  // Check equality RHS variables
+  for (const eq of equalities) {
+    for (const v of eq.exprVars) {
+      checkVarSafe(v, `equality '${eq.variable} = ...'`);
+    }
+  }
+
+  // Check complex expressions in positive atom arguments
+  for (const elem of rule.body) {
+    if (elem.kind === "atom" && !elem.negated) {
+      for (const arg of elem.args) {
+        if (arg.kind !== "variable") {
+          checkTermSafe(arg, `argument of '${elem.predicate}(...)'`);
+        }
       }
     }
   }

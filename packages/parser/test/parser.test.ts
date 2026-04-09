@@ -129,6 +129,79 @@ describe("parser", () => {
     expect(rule.body[1]?.predicate).toBe("baz");
   });
 
+  test("arithmetic expression in atom argument", () => {
+    const program = parse("foo(X + 1) :- bar(X).");
+    const rule = program.statements[0] as Rule;
+    const arg = rule.head.args[0]!;
+    expect(arg.kind).toBe("binary");
+    if (arg.kind === "binary") {
+      expect(arg.op).toBe("+");
+      expect(arg.left).toMatchObject({ kind: "variable", name: "X" });
+      expect(arg.right).toMatchObject({ kind: "number", value: 1 });
+    }
+  });
+
+  test("operator precedence: * before +", () => {
+    const program = parse("foo(X + Y * 2) :- bar(X, Y).");
+    const rule = program.statements[0] as Rule;
+    const arg = rule.head.args[0]!;
+    expect(arg.kind).toBe("binary");
+    if (arg.kind === "binary") {
+      expect(arg.op).toBe("+");
+      expect(arg.left).toMatchObject({ kind: "variable", name: "X" });
+      expect(arg.right.kind).toBe("binary");
+    }
+  });
+
+  test("unary minus", () => {
+    const program = parse("foo(-X) :- bar(X).");
+    const rule = program.statements[0] as Rule;
+    const arg = rule.head.args[0]!;
+    expect(arg.kind).toBe("unary");
+    if (arg.kind === "unary") {
+      expect(arg.op).toBe("-");
+      expect(arg.operand).toMatchObject({ kind: "variable", name: "X" });
+    }
+  });
+
+  test("parenthesized expression", () => {
+    const program = parse("foo((X + 1) * 2) :- bar(X).");
+    const rule = program.statements[0] as Rule;
+    const arg = rule.head.args[0]!;
+    expect(arg.kind).toBe("binary");
+    if (arg.kind === "binary") {
+      expect(arg.op).toBe("*");
+      expect(arg.left.kind).toBe("binary");
+      expect(arg.right).toMatchObject({ kind: "number", value: 2 });
+    }
+  });
+
+  test("equality in rule body", () => {
+    const program = parse("foo(X, Z) :- bar(X, Y), Z = Y + 1.");
+    const rule = program.statements[0] as Rule;
+    expect(rule.body).toHaveLength(2);
+    const eq = rule.body[1]!;
+    expect(eq.kind).toBe("equality");
+    if (eq.kind === "equality") {
+      expect(eq.variable).toBe("Z");
+      expect(eq.expr.kind).toBe("binary");
+    }
+  });
+
+  test("mod keyword for modulo", () => {
+    const program = parse("foo(R) :- bar(X), R = X mod 2.");
+    const rule = program.statements[0] as Rule;
+    expect(rule.body).toHaveLength(2);
+    const eq = rule.body[1]!;
+    expect(eq.kind).toBe("equality");
+    if (eq.kind === "equality") {
+      expect(eq.expr.kind).toBe("binary");
+      if (eq.expr.kind === "binary") {
+        expect(eq.expr.op).toBe("%");
+      }
+    }
+  });
+
   test("preserves span on rule", () => {
     const program = parse("foo(X).");
     const rule = program.statements[0] as Rule;

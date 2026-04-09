@@ -1,4 +1,4 @@
-import type { AnalyzedProgram, Rule, Term } from "datamog-core";
+import type { AnalyzedProgram, Atom, Equality, Rule, Term } from "datamog-core";
 
 export type Dialect = "postgres" | "sqlite";
 
@@ -49,7 +49,6 @@ function translateViews(analyzed: AnalyzedProgram, dialect: Dialect): string[] {
     const isRecursive = analyzed.recursivePredicates.has(stratum[0]!);
 
     if (!isRecursive) {
-      // Non-recursive: single predicate, plain view
       const predicate = stratum[0]!;
       const rules = analyzed.rules.get(predicate)!;
       const ruleQueries = rules.map((rule) => translateRule(rule, analyzed));
@@ -61,7 +60,6 @@ function translateViews(analyzed: AnalyzedProgram, dialect: Dialect): string[] {
         views.push(`CREATE OR REPLACE VIEW ${ident(predicate)} AS\n  ${unionBody}\n;`);
       }
     } else if (stratum.length === 1) {
-      // Self-recursive: single predicate with WITH RECURSIVE
       const predicate = stratum[0]!;
       const rules = analyzed.rules.get(predicate)!;
       const arity = analyzed.arities.get(predicate)!;
@@ -79,7 +77,6 @@ function translateViews(analyzed: AnalyzedProgram, dialect: Dialect): string[] {
         );
       }
     } else {
-      // Mutually recursive: multiple predicates sharing a WITH RECURSIVE block
       const cteParts = stratum.map((predicate) => {
         const rules = analyzed.rules.get(predicate)!;
         const arity = analyzed.arities.get(predicate)!;
@@ -106,27 +103,34 @@ function translateViews(analyzed: AnalyzedProgram, dialect: Dialect): string[] {
   return views;
 }
 
+/** Variable binding: either a column reference or an SQL expression (from equality). */
+type Binding = { kind: "col"; alias: string; col: string } | { kind: "expr"; sql: string };
+
 function translateRule(rule: Rule, analyzed: AnalyzedProgram): string {
   if (rule.body.length === 0) {
     return translateFact(rule);
   }
 
-  // Separate positive and negated body atoms
-  const positiveAtoms: { atom: (typeof rule.body)[number]; index: number }[] = [];
-  const negatedAtoms: { atom: (typeof rule.body)[number]; index: number }[] = [];
+  // Separate body elements
+  const positiveAtoms: { atom: Atom; index: number }[] = [];
+  const negatedAtoms: { atom: Atom }[] = [];
+  const equalities: Equality[] = [];
+
   for (let i = 0; i < rule.body.length; i++) {
-    const atom = rule.body[i]!;
-    if (atom.negated) {
-      negatedAtoms.push({ atom, index: i });
+    const elem = rule.body[i]!;
+    if (elem.kind === "equality") {
+      equalities.push(elem);
+    } else if (elem.negated) {
+      negatedAtoms.push({ atom: elem });
     } else {
-      positiveAtoms.push({ atom, index: i });
+      positiveAtoms.push({ atom: elem, index: i });
     }
   }
 
   const aliases = rule.body.map((_, i) => `__b${i}`);
 
-  // Build variable bindings from positive atoms only
-  const bindings = new Map<string, { alias: string; col: string }[]>();
+  // Build variable bindings from positive atoms (column refs)
+  const bindings = new Map<string, Binding[]>();
 
   for (const { atom, index } of positiveAtoms) {
     const alias = aliases[index]!;
@@ -135,13 +139,26 @@ function translateRule(rule: Rule, analyzed: AnalyzedProgram): string {
       if (term.kind === "variable") {
         const col = resolveColumnRef(atom.predicate, j, analyzed);
         const list = bindings.get(term.name) ?? [];
-        list.push({ alias, col });
+        list.push({ kind: "col", alias, col });
         bindings.set(term.name, list);
       }
     }
   }
 
-  // SELECT clause: map head args to their first binding
+  // Register equality bindings: X = expr → bind X to the SQL expression
+  for (const eq of equalities) {
+    const sql = termToSql(eq.expr, bindings);
+    const list = bindings.get(eq.variable) ?? [];
+    list.push({ kind: "expr", sql });
+    bindings.set(eq.variable, list);
+  }
+
+  // Helper: resolve a binding to SQL
+  function bindingToSql(b: Binding): string {
+    return b.kind === "col" ? `${b.alias}.${ident(b.col)}` : b.sql;
+  }
+
+  // SELECT clause
   const selectParts: string[] = [];
   for (let i = 0; i < rule.head.args.length; i++) {
     const term = rule.head.args[i]!;
@@ -153,9 +170,9 @@ function translateRule(rule: Rule, analyzed: AnalyzedProgram): string {
           `Unbound variable '${term.name}' in head of rule for '${rule.head.predicate}'`,
         );
       }
-      selectParts.push(`${refs[0]!.alias}.${ident(refs[0]!.col)} AS ${targetCol}`);
+      selectParts.push(`${bindingToSql(refs[0]!)} AS ${targetCol}`);
     } else {
-      selectParts.push(`${literalSql(term)} AS ${targetCol}`);
+      selectParts.push(`${termToSql(term, bindings)} AS ${targetCol}`);
     }
   }
 
@@ -164,26 +181,25 @@ function translateRule(rule: Rule, analyzed: AnalyzedProgram): string {
     ({ atom, index }) => `${ident(atom.predicate)} AS ${aliases[index]}`,
   );
 
-  // WHERE clause: join conditions (shared variables) + constant conditions
+  // WHERE conditions
   const conditions: string[] = [];
 
-  // Join conditions from shared variables (positive atoms only)
+  // Join conditions from shared variables (column bindings only)
   for (const [, refs] of bindings) {
-    for (let i = 1; i < refs.length; i++) {
-      conditions.push(
-        `${refs[0]!.alias}.${ident(refs[0]!.col)} = ${refs[i]!.alias}.${ident(refs[i]!.col)}`,
-      );
+    const colRefs = refs.filter((r) => r.kind === "col");
+    for (let i = 1; i < colRefs.length; i++) {
+      conditions.push(`${bindingToSql(colRefs[0]!)} = ${bindingToSql(colRefs[i]!)}`);
     }
   }
 
-  // Constant conditions (positive atoms only)
+  // Non-variable argument conditions for positive atoms
   for (const { atom, index } of positiveAtoms) {
     const alias = aliases[index]!;
     for (let j = 0; j < atom.args.length; j++) {
       const term = atom.args[j]!;
       if (term.kind !== "variable") {
         const col = resolveColumnRef(atom.predicate, j, analyzed);
-        conditions.push(`${alias}.${ident(col)} = ${literalSql(term)}`);
+        conditions.push(`${alias}.${ident(col)} = ${termToSql(term, bindings)}`);
       }
     }
   }
@@ -195,13 +211,12 @@ function translateRule(rule: Rule, analyzed: AnalyzedProgram): string {
       const term = atom.args[j]!;
       const col = resolveColumnRef(atom.predicate, j, analyzed);
       if (term.kind === "variable") {
-        // Bind to the outer query's variable
         const refs = bindings.get(term.name);
         if (refs && refs.length > 0) {
-          subConditions.push(`${ident(col)} = ${refs[0]!.alias}.${ident(refs[0]!.col)}`);
+          subConditions.push(`${ident(col)} = ${bindingToSql(refs[0]!)}`);
         }
       } else {
-        subConditions.push(`${ident(col)} = ${literalSql(term)}`);
+        subConditions.push(`${ident(col)} = ${termToSql(term, bindings)}`);
       }
     }
     let subquery = `SELECT 1 FROM ${ident(atom.predicate)}`;
@@ -219,13 +234,17 @@ function translateRule(rule: Rule, analyzed: AnalyzedProgram): string {
 }
 
 function translateFact(rule: Rule): string {
-  const selectParts = rule.head.args.map((term, i) => `${literalSql(term)} AS col${i + 1}`);
+  const emptyBindings = new Map<string, Binding[]>();
+  const selectParts = rule.head.args.map(
+    (term, i) => `${termToSql(term, emptyBindings)} AS col${i + 1}`,
+  );
   return `SELECT ${selectParts.join(", ")}`;
 }
 
 // --- Queries ---
 
 function translateQueries(analyzed: AnalyzedProgram): string[] {
+  const emptyBindings = new Map<string, Binding[]>();
   return analyzed.queries.map((query) => {
     const atom = query.atom;
     const isIDB = analyzed.rules.has(atom.predicate);
@@ -240,11 +259,10 @@ function translateQueries(analyzed: AnalyzedProgram): string[] {
       if (term.kind === "variable") {
         selectParts.push(`${ident(col)} AS ${ident(term.name)}`);
       } else {
-        conditions.push(`${ident(col)} = ${literalSql(term)}`);
+        conditions.push(`${ident(col)} = ${termToSql(term, emptyBindings)}`);
       }
     }
 
-    // If all args are constants, select all columns
     if (selectParts.length === 0) {
       selectParts.push("*");
     }
@@ -265,7 +283,6 @@ function resolveColumnRef(predicate: string, argIndex: number, analyzed: Analyze
   if (extDecl) {
     return extDecl.columns[argIndex]!.name;
   }
-  // IDB predicate: use positional column names
   return `col${argIndex + 1}`;
 }
 
@@ -273,14 +290,25 @@ function ident(name: string): string {
   return `"${name}"`;
 }
 
-function literalSql(term: Term): string {
+/** Convert a Term AST node to a SQL expression string. */
+function termToSql(term: Term, bindings: Map<string, Binding[]>): string {
   switch (term.kind) {
     case "string":
       return `'${term.value.replace(/'/g, "''")}'`;
     case "number":
       return String(term.value);
-    default:
-      throw new Error(`Cannot convert ${term.kind} to SQL literal`);
+    case "variable": {
+      const refs = bindings.get(term.name);
+      if (!refs || refs.length === 0) {
+        throw new Error(`Unbound variable '${term.name}'`);
+      }
+      const b = refs[0]!;
+      return b.kind === "col" ? `${b.alias}.${ident(b.col)}` : b.sql;
+    }
+    case "binary":
+      return `(${termToSql(term.left, bindings)} ${term.op} ${termToSql(term.right, bindings)})`;
+    case "unary":
+      return `(-${termToSql(term.operand, bindings)})`;
   }
 }
 

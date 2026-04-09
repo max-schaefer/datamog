@@ -1,6 +1,9 @@
 import type {
   Atom,
+  BinaryOp,
+  BodyElement,
   ColumnDecl,
+  Equality,
   ExtDecl,
   Program,
   Query,
@@ -94,13 +97,13 @@ export class Parser {
   private parseRuleOrFact(): Rule {
     const head = this.parseAtom();
 
-    let body: Atom[] = [];
+    let body: BodyElement[] = [];
     if (this.isAt(TokenType.Turnstile)) {
       this.advance();
-      body = [this.parseBodyAtom()];
+      body = [this.parseBodyElement()];
       while (this.isAt(TokenType.Comma)) {
         this.advance();
-        body.push(this.parseBodyAtom());
+        body.push(this.parseBodyElement());
       }
     }
 
@@ -126,26 +129,46 @@ export class Parser {
     };
   }
 
-  private parseBodyAtom(): Atom {
-    const negated = this.isAt(TokenType.Not);
-    if (negated) {
+  /**
+   * Parse a body element: either an atom (possibly negated), or an equality (Variable = expr).
+   *
+   * The ambiguity: a Variable followed by `=` is an equality, otherwise it could be
+   * an argument. But body elements at the top level are either `[not] ident(...)` or `Var = expr`.
+   */
+  private parseBodyElement(): BodyElement {
+    // Negated atom: not ident(...)
+    if (this.isAt(TokenType.Not)) {
       this.advance();
-    }
-    const atom = this.parseAtom();
-    if (negated) {
+      const atom = this.parseAtom();
       return { ...atom, negated: true };
     }
-    return atom;
+
+    // Equality: Variable = expr
+    if (this.isAt(TokenType.Variable) && this.peekAt(1)?.type === TokenType.Equals) {
+      const varToken = this.advance();
+      this.advance(); // consume =
+      const expr = this.parseExpr();
+      const name = varToken.value === "_" ? `_${this.anonCounter++}` : varToken.value;
+      return {
+        kind: "equality",
+        variable: name,
+        expr,
+        span: { ...varToken.span, end: this.tokens[this.pos - 1]!.span.end },
+      } satisfies Equality;
+    }
+
+    // Atom: ident(...)
+    return this.parseAtom();
   }
 
   private parseAtom(): Atom {
     const nameToken = this.expect(TokenType.Ident);
     this.expect(TokenType.LParen);
 
-    const args: Term[] = [this.parseTerm()];
+    const args: Term[] = [this.parseExpr()];
     while (this.isAt(TokenType.Comma)) {
       this.advance();
-      args.push(this.parseTerm());
+      args.push(this.parseExpr());
     }
 
     const rparen = this.expect(TokenType.RParen);
@@ -158,8 +181,76 @@ export class Parser {
     };
   }
 
-  private parseTerm(): Term {
+  // --- Expression parsing (precedence climbing) ---
+
+  /** Parse an expression: additive level (lowest precedence). */
+  private parseExpr(): Term {
+    return this.parseAdditive();
+  }
+
+  private parseAdditive(): Term {
+    let left = this.parseMultiplicative();
+    while (this.isAt(TokenType.Plus) || this.isAt(TokenType.Minus)) {
+      const opToken = this.advance();
+      const op = opToken.value as BinaryOp;
+      const right = this.parseMultiplicative();
+      left = {
+        kind: "binary",
+        op,
+        left,
+        right,
+        span: { ...left.span, end: right.span.end },
+      };
+    }
+    return left;
+  }
+
+  private parseMultiplicative(): Term {
+    let left = this.parseUnary();
+    while (
+      this.isAt(TokenType.Star) ||
+      this.isAt(TokenType.Slash) ||
+      this.isAt(TokenType.Percent)
+    ) {
+      const opToken = this.advance();
+      const op = (opToken.type === TokenType.Percent ? "%" : opToken.value) as BinaryOp;
+      const right = this.parseUnary();
+      left = {
+        kind: "binary",
+        op,
+        left,
+        right,
+        span: { ...left.span, end: right.span.end },
+      };
+    }
+    return left;
+  }
+
+  private parseUnary(): Term {
+    if (this.isAt(TokenType.Minus)) {
+      const opToken = this.advance();
+      const operand = this.parseUnary();
+      return {
+        kind: "unary",
+        op: "-",
+        operand,
+        span: { ...opToken.span, end: operand.span.end },
+      };
+    }
+    return this.parsePrimary();
+  }
+
+  private parsePrimary(): Term {
     const token = this.peek();
+
+    // Parenthesized expression
+    if (token.type === TokenType.LParen) {
+      this.advance();
+      const expr = this.parseExpr();
+      this.expect(TokenType.RParen);
+      return expr;
+    }
+
     switch (token.type) {
       case TokenType.Variable: {
         this.advance();
@@ -173,12 +264,18 @@ export class Parser {
         this.advance();
         return { kind: "number", value: Number(token.value), span: token.span };
       default:
-        throw new ParseError(`Expected term, got '${token.value}'`, token.span);
+        throw new ParseError(`Expected expression, got '${token.value}'`, token.span);
     }
   }
 
+  // --- Utilities ---
+
   private peek(): Token {
     return this.tokens[this.pos]!;
+  }
+
+  private peekAt(offset: number): Token | undefined {
+    return this.tokens[this.pos + offset];
   }
 
   private advance(): Token {

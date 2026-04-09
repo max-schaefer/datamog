@@ -13,7 +13,7 @@ export interface SourceElement {
   span: SourcePosition;
 }
 
-// --- Terms ---
+// --- Expressions (terms) ---
 
 export interface Variable extends SourceElement {
   kind: "variable";
@@ -30,7 +30,22 @@ export interface NumberLiteral extends SourceElement {
   value: number;
 }
 
-export type Term = Variable | StringLiteral | NumberLiteral;
+export type BinaryOp = "+" | "-" | "*" | "/" | "%";
+
+export interface BinaryExpr extends SourceElement {
+  kind: "binary";
+  op: BinaryOp;
+  left: Term;
+  right: Term;
+}
+
+export interface UnaryExpr extends SourceElement {
+  kind: "unary";
+  op: "-";
+  operand: Term;
+}
+
+export type Term = Variable | StringLiteral | NumberLiteral | BinaryExpr | UnaryExpr;
 
 // --- Column declarations (for extensional predicates) ---
 
@@ -41,7 +56,7 @@ export interface ColumnDecl {
   type: SqlType;
 }
 
-// --- Atoms ---
+// --- Body elements ---
 
 export interface Atom extends SourceElement {
   kind: "atom";
@@ -49,6 +64,14 @@ export interface Atom extends SourceElement {
   args: Term[];
   negated?: boolean;
 }
+
+export interface Equality extends SourceElement {
+  kind: "equality";
+  variable: string;
+  expr: Term;
+}
+
+export type BodyElement = Atom | Equality;
 
 // --- Statements ---
 
@@ -61,7 +84,7 @@ export interface ExtDecl extends SourceElement {
 export interface Rule extends SourceElement {
   kind: "rule";
   head: Atom;
-  body: Atom[];
+  body: BodyElement[];
 }
 
 export interface Query extends SourceElement {

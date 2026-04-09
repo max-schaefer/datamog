@@ -1,6 +1,10 @@
 export type {
   Atom,
+  BinaryExpr,
+  BinaryOp,
+  BodyElement,
   ColumnDecl,
+  Equality,
   ExtDecl,
   NumberLiteral,
   Program,
@@ -12,6 +16,7 @@ export type {
   Statement,
   StringLiteral,
   Term,
+  UnaryExpr,
   Variable,
 } from "datamog-core";
 export { ParseError } from "./errors.ts";

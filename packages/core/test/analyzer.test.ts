@@ -159,7 +159,41 @@ describe("analyzer", () => {
       extensional base(x: text).
       foo(X) :- base(X), not bar(X, Y).
     `);
-    expect(() => analyze(program)).toThrow(/Unsafe negation.*Y/);
+    expect(() => analyze(program)).toThrow(/Unsafe variable 'Y'/);
+  });
+
+  test("accepts safe equality", () => {
+    const program = parse(`
+      extensional scores(name: text, score: integer).
+      doubled(X, Y) :- scores(X, S), Y = S * 2.
+    `);
+    const result = analyze(program);
+    expect(result.rules.has("doubled")).toBe(true);
+  });
+
+  test("rejects unsafe equality RHS variable", () => {
+    const program = parse(`
+      extensional base(x: integer).
+      bad(X) :- base(X), Y = X + Z.
+    `);
+    expect(() => analyze(program)).toThrow(/Unsafe variable 'Z'/);
+  });
+
+  test("accepts chained equalities", () => {
+    const program = parse(`
+      extensional base(x: integer).
+      chain(X, Z) :- base(X), Y = X + 1, Z = Y * 2.
+    `);
+    const result = analyze(program);
+    expect(result.rules.has("chain")).toBe(true);
+  });
+
+  test("rejects unsafe head variable from expression", () => {
+    const program = parse(`
+      extensional base(x: integer).
+      bad(X, Y) :- base(X).
+    `);
+    expect(() => analyze(program)).toThrow(/Unsafe variable 'Y'/);
   });
 
   test("handles facts (rules with empty body)", () => {

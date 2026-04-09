@@ -1,6 +1,10 @@
 export type {
   Atom,
+  BinaryExpr,
+  BinaryOp,
+  BodyElement,
   ColumnDecl,
+  Equality,
   ExtDecl,
   NumberLiteral,
   Program,
@@ -12,6 +16,7 @@ export type {
   Statement,
   StringLiteral,
   Term,
+  UnaryExpr,
   Variable,
 } from "./ast.ts";
 export { analyze, AnalyzerError, type AnalyzedProgram } from "./analyzer.ts";
