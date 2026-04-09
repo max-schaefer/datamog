@@ -73,6 +73,13 @@ describe("JsonlLoader", () => {
     expect(rows).toHaveLength(1);
   });
 
+  test("rejects rows with missing fields", async () => {
+    await Bun.write(join(tempDir, "parent.jsonl"), '{"name":"alice"}\n');
+    const loader = new JsonlLoader({ directory: tempDir });
+    const decl = getExtDecl("extensional parent(name: text, child: text).");
+    expect(loader.readRows(decl)).rejects.toThrow(/missing field 'child'/);
+  });
+
   test("load calls backend with correct inserts", async () => {
     await Bun.write(join(tempDir, "parent.jsonl"), '{"name":"alice","child":"bob"}\n');
     const loader = new JsonlLoader({ directory: tempDir });

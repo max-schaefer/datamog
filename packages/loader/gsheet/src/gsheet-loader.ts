@@ -72,6 +72,13 @@ export class GSheetLoader implements ExtensionalLoader {
 
     const headers = values[0]!;
     const colIndexes = decl.columns.map((col) => headers.indexOf(col.name));
+    for (let i = 0; i < decl.columns.length; i++) {
+      if (colIndexes[i] === -1) {
+        throw new Error(
+          `Google Sheet for '${decl.predicate}': missing column '${decl.columns[i]!.name}'`,
+        );
+      }
+    }
 
     return values.slice(1).map((row) => {
       const result: Record<string, unknown> = {};

@@ -89,6 +89,16 @@ describe("GSheetLoader", () => {
     expect(rows).toEqual([]);
   });
 
+  test("parseResponse rejects missing columns in header", () => {
+    const loader = new GSheetLoader({
+      apiKey: "fake-key",
+      sheets: { parent: { spreadsheetId: "abc123" } },
+    });
+    const decl = getExtDecl("extensional parent(name: text, child: text).");
+    const apiResponse = { values: [["name"], ["alice"]] };
+    expect(() => loader.parseResponse(apiResponse, decl)).toThrow(/missing column 'child'/);
+  });
+
   test("builds correct API URL", () => {
     const loader = new GSheetLoader({
       apiKey: "my-key",

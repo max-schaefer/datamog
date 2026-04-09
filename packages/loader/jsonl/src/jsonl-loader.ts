@@ -39,10 +39,15 @@ export class JsonlLoader implements ExtensionalLoader {
     const content = await Bun.file(this.filePath(decl)).text();
     const lines = content.split("\n").filter((line) => line.trim() !== "");
 
-    return lines.map((line) => {
+    return lines.map((line, lineIndex) => {
       const obj = JSON.parse(line) as Record<string, unknown>;
       const row: Record<string, unknown> = {};
       for (const col of decl.columns) {
+        if (!(col.name in obj)) {
+          throw new Error(
+            `${decl.predicate}.jsonl line ${lineIndex + 1}: missing field '${col.name}'`,
+          );
+        }
         row[col.name] = coerce(obj[col.name], col.type);
       }
       return row;

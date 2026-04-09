@@ -55,13 +55,18 @@ export class CsvLoader implements ExtensionalLoader {
 
     const dataLines = this.hasHeader ? lines.slice(1) : lines;
 
-    return dataLines.map((line) => {
+    return dataLines.map((line, lineIndex) => {
       const fields = this.parseFields(line);
+      if (fields.length !== decl.columns.length) {
+        const dataLineNum = this.hasHeader ? lineIndex + 2 : lineIndex + 1;
+        throw new Error(
+          `${decl.predicate}.csv line ${dataLineNum}: expected ${decl.columns.length} fields but got ${fields.length}`,
+        );
+      }
       const row: Record<string, unknown> = {};
       for (let i = 0; i < decl.columns.length; i++) {
         const col = decl.columns[i]!;
-        const raw = fields[i] ?? "";
-        row[col.name] = coerce(raw, col.type);
+        row[col.name] = coerce(fields[i]!, col.type);
       }
       return row;
     });

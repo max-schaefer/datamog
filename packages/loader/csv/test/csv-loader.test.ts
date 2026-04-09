@@ -105,6 +105,13 @@ describe("CsvLoader", () => {
     expect(rows).toHaveLength(1);
   });
 
+  test("rejects rows with wrong number of fields", async () => {
+    await Bun.write(join(tempDir, "parent.csv"), "name,child\nalice\n");
+    const loader = new CsvLoader({ directory: tempDir });
+    const decl = getExtDecl("extensional parent(name: text, child: text).");
+    expect(loader.readRows(decl)).rejects.toThrow(/expected 2 fields but got 1/);
+  });
+
   test("load calls sql with correct inserts", async () => {
     await Bun.write(join(tempDir, "parent.csv"), "name,child\nalice,bob\n");
     const loader = new CsvLoader({ directory: tempDir });
