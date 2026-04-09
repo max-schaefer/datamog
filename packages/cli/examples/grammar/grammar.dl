@@ -1,20 +1,24 @@
-% Recognizing a left-recursive grammar
-% Based on [Fitting & Doets, 1992]
+% Recognizing a left-recursive grammar using string operations
 %
 % The recognizer parses the following grammar rules:
-%   A -> a
-%   A -> Ab
-%   A -> Aa
+%   A -> "a"
+%   A -> A "b"
+%   A -> A "a"
 %
-% The input string "ababa" is encoded as a sequence of transitions
-% t(position, symbol, next_position), where positions are numbered 1..6.
+% The input string is stored in a single-row extensional predicate.
+% Positions are provided as an extensional predicate (0-based indices).
 %
+% at(I, C) means the character at position I in the input string is C.
+% a(F, T) means the nonterminal A matches input[F:T].
 % Query: does the grammar accept the full string?
 
-extensional t(pos: integer, sym: text, next: integer).
+extensional input(s: text).
+extensional pos(i: integer).
 
-a(F, L) :- t(F, "a", L).
-a(F, L) :- a(F, M), t(M, "b", L).
-a(F, L) :- a(F, M), t(M, "a", L).
+at(S, I, C) :- pos(I), input(S), C = S[I].
 
-?- a(1, 6).
+a(S, F, F + 1) :- at(S, F, "a").
+a(S, F, T + 1) :- a(S, F, T), at(S, T, "b").
+a(S, F, T + 1) :- a(S, F, T), at(S, T, "a").
+
+?- a(S, 0, N).
