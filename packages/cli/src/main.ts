@@ -26,6 +26,7 @@ function usage(): never {
   console.error("Options:");
   console.error("  --extensional name=source  Map a predicate to a file (.csv/.jsonl) or");
   console.error("                             a Google Sheets URL (requires GOOGLE_API_KEY)");
+  console.error("  --output-format <format>   Output format: table (default), csv, or jsonl");
   console.error("  --dry-run                  Print generated SQL without executing");
   console.error("  --backend <backend>        Backend: postgres or sqlite (default: auto)");
   console.error("  -h, --help                 Show this help message");
@@ -37,6 +38,7 @@ function usage(): never {
 }
 
 type BackendName = "postgres" | "sqlite";
+type OutputFormat = "table" | "csv" | "jsonl";
 
 async function createBackend(name: BackendName): Promise<Backend> {
   if (name === "postgres") {
@@ -178,6 +180,41 @@ function buildExplicitLoaders(mappings: { name: string; source: string }[]): Ext
   return loaders;
 }
 
+function printResult(sql: string, rows: Record<string, unknown>[], format: OutputFormat) {
+  switch (format) {
+    case "table":
+      console.log(`-- ${sql}`);
+      if (rows.length === 0) {
+        console.log("(no rows)");
+      } else {
+        console.table(rows);
+      }
+      console.log();
+      break;
+    case "csv": {
+      if (rows.length === 0) break;
+      const keys = Object.keys(rows[0]!);
+      console.log(keys.join(","));
+      for (const row of rows) {
+        console.log(keys.map((k) => csvEscape(String(row[k] ?? ""))).join(","));
+      }
+      break;
+    }
+    case "jsonl":
+      for (const row of rows) {
+        console.log(JSON.stringify(row));
+      }
+      break;
+  }
+}
+
+function csvEscape(value: string): string {
+  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
 async function main() {
   const args = process.argv.slice(2);
 
@@ -185,6 +222,7 @@ async function main() {
   let dataDir: string | undefined;
   let dryRun = false;
   let backendOverride: BackendName | undefined;
+  let outputFormat: OutputFormat = "table";
   const extMappings: { name: string; source: string }[] = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -198,6 +236,13 @@ async function main() {
         process.exit(1);
       }
       backendOverride = value;
+    } else if (arg === "--output-format") {
+      const value = args[++i];
+      if (value !== "table" && value !== "csv" && value !== "jsonl") {
+        console.error(`Invalid output format: ${value} (expected "table", "csv", or "jsonl")`);
+        process.exit(1);
+      }
+      outputFormat = value;
     } else if (arg === "--extensional") {
       const value = args[++i];
       if (!value) {
@@ -237,6 +282,18 @@ async function main() {
   const backendName: BackendName =
     backendOverride ?? (process.env.DATABASE_URL ? "postgres" : "sqlite");
 
+  // Check query count for machine-readable formats
+  if (outputFormat !== "table") {
+    const program = parse(source);
+    const queryCount = program.statements.filter((s) => s.kind === "query").length;
+    if (queryCount > 1) {
+      console.error(
+        `--output-format ${outputFormat} requires exactly one query clause, but found ${queryCount}`,
+      );
+      process.exit(1);
+    }
+  }
+
   if (dryRun) {
     const program = parse(source);
     const analyzed = analyze(program);
@@ -274,13 +331,7 @@ async function main() {
   try {
     const results = await executor.execute(source);
     for (const result of results) {
-      console.log(`-- ${result.sql}`);
-      if (result.rows.length === 0) {
-        console.log("(no rows)");
-      } else {
-        console.table(result.rows);
-      }
-      console.log();
+      printResult(result.sql, result.rows, outputFormat);
     }
   } finally {
     await backend.close();

@@ -78,6 +78,7 @@ The sheet must have a header row with column names matching the `extensional` de
 | Option | Description |
 |--------|-------------|
 | `--extensional name=source` | Map a predicate to a file (.csv/.jsonl) or Google Sheets URL |
+| `--output-format <format>` | Output format: `table` (default), `csv`, or `jsonl` |
 | `--dry-run` | Print generated SQL without executing |
 | `--backend <postgres\|sqlite>` | Backend (default: auto-detected from `DATABASE_URL`) |
 | `-h`, `--help` | Show help message |
