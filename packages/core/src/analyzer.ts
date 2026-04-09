@@ -10,6 +10,8 @@ export class AnalyzerError extends Error {
 export interface AnalyzedProgram {
   extDecls: Map<string, ExtDecl>;
   rules: Map<string, Rule[]>;
+  /** Arity of each predicate (EDB and IDB). */
+  arities: Map<string, number>;
   queries: Query[];
   dependencies: Map<string, Set<string>>;
   recursivePredicates: Set<string>;
@@ -20,6 +22,7 @@ export interface AnalyzedProgram {
 export function analyze(program: Program): AnalyzedProgram {
   const extDecls = new Map<string, ExtDecl>();
   const rules = new Map<string, Rule[]>();
+  const arities = new Map<string, number>();
   const queries: Query[] = [];
 
   // Classify statements
@@ -32,13 +35,21 @@ export function analyze(program: Program): AnalyzedProgram {
           );
         }
         extDecls.set(stmt.predicate, stmt);
+        arities.set(stmt.predicate, stmt.columns.length);
         break;
       case "rule": {
         const existing = rules.get(stmt.head.predicate);
         if (existing) {
+          const expectedArity = arities.get(stmt.head.predicate)!;
+          if (stmt.head.args.length !== expectedArity) {
+            throw new AnalyzerError(
+              `Predicate '${stmt.head.predicate}' is defined with arity ${expectedArity} and ${stmt.head.args.length}`,
+            );
+          }
           existing.push(stmt);
         } else {
           rules.set(stmt.head.predicate, [stmt]);
+          arities.set(stmt.head.predicate, stmt.head.args.length);
         }
         break;
       }
@@ -55,6 +66,28 @@ export function analyze(program: Program): AnalyzedProgram {
         `Predicate '${predicate}' is declared as both extensional and intensional`,
       );
     }
+  }
+
+  // Check arity of atoms in rule bodies and queries
+  function checkAtomArity(predicate: string, actual: number) {
+    const expected = arities.get(predicate);
+    if (expected !== undefined && actual !== expected) {
+      throw new AnalyzerError(
+        `Predicate '${predicate}' has arity ${expected} but is used with ${actual} arguments`,
+      );
+    }
+  }
+
+  for (const predicateRules of rules.values()) {
+    for (const rule of predicateRules) {
+      for (const atom of rule.body) {
+        checkAtomArity(atom.predicate, atom.args.length);
+      }
+    }
+  }
+
+  for (const query of queries) {
+    checkAtomArity(query.atom.predicate, query.atom.args.length);
   }
 
   // Build dependency graph (IDB predicates only)
@@ -94,6 +127,7 @@ export function analyze(program: Program): AnalyzedProgram {
   return {
     extDecls,
     rules,
+    arities,
     queries,
     dependencies,
     recursivePredicates,

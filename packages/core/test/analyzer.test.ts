@@ -51,6 +51,31 @@ describe("analyzer", () => {
     expect(() => analyze(program)).toThrow(/multiple times/);
   });
 
+  test("errors on arity mismatch between rules", () => {
+    const program = parse(`
+      extensional parent(name: text, child: text).
+      related(X, Y) :- parent(X, Y).
+      related(X) :- parent(X, "alice").
+    `);
+    expect(() => analyze(program)).toThrow(/arity/);
+  });
+
+  test("errors on arity mismatch in rule body", () => {
+    const program = parse(`
+      extensional parent(name: text, child: text).
+      wrong(X) :- parent(X).
+    `);
+    expect(() => analyze(program)).toThrow(/arity 2 but is used with 1/);
+  });
+
+  test("errors on arity mismatch in query", () => {
+    const program = parse(`
+      extensional parent(name: text, child: text).
+      ?- parent(X).
+    `);
+    expect(() => analyze(program)).toThrow(/arity 2 but is used with 1/);
+  });
+
   test("errors on predicate that is both EDB and IDB", () => {
     const program = parse(`
       extensional parent(name: text, child: text).

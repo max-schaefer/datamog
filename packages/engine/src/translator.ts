@@ -64,7 +64,7 @@ function translateViews(analyzed: AnalyzedProgram, dialect: Dialect): string[] {
       // Self-recursive: single predicate with WITH RECURSIVE
       const predicate = stratum[0]!;
       const rules = analyzed.rules.get(predicate)!;
-      const arity = rules[0]!.head.args.length;
+      const arity = analyzed.arities.get(predicate)!;
       const ruleQueries = rules.map((rule) => translateRule(rule, analyzed));
       const unionBody = ruleQueries.join("\n  UNION\n");
       const colNames = colList(arity);
@@ -82,7 +82,7 @@ function translateViews(analyzed: AnalyzedProgram, dialect: Dialect): string[] {
       // Mutually recursive: multiple predicates sharing a WITH RECURSIVE block
       const cteParts = stratum.map((predicate) => {
         const rules = analyzed.rules.get(predicate)!;
-        const arity = rules[0]!.head.args.length;
+        const arity = analyzed.arities.get(predicate)!;
         const ruleQueries = rules.map((rule) => translateRule(rule, analyzed));
         const unionBody = ruleQueries.join("\n    UNION\n  ");
         const colNames = colList(arity);
