@@ -86,6 +86,17 @@ describe("JsonlLoader", () => {
     expect(loader.readRows(decl)).rejects.toThrow(/Expected integer/);
   });
 
+  test("ignores extra keys in JSON objects", async () => {
+    await Bun.write(
+      join(tempDir, "parent.jsonl"),
+      '{"name":"alice","child":"bob","extra":"ignored","score":99}\n',
+    );
+    const loader = new JsonlLoader({ directory: tempDir });
+    const decl = getExtDecl("extensional parent(name: text, child: text).");
+    const rows = await loader.readRows(decl);
+    expect(rows).toEqual([{ name: "alice", child: "bob" }]);
+  });
+
   test("load calls backend with correct inserts", async () => {
     await Bun.write(join(tempDir, "parent.jsonl"), '{"name":"alice","child":"bob"}\n');
     const loader = new JsonlLoader({ directory: tempDir });
