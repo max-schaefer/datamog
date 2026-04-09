@@ -196,6 +196,23 @@ describe("analyzer", () => {
     expect(() => analyze(program)).toThrow(/Unsafe variable 'Y'/);
   });
 
+  test("accepts safe comparison", () => {
+    const program = parse(`
+      extensional scores(name: text, score: integer).
+      high(X) :- scores(X, S), S > 80.
+    `);
+    const result = analyze(program);
+    expect(result.rules.has("high")).toBe(true);
+  });
+
+  test("rejects unsafe variable in comparison", () => {
+    const program = parse(`
+      extensional base(x: integer).
+      bad(X) :- base(X), Y > 10.
+    `);
+    expect(() => analyze(program)).toThrow(/Unsafe variable 'Y'/);
+  });
+
   test("handles facts (rules with empty body)", () => {
     const program = parse(`
       base("hello").

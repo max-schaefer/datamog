@@ -71,7 +71,16 @@ export interface Equality extends SourceElement {
   expr: Term;
 }
 
-export type BodyElement = Atom | Equality;
+export type ComparisonOp = "<" | ">" | "<=" | ">=" | "!=";
+
+export interface Comparison extends SourceElement {
+  kind: "comparison";
+  op: ComparisonOp;
+  left: Term;
+  right: Term;
+}
+
+export type BodyElement = Atom | Equality | Comparison;
 
 // --- Statements ---
 

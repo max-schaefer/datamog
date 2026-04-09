@@ -4,6 +4,8 @@ export type {
   BinaryOp,
   BodyElement,
   ColumnDecl,
+  Comparison,
+  ComparisonOp,
   Equality,
   ExtDecl,
   NumberLiteral,

@@ -31,8 +31,13 @@ export enum TokenType {
   Slash = 24,
   Percent = 25,
   Equals = 26,
+  Lt = 27,
+  Gt = 28,
+  LtEq = 29,
+  GtEq = 30,
+  NotEq = 31,
 
-  EOF = 30,
+  EOF = 40,
 }
 
 export interface Token {
@@ -133,6 +138,28 @@ export function tokenize(source: string): Token[] {
       });
       continue;
     }
+    if (ch === "<" && source[pos + 1] === "=") {
+      pos += 2;
+      column += 2;
+      tokens.push({ type: TokenType.LtEq, value: "<=", span: span(startPos, startLine, startCol) });
+      continue;
+    }
+    if (ch === ">" && source[pos + 1] === "=") {
+      pos += 2;
+      column += 2;
+      tokens.push({ type: TokenType.GtEq, value: ">=", span: span(startPos, startLine, startCol) });
+      continue;
+    }
+    if (ch === "!" && source[pos + 1] === "=") {
+      pos += 2;
+      column += 2;
+      tokens.push({
+        type: TokenType.NotEq,
+        value: "!=",
+        span: span(startPos, startLine, startCol),
+      });
+      continue;
+    }
 
     // Single-character punctuation
     const punctMap: Record<string, TokenType> = {
@@ -148,6 +175,8 @@ export function tokenize(source: string): Token[] {
       "*": TokenType.Star,
       "/": TokenType.Slash,
       "=": TokenType.Equals,
+      "<": TokenType.Lt,
+      ">": TokenType.Gt,
     };
     if (punctMap[ch] !== undefined) {
       advance();

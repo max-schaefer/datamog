@@ -202,6 +202,49 @@ describe("parser", () => {
     }
   });
 
+  test("comparison in rule body", () => {
+    const program = parse("foo(X) :- bar(X, Y), Y > 10.");
+    const rule = program.statements[0] as Rule;
+    expect(rule.body).toHaveLength(2);
+    const cmp = rule.body[1]!;
+    expect(cmp.kind).toBe("comparison");
+    if (cmp.kind === "comparison") {
+      expect(cmp.op).toBe(">");
+      expect(cmp.left).toMatchObject({ kind: "variable", name: "Y" });
+      expect(cmp.right).toMatchObject({ kind: "number", value: 10 });
+    }
+  });
+
+  test("comparison with expressions on both sides", () => {
+    const program = parse("foo(X) :- bar(X, Y), X + 1 <= Y * 2.");
+    const rule = program.statements[0] as Rule;
+    const cmp = rule.body[1]!;
+    expect(cmp.kind).toBe("comparison");
+    if (cmp.kind === "comparison") {
+      expect(cmp.op).toBe("<=");
+      expect(cmp.left.kind).toBe("binary");
+      expect(cmp.right.kind).toBe("binary");
+    }
+  });
+
+  test("all comparison operators", () => {
+    for (const [src, op] of [
+      ["X < 1", "<"],
+      ["X > 1", ">"],
+      ["X <= 1", "<="],
+      ["X >= 1", ">="],
+      ["X != 1", "!="],
+    ] as const) {
+      const program = parse(`foo(X) :- bar(X), ${src}.`);
+      const rule = program.statements[0] as Rule;
+      const cmp = rule.body[1]!;
+      expect(cmp.kind).toBe("comparison");
+      if (cmp.kind === "comparison") {
+        expect(cmp.op).toBe(op);
+      }
+    }
+  });
+
   test("preserves span on rule", () => {
     const program = parse("foo(X).");
     const rule = program.statements[0] as Rule;

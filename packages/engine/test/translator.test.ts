@@ -183,6 +183,24 @@ describe("translator", () => {
     expect(sql).toContain("+ 1)");
   });
 
+  test("generates SQL for comparison", () => {
+    const result = translateSource(`
+      extensional scores(name: text, score: integer).
+      high(X) :- scores(X, S), S > 80.
+    `);
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("> 80");
+  });
+
+  test("generates SQL for != comparison", () => {
+    const result = translateSource(`
+      extensional pairs(a: integer, b: integer).
+      diff(X, Y) :- pairs(X, Y), X != Y.
+    `);
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("<>");
+  });
+
   test("generates SQL for equality binding used in head", () => {
     const result = translateSource(`
       extensional base(x: integer).

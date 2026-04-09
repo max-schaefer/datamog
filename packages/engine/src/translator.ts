@@ -1,4 +1,4 @@
-import type { AnalyzedProgram, Atom, Equality, Rule, Term } from "datamog-core";
+import type { AnalyzedProgram, Atom, Comparison, Equality, Rule, Term } from "datamog-core";
 
 export type Dialect = "postgres" | "sqlite";
 
@@ -115,11 +115,14 @@ function translateRule(rule: Rule, analyzed: AnalyzedProgram): string {
   const positiveAtoms: { atom: Atom; index: number }[] = [];
   const negatedAtoms: { atom: Atom }[] = [];
   const equalities: Equality[] = [];
+  const comparisons: Comparison[] = [];
 
   for (let i = 0; i < rule.body.length; i++) {
     const elem = rule.body[i]!;
     if (elem.kind === "equality") {
       equalities.push(elem);
+    } else if (elem.kind === "comparison") {
+      comparisons.push(elem);
     } else if (elem.negated) {
       negatedAtoms.push({ atom: elem });
     } else {
@@ -224,6 +227,12 @@ function translateRule(rule: Rule, analyzed: AnalyzedProgram): string {
       subquery += ` WHERE ${subConditions.join(" AND ")}`;
     }
     conditions.push(`NOT EXISTS (${subquery})`);
+  }
+
+  // Comparison conditions
+  for (const cmp of comparisons) {
+    const sqlOp = cmp.op === "!=" ? "<>" : cmp.op;
+    conditions.push(`${termToSql(cmp.left, bindings)} ${sqlOp} ${termToSql(cmp.right, bindings)}`);
   }
 
   let sql = `SELECT ${selectParts.join(", ")} FROM ${fromParts.join(", ")}`;

@@ -283,6 +283,14 @@ function checkSafety(rule: Rule) {
       }
     }
   }
+
+  // Check comparison variables
+  for (const elem of rule.body) {
+    if (elem.kind === "comparison") {
+      checkTermSafe(elem.left, "comparison");
+      checkTermSafe(elem.right, "comparison");
+    }
+  }
 }
 
 function tarjanSCC(rules: Map<string, Rule[]>, dependencies: Map<string, Set<string>>): string[][] {

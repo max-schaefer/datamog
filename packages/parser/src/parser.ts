@@ -3,6 +3,8 @@ import type {
   BinaryOp,
   BodyElement,
   ColumnDecl,
+  Comparison,
+  ComparisonOp,
   Equality,
   ExtDecl,
   Program,
@@ -130,10 +132,13 @@ export class Parser {
   }
 
   /**
-   * Parse a body element: either an atom (possibly negated), or an equality (Variable = expr).
+   * Parse a body element: atom, negated atom, equality, or comparison.
    *
-   * The ambiguity: a Variable followed by `=` is an equality, otherwise it could be
-   * an argument. But body elements at the top level are either `[not] ident(...)` or `Var = expr`.
+   * Disambiguation:
+   * - `not ident(...)` → negated atom
+   * - `ident(...)` → atom (ident followed by lparen)
+   * - `Variable = expr` → equality (binding)
+   * - `expr <op> expr` → comparison (where <op> is <, >, <=, >=, !=)
    */
   private parseBodyElement(): BodyElement {
     // Negated atom: not ident(...)
@@ -141,6 +146,11 @@ export class Parser {
       this.advance();
       const atom = this.parseAtom();
       return { ...atom, negated: true };
+    }
+
+    // Atom: ident(...)
+    if (this.isAt(TokenType.Ident) && this.peekAt(1)?.type === TokenType.LParen) {
+      return this.parseAtom();
     }
 
     // Equality: Variable = expr
@@ -157,8 +167,44 @@ export class Parser {
       } satisfies Equality;
     }
 
-    // Atom: ident(...)
-    return this.parseAtom();
+    // Comparison: expr <op> expr
+    return this.parseComparison();
+  }
+
+  private parseComparison(): Comparison {
+    const left = this.parseExpr();
+    const op = this.parseComparisonOp();
+    const right = this.parseExpr();
+    return {
+      kind: "comparison",
+      op,
+      left,
+      right,
+      span: { ...left.span, end: right.span.end },
+    };
+  }
+
+  private parseComparisonOp(): ComparisonOp {
+    const token = this.peek();
+    switch (token.type) {
+      case TokenType.Lt:
+        this.advance();
+        return "<";
+      case TokenType.Gt:
+        this.advance();
+        return ">";
+      case TokenType.LtEq:
+        this.advance();
+        return "<=";
+      case TokenType.GtEq:
+        this.advance();
+        return ">=";
+      case TokenType.NotEq:
+        this.advance();
+        return "!=";
+      default:
+        throw new ParseError(`Expected comparison operator, got '${token.value}'`, token.span);
+    }
   }
 
   private parseAtom(): Atom {
