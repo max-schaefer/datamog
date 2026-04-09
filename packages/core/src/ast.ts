@@ -45,7 +45,34 @@ export interface UnaryExpr extends SourceElement {
   operand: Term;
 }
 
-export type Term = Variable | StringLiteral | NumberLiteral | BinaryExpr | UnaryExpr;
+export interface FunctionCall extends SourceElement {
+  kind: "call";
+  name: string;
+  args: Term[];
+}
+
+export interface Subscript extends SourceElement {
+  kind: "subscript";
+  object: Term;
+  index: Term;
+}
+
+export interface Slice extends SourceElement {
+  kind: "slice";
+  object: Term;
+  start?: Term;
+  end?: Term;
+}
+
+export type Term =
+  | Variable
+  | StringLiteral
+  | NumberLiteral
+  | BinaryExpr
+  | UnaryExpr
+  | FunctionCall
+  | Subscript
+  | Slice;
 
 // --- Column declarations (for extensional predicates) ---
 

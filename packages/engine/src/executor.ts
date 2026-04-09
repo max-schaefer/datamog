@@ -1,4 +1,4 @@
-import { analyze } from "datamog-core";
+import { analyze, inferTypes } from "datamog-core";
 import { parse } from "datamog-parser";
 import type { Backend } from "./backend.ts";
 import type { ExtensionalLoader } from "./loader.ts";
@@ -25,7 +25,7 @@ export class DatamogExecutor {
 
   async execute(source: string): Promise<QueryResult[]> {
     const program = parse(source);
-    const analyzed = analyze(program);
+    const analyzed = inferTypes(analyze(program));
     const translation = translate(analyzed, { dialect: this.backend.dialect });
 
     // 1. Create tables

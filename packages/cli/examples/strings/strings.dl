@@ -1,0 +1,11 @@
+% String manipulation example
+% Demonstrates concatenation, len, subscript, and slice.
+
+extensional words(w: text).
+
+prefixed(R) :- words(W), R = "hello_" + W.
+lengths(W, N) :- words(W), N = len(W).
+initials(W, C) :- words(W), C = W[0].
+first_three(W, S) :- words(W), len(W) >= 3, S = W[:3].
+
+?- prefixed(R).

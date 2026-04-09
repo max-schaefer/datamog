@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { analyze } from "datamog-core";
+import { analyze, inferTypes } from "datamog-core";
 import { parse } from "datamog-parser";
 import { translate } from "../src/translator.ts";
 
@@ -7,6 +7,10 @@ import type { Dialect } from "../src/translator.ts";
 
 function translateSource(source: string, dialect: Dialect = "postgres") {
   return translate(analyze(parse(source)), { dialect });
+}
+
+function translateTyped(source: string, dialect: Dialect = "postgres") {
+  return translate(inferTypes(analyze(parse(source))), { dialect });
 }
 
 /** Normalize whitespace for comparison */
@@ -209,6 +213,54 @@ describe("translator", () => {
     const sql = norm(result.createViews[0]!);
     expect(sql).toContain("+ 10");
     expect(sql).toContain("AS col2");
+  });
+
+  test("uses || for string concatenation with type info", () => {
+    const result = translateTyped(`
+      extensional words(w: text).
+      prefixed(R) :- words(W), R = "hello_" + W.
+    `);
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("||");
+    expect(sql).not.toContain("+");
+  });
+
+  test("uses + for integer arithmetic with type info", () => {
+    const result = translateTyped(`
+      extensional nums(x: integer).
+      inc(X, Y) :- nums(X), Y = X + 1.
+    `);
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("+");
+    expect(sql).not.toContain("||");
+  });
+
+  test("generates LENGTH for len()", () => {
+    const result = translateSource(`
+      extensional words(w: text).
+      lengths(W, N) :- words(W), N = len(W).
+    `);
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("LENGTH(");
+  });
+
+  test("generates SUBSTR for subscript", () => {
+    const result = translateSource(`
+      extensional words(w: text).
+      first_char(W, C) :- words(W), C = W[0].
+    `);
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("SUBSTR(");
+    expect(sql).toContain("+ 1, 1)");
+  });
+
+  test("generates SUBSTR for slice", () => {
+    const result = translateSource(`
+      extensional words(w: text).
+      mid(W, S) :- words(W), S = W[1:3].
+    `);
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("SUBSTR(");
   });
 
   test("generates NOT EXISTS for negated atoms", () => {

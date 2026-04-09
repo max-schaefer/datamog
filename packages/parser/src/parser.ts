@@ -148,9 +148,17 @@ export class Parser {
       return { ...atom, negated: true };
     }
 
-    // Atom: ident(...)
+    // Atom: ident(...) — but only if not followed by a comparison operator
+    // (which would make it a function call in a comparison, e.g. len(X) >= 3)
     if (this.isAt(TokenType.Ident) && this.peekAt(1)?.type === TokenType.LParen) {
-      return this.parseAtom();
+      const saved = this.pos;
+      const atom = this.parseAtom();
+      if (this.isComparisonOp()) {
+        // Reinterpret as comparison: function call on left side
+        this.pos = saved;
+        return this.parseComparison();
+      }
+      return atom;
     }
 
     // Equality: Variable = expr
@@ -182,6 +190,17 @@ export class Parser {
       right,
       span: { ...left.span, end: right.span.end },
     };
+  }
+
+  private isComparisonOp(): boolean {
+    const t = this.peek().type;
+    return (
+      t === TokenType.Lt ||
+      t === TokenType.Gt ||
+      t === TokenType.LtEq ||
+      t === TokenType.GtEq ||
+      t === TokenType.NotEq
+    );
   }
 
   private parseComparisonOp(): ComparisonOp {
@@ -283,7 +302,55 @@ export class Parser {
         span: { ...opToken.span, end: operand.span.end },
       };
     }
-    return this.parsePrimary();
+    return this.parsePostfix();
+  }
+
+  /** Parse postfix operations: subscript X[N] and slice X[A:B]. */
+  private parsePostfix(): Term {
+    let expr = this.parsePrimary();
+
+    while (this.isAt(TokenType.LBracket)) {
+      this.advance(); // consume [
+
+      if (this.isAt(TokenType.Colon)) {
+        // [:end]
+        this.advance();
+        const end = this.isAt(TokenType.RBracket) ? undefined : this.parseExpr();
+        const rbracket = this.expect(TokenType.RBracket);
+        expr = {
+          kind: "slice",
+          object: expr,
+          end,
+          span: { ...expr.span, end: rbracket.span.end },
+        };
+      } else {
+        const indexOrStart = this.parseExpr();
+        if (this.isAt(TokenType.Colon)) {
+          // [start:end] or [start:]
+          this.advance();
+          const end = this.isAt(TokenType.RBracket) ? undefined : this.parseExpr();
+          const rbracket = this.expect(TokenType.RBracket);
+          expr = {
+            kind: "slice",
+            object: expr,
+            start: indexOrStart,
+            end,
+            span: { ...expr.span, end: rbracket.span.end },
+          };
+        } else {
+          // [index]
+          const rbracket = this.expect(TokenType.RBracket);
+          expr = {
+            kind: "subscript",
+            object: expr,
+            index: indexOrStart,
+            span: { ...expr.span, end: rbracket.span.end },
+          };
+        }
+      }
+    }
+
+    return expr;
   }
 
   private parsePrimary(): Term {
@@ -295,6 +362,24 @@ export class Parser {
       const expr = this.parseExpr();
       this.expect(TokenType.RParen);
       return expr;
+    }
+
+    // Function call: ident(args)
+    if (token.type === TokenType.Ident && this.peekAt(1)?.type === TokenType.LParen) {
+      const nameToken = this.advance();
+      this.advance(); // consume (
+      const args: Term[] = [this.parseExpr()];
+      while (this.isAt(TokenType.Comma)) {
+        this.advance();
+        args.push(this.parseExpr());
+      }
+      const rparen = this.expect(TokenType.RParen);
+      return {
+        kind: "call",
+        name: nameToken.value,
+        args,
+        span: { ...nameToken.span, end: rparen.span.end },
+      };
     }
 
     switch (token.type) {

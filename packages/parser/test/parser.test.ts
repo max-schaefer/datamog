@@ -245,6 +245,68 @@ describe("parser", () => {
     }
   });
 
+  test("function call in expression", () => {
+    const program = parse("foo(N) :- bar(X), N = len(X).");
+    const rule = program.statements[0] as Rule;
+    const eq = rule.body[1]!;
+    expect(eq.kind).toBe("equality");
+    if (eq.kind === "equality") {
+      expect(eq.expr.kind).toBe("call");
+      if (eq.expr.kind === "call") {
+        expect(eq.expr.name).toBe("len");
+        expect(eq.expr.args).toHaveLength(1);
+      }
+    }
+  });
+
+  test("subscript expression", () => {
+    const program = parse("foo(C) :- bar(X), C = X[0].");
+    const rule = program.statements[0] as Rule;
+    const eq = rule.body[1]!;
+    if (eq.kind === "equality") {
+      expect(eq.expr.kind).toBe("subscript");
+    }
+  });
+
+  test("slice expression", () => {
+    const program = parse("foo(S) :- bar(X), S = X[1:3].");
+    const rule = program.statements[0] as Rule;
+    const eq = rule.body[1]!;
+    if (eq.kind === "equality") {
+      expect(eq.expr.kind).toBe("slice");
+      if (eq.expr.kind === "slice") {
+        expect(eq.expr.start).toMatchObject({ kind: "number", value: 1 });
+        expect(eq.expr.end).toMatchObject({ kind: "number", value: 3 });
+      }
+    }
+  });
+
+  test("slice with omitted start", () => {
+    const program = parse("foo(S) :- bar(X), S = X[:3].");
+    const rule = program.statements[0] as Rule;
+    const eq = rule.body[1]!;
+    if (eq.kind === "equality") {
+      expect(eq.expr.kind).toBe("slice");
+      if (eq.expr.kind === "slice") {
+        expect(eq.expr.start).toBeUndefined();
+        expect(eq.expr.end).toMatchObject({ kind: "number", value: 3 });
+      }
+    }
+  });
+
+  test("slice with omitted end", () => {
+    const program = parse("foo(S) :- bar(X), S = X[1:].");
+    const rule = program.statements[0] as Rule;
+    const eq = rule.body[1]!;
+    if (eq.kind === "equality") {
+      expect(eq.expr.kind).toBe("slice");
+      if (eq.expr.kind === "slice") {
+        expect(eq.expr.start).toMatchObject({ kind: "number", value: 1 });
+        expect(eq.expr.end).toBeUndefined();
+      }
+    }
+  });
+
   test("preserves span on rule", () => {
     const program = parse("foo(X).");
     const rule = program.statements[0] as Rule;

@@ -14,20 +14,37 @@ export interface TypedProgram extends AnalyzedProgram {
  * expression type rules. Uses a fixed-point iteration for recursive predicates.
  */
 export function inferTypes(analyzed: AnalyzedProgram): TypedProgram {
-  const columnTypes = new Map<string, SqlType[]>();
+  // Internal representation allows undefined for unknown positions
+  const types = new Map<string, (SqlType | undefined)[]>();
 
   // Seed EDB types from declarations
   for (const [predicate, decl] of analyzed.extDecls) {
-    columnTypes.set(
+    types.set(
       predicate,
       decl.columns.map((c) => c.type),
     );
   }
 
-  // Initialize IDB types as unknown (null), then iterate to fixed point
+  // Initialize IDB types — seed from facts (empty body rules) where possible
   for (const [predicate, rules] of analyzed.rules) {
     const arity = analyzed.arities.get(predicate)!;
-    columnTypes.set(predicate, new Array<SqlType>(arity).fill("text")); // placeholder
+    const seedTypes: (SqlType | undefined)[] = new Array(arity).fill(undefined);
+
+    for (const rule of rules) {
+      if (rule.body.length === 0) {
+        for (let i = 0; i < rule.head.args.length; i++) {
+          const arg = rule.head.args[i]!;
+          if (arg.kind === "string") seedTypes[i] = joinTypes(seedTypes[i], "text");
+          else if (arg.kind === "number")
+            seedTypes[i] = joinTypes(
+              seedTypes[i],
+              Number.isInteger(arg.value) ? "integer" : "real",
+            );
+        }
+      }
+    }
+
+    types.set(predicate, seedTypes);
   }
 
   // Fixed-point iteration: infer types from rules until stable
@@ -48,7 +65,7 @@ export function inferTypes(analyzed: AnalyzedProgram): TypedProgram {
 
           for (const elem of rule.body) {
             if (elem.kind === "atom" && !elem.negated) {
-              const predTypes = columnTypes.get(elem.predicate);
+              const predTypes = types.get(elem.predicate);
               if (!predTypes) continue;
               for (let j = 0; j < elem.args.length; j++) {
                 const arg = elem.args[j]!;
@@ -60,7 +77,7 @@ export function inferTypes(analyzed: AnalyzedProgram): TypedProgram {
                 }
               }
             } else if (elem.kind === "equality") {
-              const exprType = inferTermType(elem.expr, varTypes, columnTypes);
+              const exprType = inferTermType(elem.expr, varTypes, types);
               if (exprType) {
                 varTypes.set(elem.variable, exprType);
               }
@@ -70,24 +87,33 @@ export function inferTypes(analyzed: AnalyzedProgram): TypedProgram {
           // Infer head argument types
           for (let i = 0; i < rule.head.args.length; i++) {
             const arg = rule.head.args[i]!;
-            const argType = inferTermType(arg, varTypes, columnTypes);
+            const argType = inferTermType(arg, varTypes, types);
             if (argType) {
               newTypes[i] = joinTypes(newTypes[i], argType);
             }
           }
         }
 
-        // Check if types changed
-        const oldTypes = columnTypes.get(predicate)!;
-        const finalTypes = newTypes.map((t, i) => t ?? oldTypes[i]!);
+        // Merge new types with old, check for changes
+        const oldTypes = types.get(predicate)!;
         for (let i = 0; i < arity; i++) {
-          if (finalTypes[i] !== oldTypes[i]) {
+          const merged = newTypes[i] ?? oldTypes[i];
+          if (merged !== oldTypes[i]) {
             changed = true;
           }
+          oldTypes[i] = merged;
         }
-        columnTypes.set(predicate, finalTypes);
       }
     }
+  }
+
+  // Finalize: convert undefined to "text" as default
+  const columnTypes = new Map<string, SqlType[]>();
+  for (const [pred, predTypes] of types) {
+    columnTypes.set(
+      pred,
+      predTypes.map((t) => t ?? "text"),
+    );
   }
 
   return { ...analyzed, columnTypes };
@@ -97,7 +123,7 @@ export function inferTypes(analyzed: AnalyzedProgram): TypedProgram {
 function inferTermType(
   term: Term,
   varTypes: Map<string, SqlType>,
-  columnTypes: Map<string, SqlType[]>,
+  types: Map<string, (SqlType | undefined)[]>,
 ): SqlType | undefined {
   switch (term.kind) {
     case "string":
@@ -107,15 +133,31 @@ function inferTermType(
     case "variable":
       return varTypes.get(term.name);
     case "binary": {
-      const leftType = inferTermType(term.left, varTypes, columnTypes);
-      const rightType = inferTermType(term.right, varTypes, columnTypes);
+      const leftType = inferTermType(term.left, varTypes, types);
+      const rightType = inferTermType(term.right, varTypes, types);
       if (term.op === "+" && (leftType === "text" || rightType === "text")) {
         return "text";
       }
       return numericResultType(leftType, rightType, term.op);
     }
     case "unary":
-      return inferTermType(term.operand, varTypes, columnTypes);
+      return inferTermType(term.operand, varTypes, types);
+    case "call":
+      return inferCallType(term.name);
+    case "subscript":
+      return "text";
+    case "slice":
+      return "text";
+  }
+}
+
+/** Return type of a built-in function call. */
+function inferCallType(name: string): SqlType | undefined {
+  switch (name) {
+    case "len":
+      return "integer";
+    default:
+      return undefined;
   }
 }
 
@@ -126,7 +168,6 @@ function numericResultType(
   op: string,
 ): SqlType | undefined {
   if (op === "/" || op === "%") {
-    // Division may produce real, but integer/integer in SQL stays integer
     if (left === "real" || right === "real") return "real";
     if (left === "integer" && right === "integer") return "integer";
     return left ?? right;
@@ -140,9 +181,7 @@ function numericResultType(
 function joinTypes(a: SqlType | undefined, b: SqlType): SqlType {
   if (!a) return b;
   if (a === b) return a;
-  // text + anything = text (string coercion dominates)
   if (a === "text" || b === "text") return "text";
-  // real + integer = real
   if ((a === "real" && b === "integer") || (a === "integer" && b === "real")) return "real";
   return a;
 }

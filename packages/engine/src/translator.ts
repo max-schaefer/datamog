@@ -1,4 +1,12 @@
-import type { AnalyzedProgram, Atom, Comparison, Equality, Rule, Term } from "datamog-core";
+import type {
+  AnalyzedProgram,
+  Atom,
+  Comparison,
+  Equality,
+  Rule,
+  SqlType,
+  Term,
+} from "datamog-core";
 
 export type Dialect = "postgres" | "sqlite";
 
@@ -191,11 +199,14 @@ function translateRule(
 
   const aliases = rule.body.map((_, i) => `__b${i}`);
 
-  // Build variable bindings from positive atoms (column refs)
+  // Build variable bindings and type map from positive atoms
   const bindings = new Map<string, Binding[]>();
+  const varTypes = new Map<string, SqlType>();
+  const columnTypes = (analyzed as { columnTypes?: Map<string, SqlType[]> }).columnTypes;
 
   for (const { atom, index } of positiveAtoms) {
     const alias = aliases[index]!;
+    const predTypes = columnTypes?.get(atom.predicate);
     for (let j = 0; j < atom.args.length; j++) {
       const term = atom.args[j]!;
       if (term.kind === "variable") {
@@ -203,13 +214,16 @@ function translateRule(
         const list = bindings.get(term.name) ?? [];
         list.push({ kind: "col", alias, col });
         bindings.set(term.name, list);
+        if (predTypes?.[j] && !varTypes.has(term.name)) {
+          varTypes.set(term.name, predTypes[j]!);
+        }
       }
     }
   }
 
   // Register equality bindings: X = expr → bind X to the SQL expression
   for (const eq of equalities) {
-    const sql = termToSql(eq.expr, bindings);
+    const sql = termToSql(eq.expr, bindings, varTypes);
     const list = bindings.get(eq.variable) ?? [];
     list.push({ kind: "expr", sql });
     bindings.set(eq.variable, list);
@@ -234,7 +248,7 @@ function translateRule(
       }
       selectParts.push(`${bindingToSql(refs[0]!)} AS ${targetCol}`);
     } else {
-      selectParts.push(`${termToSql(term, bindings)} AS ${targetCol}`);
+      selectParts.push(`${termToSql(term, bindings, varTypes)} AS ${targetCol}`);
     }
   }
 
@@ -273,7 +287,7 @@ function translateRule(
       const term = atom.args[j]!;
       if (term.kind !== "variable") {
         const col = resolveColumnRef(atom.predicate, j, analyzed);
-        conditions.push(`${alias}.${ident(col)} = ${termToSql(term, bindings)}`);
+        conditions.push(`${alias}.${ident(col)} = ${termToSql(term, bindings, varTypes)}`);
       }
     }
   }
@@ -290,7 +304,7 @@ function translateRule(
           subConditions.push(`${ident(col)} = ${bindingToSql(refs[0]!)}`);
         }
       } else {
-        subConditions.push(`${ident(col)} = ${termToSql(term, bindings)}`);
+        subConditions.push(`${ident(col)} = ${termToSql(term, bindings, varTypes)}`);
       }
     }
     const tag = tagMap?.get(atom.predicate);
@@ -307,7 +321,9 @@ function translateRule(
   // Comparison conditions
   for (const cmp of comparisons) {
     const sqlOp = cmp.op === "!=" ? "<>" : cmp.op;
-    conditions.push(`${termToSql(cmp.left, bindings)} ${sqlOp} ${termToSql(cmp.right, bindings)}`);
+    conditions.push(
+      `${termToSql(cmp.left, bindings, varTypes)} ${sqlOp} ${termToSql(cmp.right, bindings, varTypes)}`,
+    );
   }
 
   let sql = `SELECT ${selectParts.join(", ")} FROM ${fromParts.join(", ")}`;
@@ -374,8 +390,15 @@ function ident(name: string): string {
   return `"${name}"`;
 }
 
-/** Convert a Term AST node to a SQL expression string. */
-function termToSql(term: Term, bindings: Map<string, Binding[]>): string {
+/**
+ * Convert a Term AST node to a SQL expression string.
+ * @param varTypes - Optional variable type map for type-aware operator selection (+ vs ||)
+ */
+function termToSql(
+  term: Term,
+  bindings: Map<string, Binding[]>,
+  varTypes?: Map<string, SqlType>,
+): string {
   switch (term.kind) {
     case "string":
       return `'${term.value.replace(/'/g, "''")}'`;
@@ -389,10 +412,66 @@ function termToSql(term: Term, bindings: Map<string, Binding[]>): string {
       const b = refs[0]!;
       return b.kind === "col" ? `${b.alias}.${ident(b.col)}` : b.sql;
     }
-    case "binary":
-      return `(${termToSql(term.left, bindings)} ${term.op} ${termToSql(term.right, bindings)})`;
+    case "binary": {
+      const leftSql = termToSql(term.left, bindings, varTypes);
+      const rightSql = termToSql(term.right, bindings, varTypes);
+      let op = term.op;
+      if (op === "+" && (isTextType(term.left, varTypes) || isTextType(term.right, varTypes))) {
+        op = "||" as typeof op;
+      }
+      return `(${leftSql} ${op} ${rightSql})`;
+    }
     case "unary":
-      return `(-${termToSql(term.operand, bindings)})`;
+      return `(-${termToSql(term.operand, bindings, varTypes)})`;
+    case "call":
+      return translateCall(term.name, term.args, bindings, varTypes);
+    case "subscript": {
+      const obj = termToSql(term.object, bindings, varTypes);
+      const idx = termToSql(term.index, bindings, varTypes);
+      return `SUBSTR(${obj}, (${idx}) + 1, 1)`;
+    }
+    case "slice": {
+      const obj = termToSql(term.object, bindings, varTypes);
+      if (term.start && term.end) {
+        const s = termToSql(term.start, bindings, varTypes);
+        const e = termToSql(term.end, bindings, varTypes);
+        return `SUBSTR(${obj}, (${s}) + 1, (${e}) - (${s}))`;
+      }
+      if (term.start) {
+        const s = termToSql(term.start, bindings, varTypes);
+        return `SUBSTR(${obj}, (${s}) + 1)`;
+      }
+      if (term.end) {
+        const e = termToSql(term.end, bindings, varTypes);
+        return `SUBSTR(${obj}, 1, (${e}))`;
+      }
+      return obj;
+    }
+  }
+}
+
+/** Check whether a term has text type (for choosing || over +). */
+function isTextType(term: Term, varTypes?: Map<string, SqlType>): boolean {
+  if (term.kind === "string") return true;
+  if (term.kind === "call" && term.name === "len") return false;
+  if (term.kind === "subscript" || term.kind === "slice") return true;
+  if (term.kind === "variable" && varTypes?.get(term.name) === "text") return true;
+  return false;
+}
+
+/** Translate a built-in function call to SQL. */
+function translateCall(
+  name: string,
+  args: Term[],
+  bindings: Map<string, Binding[]>,
+  varTypes?: Map<string, SqlType>,
+): string {
+  const sqlArgs = args.map((a) => termToSql(a, bindings, varTypes));
+  switch (name) {
+    case "len":
+      return `LENGTH(${sqlArgs[0]})`;
+    default:
+      return `${name.toUpperCase()}(${sqlArgs.join(", ")})`;
   }
 }
 

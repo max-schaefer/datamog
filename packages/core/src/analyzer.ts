@@ -34,6 +34,18 @@ function collectVars(term: Term, into: Set<string>) {
     case "unary":
       collectVars(term.operand, into);
       break;
+    case "call":
+      for (const arg of term.args) collectVars(arg, into);
+      break;
+    case "subscript":
+      collectVars(term.object, into);
+      collectVars(term.index, into);
+      break;
+    case "slice":
+      collectVars(term.object, into);
+      if (term.start) collectVars(term.start, into);
+      if (term.end) collectVars(term.end, into);
+      break;
   }
 }
 
