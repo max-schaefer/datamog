@@ -22,3 +22,4 @@ export type {
   Variable,
 } from "./ast.ts";
 export { analyze, AnalyzerError, type AnalyzedProgram } from "./analyzer.ts";
+export { inferTypes, type TypedProgram } from "./types.ts";
