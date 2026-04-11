@@ -11,6 +11,7 @@
     { "path": "../parser" },
     { "path": "../engine" },
     { "path": "../loader/csv" },
+    { "path": "../loader/mermaid" },
     { "path": "../backend/postgres" },
     { "path": "../backend/sqlite" }
   ]

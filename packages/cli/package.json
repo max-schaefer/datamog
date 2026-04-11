@@ -12,6 +12,8 @@
     "datamog-csv": "workspace:*",
     "datamog-gsheet": "workspace:*",
     "datamog-jsonl": "workspace:*",
+    "datamog-mermaid": "workspace:*",
+    "beautiful-mermaid": "^1",
     "datamog-parser": "workspace:*",
     "datamog-engine": "workspace:*"
   }

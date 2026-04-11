@@ -14,6 +14,7 @@ import {
 } from "datamog-engine";
 import { type GSheetAuth, GSheetLoader } from "datamog-gsheet";
 import { JsonlLoader } from "datamog-jsonl";
+import { MermaidLoader, parseMermaidGraph } from "datamog-mermaid";
 import { parse } from "datamog-parser";
 
 function usage(): never {
@@ -24,9 +25,11 @@ function usage(): never {
   console.error("                   (defaults to the directory containing the .dl file)");
   console.error();
   console.error("Options:");
-  console.error("  --extensional name=source  Map a predicate to a file (.csv/.jsonl) or");
+  console.error("  --extensional name=source  Map a predicate to a file (.csv/.jsonl/.mmd) or");
   console.error("                             a Google Sheets URL (requires GOOGLE_API_KEY)");
-  console.error("  --output-format <format>   Output format: table (default), csv, or jsonl");
+  console.error(
+    "  --output-format <format>   Output format: table (default), csv, jsonl, mermaid, or ascii",
+  );
   console.error("  --dry-run                  Print generated SQL without executing");
   console.error("  --backend <backend>        Backend: postgres or sqlite (default: auto)");
   console.error("  -h, --help                 Show this help message");
@@ -46,7 +49,7 @@ function usage(): never {
 }
 
 type BackendName = "postgres" | "sqlite";
-type OutputFormat = "table" | "csv" | "jsonl";
+type OutputFormat = "table" | "csv" | "jsonl" | "mermaid" | "ascii";
 
 async function createBackend(name: BackendName): Promise<Backend> {
   if (name === "postgres") {
@@ -86,6 +89,9 @@ class ExplicitFileLoader implements ExtensionalLoader {
     }
     if (ext === ".jsonl") {
       return this.loadJsonl(content, decl, backend);
+    }
+    if (ext === ".mmd") {
+      return this.loadMermaid(content, decl, backend);
     }
     throw new Error(`Unsupported file format '${ext}' for predicate '${this.predicateName}'`);
   }
@@ -132,6 +138,22 @@ class ExplicitFileLoader implements ExtensionalLoader {
         );
       });
       await this.insertRow(decl, values, backend);
+      rowsLoaded++;
+    }
+    return { rowsLoaded };
+  }
+
+  private async loadMermaid(content: string, decl: ExtDecl, backend: Backend): Promise<LoadResult> {
+    if (decl.columns.length !== 2) {
+      throw new Error(
+        `Mermaid format requires a binary predicate (2 columns), but '${decl.predicate}' has ${decl.columns.length}`,
+      );
+    }
+    const edges = parseMermaidGraph(content);
+
+    let rowsLoaded = 0;
+    for (const edge of edges) {
+      await this.insertRow(decl, [edge.source, edge.target], backend);
       rowsLoaded++;
     }
     return { rowsLoaded };
@@ -186,7 +208,7 @@ function buildExplicitLoaders(mappings: { name: string; source: string }[]): Ext
     }
 
     const ext = extname(source).toLowerCase();
-    if (ext !== ".csv" && ext !== ".jsonl") {
+    if (ext !== ".csv" && ext !== ".jsonl" && ext !== ".mmd") {
       console.error(`Unsupported file format '${ext}' for --extensional ${name}=${source}`);
       process.exit(1);
     }
@@ -202,7 +224,7 @@ function buildExplicitLoaders(mappings: { name: string; source: string }[]): Ext
   return loaders;
 }
 
-function printResult(sql: string, rows: Record<string, unknown>[], format: OutputFormat) {
+async function printResult(sql: string, rows: Record<string, unknown>[], format: OutputFormat) {
   switch (format) {
     case "table":
       console.log(`-- ${sql}`);
@@ -227,6 +249,16 @@ function printResult(sql: string, rows: Record<string, unknown>[], format: Outpu
         console.log(JSON.stringify(row));
       }
       break;
+    case "mermaid":
+      if (rows.length === 0) break;
+      console.log(rowsToMermaid(rows));
+      break;
+    case "ascii": {
+      if (rows.length === 0) break;
+      const { renderMermaidASCII } = await import("beautiful-mermaid");
+      console.log(renderMermaidASCII(rowsToMermaid(rows)));
+      break;
+    }
   }
 }
 
@@ -235,6 +267,23 @@ function csvEscape(value: string): string {
     return `"${value.replace(/"/g, '""')}"`;
   }
   return value;
+}
+
+function mermaidEscape(id: string): string {
+  if (/^[\w][\w.-]*$/.test(id)) return id;
+  const safeId = id.replace(/[^a-zA-Z0-9_]/g, "_");
+  return `${safeId}["${id.replace(/"/g, "#quot;")}"]`;
+}
+
+function rowsToMermaid(rows: Record<string, unknown>[]): string {
+  const keys = Object.keys(rows[0]!);
+  const lines = ["graph TD"];
+  for (const row of rows) {
+    const src = String(row[keys[0]!] ?? "");
+    const dst = String(row[keys[1]!] ?? "");
+    lines.push(`    ${mermaidEscape(src)} --> ${mermaidEscape(dst)}`);
+  }
+  return lines.join("\n");
 }
 
 async function main() {
@@ -260,8 +309,16 @@ async function main() {
       backendOverride = value;
     } else if (arg === "--output-format") {
       const value = args[++i];
-      if (value !== "table" && value !== "csv" && value !== "jsonl") {
-        console.error(`Invalid output format: ${value} (expected "table", "csv", or "jsonl")`);
+      if (
+        value !== "table" &&
+        value !== "csv" &&
+        value !== "jsonl" &&
+        value !== "mermaid" &&
+        value !== "ascii"
+      ) {
+        console.error(
+          `Invalid output format: ${value} (expected "table", "csv", "jsonl", "mermaid", or "ascii")`,
+        );
         process.exit(1);
       }
       outputFormat = value;
@@ -348,12 +405,28 @@ async function main() {
     ...explicitLoaders,
     new CsvLoader({ directory: dataDir }),
     new JsonlLoader({ directory: dataDir }),
+    new MermaidLoader({ directory: dataDir }),
   ]);
 
   try {
     const results = await executor.execute(source);
+
+    if (outputFormat === "mermaid" || outputFormat === "ascii") {
+      for (const result of results) {
+        if (result.rows.length > 0) {
+          const colCount = Object.keys(result.rows[0]!).length;
+          if (colCount !== 2) {
+            console.error(
+              `--output-format ${outputFormat} requires a binary predicate (2 columns), but got ${colCount}`,
+            );
+            process.exit(1);
+          }
+        }
+      }
+    }
+
     for (const result of results) {
-      printResult(result.sql, result.rows, outputFormat);
+      await printResult(result.sql, result.rows, outputFormat);
     }
   } finally {
     await backend.close();

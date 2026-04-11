@@ -1,6 +1,6 @@
 # Datamog — Project Instructions
 
-Educational Datalog → SQL translator. TypeScript/Bun monorepo.
+Educational Datalog → SQL translator. TypeScript/Bun monorepo. Uses **bun** as package manager and runtime — do not use pnpm/npm/yarn.
 
 ## Commands
 

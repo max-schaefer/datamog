@@ -1,0 +1,15 @@
+{
+  "name": "datamog-mermaid",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "datamog-core": "workspace:*",
+    "datamog-engine": "workspace:*"
+  },
+  "devDependencies": {
+    "datamog-parser": "workspace:*"
+  }
+}

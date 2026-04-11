@@ -5,6 +5,7 @@ import { create } from "datamog-backend-sqlite";
 import { CsvLoader } from "datamog-csv";
 import { DatamogExecutor } from "datamog-engine";
 import { JsonlLoader } from "datamog-jsonl";
+import { MermaidLoader } from "datamog-mermaid";
 
 const EXAMPLES_DIR = join(dirname(import.meta.dir), "examples");
 
@@ -24,6 +25,7 @@ async function runExample(name: string): Promise<Record<string, unknown>[][]> {
   const executor = new DatamogExecutor(backend, [
     new CsvLoader({ directory: dir }),
     new JsonlLoader({ directory: dir }),
+    new MermaidLoader({ directory: dir }),
   ]);
 
   try {

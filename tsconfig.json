@@ -8,6 +8,7 @@
     { "path": "packages/loader/csv" },
     { "path": "packages/loader/jsonl" },
     { "path": "packages/loader/gsheet" },
+    { "path": "packages/loader/mermaid" },
     { "path": "packages/cli" }
   ],
   "files": []
