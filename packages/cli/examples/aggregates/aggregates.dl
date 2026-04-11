@@ -1,0 +1,32 @@
+% Aggregates — student scores
+%
+% Demonstrates aggregate functions: count, sum, avg, min, max.
+
+extensional scores(student: text, subject: text, score: integer).
+
+% Average score per student
+student_avg(Student, avg(Score)) :- scores(Student, _, Score).
+
+% Number of subjects each student took
+num_subjects(Student, count(Subject)) :- scores(Student, Subject, _).
+
+% Total score per student
+total_score(Student, sum(Score)) :- scores(Student, _, Score).
+
+% Highest and lowest score per student
+best_score(Student, max(Score)) :- scores(Student, _, Score).
+worst_score(Student, min(Score)) :- scores(Student, _, Score).
+
+% Overall: total number of records
+record_count(count(_)) :- scores(_, _, _).
+
+% Students whose worst score is above 80
+strong(Student) :- worst_score(Student, W), W > 80.
+
+?- student_avg(Student, Avg).
+?- num_subjects(Student, N).
+?- total_score(Student, Total).
+?- best_score(Student, Best).
+?- worst_score(Student, Worst).
+?- record_count(N).
+?- strong(Student).

@@ -52,6 +52,7 @@ cli (imports all packages, selects backend via --backend flag)
 - Recursive IDB → `CREATE RECURSIVE VIEW` (postgres) / `CREATE VIEW ... WITH RECURSIVE` (sqlite)
 - Mutually recursive IDB → shared `WITH RECURSIVE` block with co-dependent CTEs
 - Multiple rules for the same predicate → `UNION`
+- **Aggregates**: aggregate functions (`count`, `sum`, `avg`, `min`, `max`, `group_concat`) in rule heads define grouped views; non-aggregate head args become `GROUP BY` columns; `count(_)` → `COUNT(*)`; aggregate predicates cannot be recursive; all rules for a predicate must agree on aggregate positions
 - IDB views use positional column names (`col1`, `col2`, ...), EDB tables use declared names
 - Don't-care variable `_` is desugared to unique anonymous variables in the parser
 
@@ -62,7 +63,7 @@ Typical touch points (in dependency order):
 1. **AST** (`core/src/ast.ts`): add interface with `kind` discriminant extending `SourceElement`, update `BodyElement`/`Term` union
 2. **Core exports** (`core/src/index.ts`): export the new type
 3. **Lexer** (`parser/src/lexer.ts`): add new `TokenType` enum values, keywords in `KEYWORDS` map, multi-char ops before single-char `punctMap`
-4. **Parser** (`parser/src/parser.ts`): handle in `parseBodyElement()` (body elements) or expression parsing chain; watch for ambiguity with existing dispatch (ident+lparen → atom vs function call, variable+equals → equality)
+4. **Parser** (`parser/src/parser.ts`): handle in `parseBodyElement()` (body elements) or expression parsing chain; watch for ambiguity with existing dispatch (ident+lparen → atom vs function call, variable+equals → equality); `parsingHead` flag controls aggregate function recognition
 5. **Analyzer** (`core/src/analyzer.ts`): update `checkSafety()` — phase 1 collects safe vars (fixed-point for equalities/ranges), phase 2 checks all body elements left-to-right
 6. **Type inference** (`core/src/types.ts`): update var type environment building in the fixed-point loop, add validation if needed
 7. **Translator** (`engine/src/translator.ts`): update `translateRule()` — single left-to-right pass over body elements registers bindings and categorizes into positiveAtoms/negatedAtoms/comparisons/bindingRanges/filterRanges; FROM/WHERE assembled from these
@@ -73,6 +74,7 @@ Typical touch points (in dependency order):
 - SQLite: `CREATE VIEW IF NOT EXISTS`; Postgres: `CREATE OR REPLACE VIEW`
 - SQLite mutual recursion: combined CTE with `__tag` discriminator column
 - Postgres mutual recursion: multiple CTEs in `WITH RECURSIVE` block
+- `group_concat` → `GROUP_CONCAT(expr, ',')` (SQLite) / `STRING_AGG(expr::TEXT, ',')` (Postgres)
 - `translateRule()` receives `dialect` parameter (passed through from `translateViews`)
 
 ## Conventions

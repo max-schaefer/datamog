@@ -339,6 +339,87 @@ describe("translator", () => {
     expect(sql).toContain("+ 10)");
   });
 
+  test("generates GROUP BY for aggregate rule", () => {
+    const result = translateSource(`
+      extensional parent(name: text, child: text).
+      num_children(P, count(C)) :- parent(P, C).
+    `);
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain('CREATE OR REPLACE VIEW "num_children"');
+    expect(sql).toContain("COUNT(");
+    expect(sql).toContain("GROUP BY");
+  });
+
+  test("generates COUNT(*) for count(_)", () => {
+    const result = translateSource(`
+      extensional parent(name: text, child: text).
+      total(count(_)) :- parent(_, _).
+    `);
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("COUNT(*)");
+    expect(sql).not.toContain("GROUP BY");
+  });
+
+  test("generates SUM aggregate", () => {
+    const result = translateSource(`
+      extensional scores(name: text, score: integer).
+      totals(X, sum(S)) :- scores(X, S).
+    `);
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("SUM(");
+    expect(sql).toContain("GROUP BY");
+  });
+
+  test("generates aggregate with expression argument", () => {
+    const result = translateSource(`
+      extensional items(part: text, qty: integer, cost: integer).
+      total_cost(P, sum(Q * C)) :- items(P, Q, C).
+    `);
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("SUM(");
+    expect(sql).toContain("*");
+    expect(sql).toContain("GROUP BY");
+  });
+
+  test("generates all aggregate functions", () => {
+    for (const [func, sqlFunc] of [
+      ["count", "COUNT"],
+      ["sum", "SUM"],
+      ["avg", "AVG"],
+      ["min", "MIN"],
+      ["max", "MAX"],
+    ] as const) {
+      const result = translateSource(`
+        extensional t(a: text, b: integer).
+        r(X, ${func}(Y)) :- t(X, Y).
+      `);
+      const sql = norm(result.createViews[0]!);
+      expect(sql).toContain(`${sqlFunc}(`);
+    }
+  });
+
+  test("generates UNION of aggregate rules", () => {
+    const result = translateSource(`
+      extensional t1(a: text, b: integer).
+      extensional t2(a: text, b: integer).
+      totals(X, sum(Y)) :- t1(X, Y).
+      totals(X, sum(Y)) :- t2(X, Y).
+    `);
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("UNION");
+    expect(sql).toContain("GROUP BY");
+  });
+
+  test("generates STRING_AGG for group_concat (postgres)", () => {
+    const result = translateSource(`
+      extensional items(group_name: text, item: text).
+      concat_items(G, group_concat(I)) :- items(G, I).
+    `);
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("STRING_AGG(");
+    expect(sql).toContain("::TEXT");
+  });
+
   test("mutual recursion with dependent non-recursive predicate", () => {
     const result = translateSource(`
       extensional base(x: integer).
@@ -399,6 +480,33 @@ describe("translator (sqlite dialect)", () => {
     expect(sql).toContain(">= 1");
     expect(sql).toContain("<= 5");
     expect(sql).not.toContain("generate_series");
+  });
+
+  test("generates GROUP_CONCAT for group_concat (sqlite)", () => {
+    const result = translateSource(
+      `
+      extensional items(group_name: text, item: text).
+      concat_items(G, group_concat(I)) :- items(G, I).
+    `,
+      "sqlite",
+    );
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("GROUP_CONCAT(");
+    expect(sql).not.toContain("STRING_AGG");
+  });
+
+  test("generates CREATE VIEW IF NOT EXISTS for aggregate rule (sqlite)", () => {
+    const result = translateSource(
+      `
+      extensional parent(name: text, child: text).
+      num_children(P, count(C)) :- parent(P, C).
+    `,
+      "sqlite",
+    );
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("CREATE VIEW IF NOT EXISTS");
+    expect(sql).toContain("COUNT(");
+    expect(sql).toContain("GROUP BY");
   });
 
   test("generates WITH RECURSIVE for mutual recursion", () => {

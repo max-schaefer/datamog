@@ -227,6 +227,8 @@ function inferTermType(
       return inferTermType(term.operand, varTypes, types);
     case "call":
       return inferCallType(term.name);
+    case "aggregate":
+      return inferAggregateType(term.func, term.arg, varTypes, types);
     case "subscript":
       return "text";
     case "slice":
@@ -239,6 +241,32 @@ function inferCallType(name: string): SqlType | undefined {
   switch (name) {
     case "len":
       return "integer";
+    default:
+      return undefined;
+  }
+}
+
+/** Return type of an aggregate function call. */
+function inferAggregateType(
+  func: string,
+  arg: Term,
+  varTypes: Map<string, SqlType>,
+  types: Map<string, (SqlType | undefined)[]>,
+): SqlType | undefined {
+  switch (func) {
+    case "count":
+      return "integer";
+    case "sum": {
+      const argType = inferTermType(arg, varTypes, types);
+      return argType === "real" ? "real" : "integer";
+    }
+    case "avg":
+      return "real";
+    case "min":
+    case "max":
+      return inferTermType(arg, varTypes, types);
+    case "group_concat":
+      return "text";
     default:
       return undefined;
   }

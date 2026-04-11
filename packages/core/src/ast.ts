@@ -64,6 +64,14 @@ export interface Slice extends SourceElement {
   end?: Term;
 }
 
+export type AggregateFunction = "count" | "sum" | "avg" | "min" | "max" | "group_concat";
+
+export interface AggregateCall extends SourceElement {
+  kind: "aggregate";
+  func: AggregateFunction;
+  arg: Term;
+}
+
 export type Term =
   | Variable
   | StringLiteral
@@ -72,7 +80,8 @@ export type Term =
   | UnaryExpr
   | FunctionCall
   | Subscript
-  | Slice;
+  | Slice
+  | AggregateCall;
 
 // --- Column declarations (for extensional predicates) ---
 

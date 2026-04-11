@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { ExtDecl, Query, Rule } from "datamog-core";
+import type { AggregateCall, AggregateFunction, ExtDecl, Query, Rule } from "datamog-core";
 import { parse } from "../src/index.ts";
 
 describe("parser", () => {
@@ -356,6 +356,64 @@ describe("parser", () => {
     expect(range.kind).toBe("range");
     if (range.kind === "range") {
       expect(range.expr.kind).toBe("call");
+    }
+  });
+
+  test("aggregate count in head", () => {
+    const program = parse("cnt(X, count(Y)) :- bar(X, Y).");
+    const rule = program.statements[0] as Rule;
+    expect(rule.head.args[0]).toMatchObject({ kind: "variable", name: "X" });
+    const agg = rule.head.args[1] as AggregateCall;
+    expect(agg.kind).toBe("aggregate");
+    expect(agg.func).toBe("count");
+    expect(agg.arg).toMatchObject({ kind: "variable", name: "Y" });
+  });
+
+  test("aggregate sum in head", () => {
+    const program = parse("total(X, sum(Y)) :- bar(X, Y).");
+    const rule = program.statements[0] as Rule;
+    const agg = rule.head.args[1] as AggregateCall;
+    expect(agg.kind).toBe("aggregate");
+    expect(agg.func).toBe("sum");
+  });
+
+  test("all aggregate functions", () => {
+    const funcs: AggregateFunction[] = ["count", "sum", "avg", "min", "max", "group_concat"];
+    for (const func of funcs) {
+      const program = parse(`r(X, ${func}(Y)) :- bar(X, Y).`);
+      const rule = program.statements[0] as Rule;
+      const agg = rule.head.args[1] as AggregateCall;
+      expect(agg.kind).toBe("aggregate");
+      expect(agg.func).toBe(func);
+    }
+  });
+
+  test("aggregate with expression argument", () => {
+    const program = parse("total(X, sum(Y * Z)) :- bar(X, Y, Z).");
+    const rule = program.statements[0] as Rule;
+    const agg = rule.head.args[1] as AggregateCall;
+    expect(agg.func).toBe("sum");
+    expect(agg.arg.kind).toBe("binary");
+  });
+
+  test("count with don't-care variable", () => {
+    const program = parse("cnt(count(_)) :- bar(_).");
+    const rule = program.statements[0] as Rule;
+    const agg = rule.head.args[0] as AggregateCall;
+    expect(agg.func).toBe("count");
+    expect(agg.arg.kind).toBe("variable");
+  });
+
+  test("aggregate names are not aggregates in body position", () => {
+    const program = parse("foo(X) :- bar(X), X = min(X, 0).");
+    const rule = program.statements[0] as Rule;
+    const eq = rule.body[1]!;
+    expect(eq.kind).toBe("equality");
+    if (eq.kind === "equality") {
+      expect(eq.expr.kind).toBe("call");
+      if (eq.expr.kind === "call") {
+        expect(eq.expr.name).toBe("min");
+      }
     }
   });
 });

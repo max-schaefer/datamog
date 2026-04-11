@@ -1,4 +1,5 @@
 import type {
+  AggregateFunction,
   Atom,
   BinaryOp,
   BodyElement,
@@ -18,9 +19,12 @@ import type {
 import { ParseError } from "./errors.ts";
 import { type Token, TokenType } from "./lexer.ts";
 
+const AGGREGATE_FUNCTIONS = new Set<string>(["count", "sum", "avg", "min", "max", "group_concat"]);
+
 export class Parser {
   private pos = 0;
   private anonCounter = 0;
+  private parsingHead = false;
 
   constructor(private tokens: Token[]) {}
 
@@ -98,7 +102,9 @@ export class Parser {
   }
 
   private parseRuleOrFact(): Rule {
+    this.parsingHead = true;
     const head = this.parseAtom();
+    this.parsingHead = false;
 
     let body: BodyElement[] = [];
     if (this.isAt(TokenType.Turnstile)) {
@@ -378,6 +384,25 @@ export class Parser {
       const expr = this.parseExpr();
       this.expect(TokenType.RParen);
       return expr;
+    }
+
+    // Aggregate call in head position: count(X), sum(X), etc.
+    if (
+      this.parsingHead &&
+      token.type === TokenType.Ident &&
+      AGGREGATE_FUNCTIONS.has(token.value) &&
+      this.peekAt(1)?.type === TokenType.LParen
+    ) {
+      const nameToken = this.advance();
+      this.advance(); // consume (
+      const arg = this.parseExpr();
+      const rparen = this.expect(TokenType.RParen);
+      return {
+        kind: "aggregate",
+        func: nameToken.value as AggregateFunction,
+        arg,
+        span: { ...nameToken.span, end: rparen.span.end },
+      };
     }
 
     // Function call: ident(args)

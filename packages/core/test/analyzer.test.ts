@@ -265,4 +265,85 @@ describe("analyzer", () => {
     `);
     expect(() => analyze(program)).toThrow(/Unsafe variable 'Y'/);
   });
+
+  test("accepts aggregate rule with count", () => {
+    const program = parse(`
+      extensional parent(name: text, child: text).
+      num_children(P, count(C)) :- parent(P, C).
+    `);
+    const result = analyze(program);
+    expect(result.rules.has("num_children")).toBe(true);
+  });
+
+  test("accepts aggregate rule with count(_)", () => {
+    const program = parse(`
+      extensional parent(name: text, child: text).
+      total(count(_)) :- parent(_, _).
+    `);
+    const result = analyze(program);
+    expect(result.rules.has("total")).toBe(true);
+  });
+
+  test("accepts aggregate rule with no grouping variables", () => {
+    const program = parse(`
+      extensional scores(name: text, score: integer).
+      total_score(sum(S)) :- scores(_, S).
+    `);
+    const result = analyze(program);
+    expect(result.rules.has("total_score")).toBe(true);
+  });
+
+  test("rejects mixed aggregate and non-aggregate rules", () => {
+    const program = parse(`
+      extensional parent(name: text, child: text).
+      foo(P, count(C)) :- parent(P, C).
+      foo("nobody", 0).
+    `);
+    expect(() => analyze(program)).toThrow(/both aggregate and non-aggregate/);
+  });
+
+  test("rejects aggregate embedded in expression", () => {
+    const program = parse(`
+      extensional scores(name: text, score: integer).
+      bad(X, sum(S) + 1) :- scores(X, S).
+    `);
+    expect(() => analyze(program)).toThrow(/top-level head argument/);
+  });
+
+  test("rejects nested aggregates", () => {
+    const program = parse(`
+      extensional scores(name: text, score: integer).
+      bad(X, count(sum(S))) :- scores(X, S).
+    `);
+    expect(() => analyze(program)).toThrow(/Nested aggregate/);
+  });
+
+  test("rejects recursive aggregate predicate", () => {
+    const program = parse(`
+      extensional edge(src: text, dst: text).
+      cnt(X, count(Y)) :- edge(X, Y).
+      cnt(X, count(Y)) :- cnt(X, Y).
+    `);
+    expect(() => analyze(program)).toThrow(/cannot be recursive/);
+  });
+
+  test("rejects rules disagreeing on aggregate positions", () => {
+    const program = parse(`
+      extensional t(a: integer, b: integer).
+      foo(X, count(Y)) :- t(X, Y).
+      foo(count(X), Y) :- t(X, Y).
+    `);
+    expect(() => analyze(program)).toThrow(/disagree on which head positions/);
+  });
+
+  test("accepts multiple aggregate rules for same predicate", () => {
+    const program = parse(`
+      extensional t1(a: text, b: integer).
+      extensional t2(a: text, b: integer).
+      totals(X, sum(Y)) :- t1(X, Y).
+      totals(X, sum(Y)) :- t2(X, Y).
+    `);
+    const result = analyze(program);
+    expect(result.rules.has("totals")).toBe(true);
+  });
 });

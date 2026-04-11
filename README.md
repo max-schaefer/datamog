@@ -1,6 +1,6 @@
 # Datamog
 
-Datamog is an educational Datalog dialect that translates into SQL. It supports negation-free Horn clauses with extensional predicate declarations, and compiles rules into views (including recursive views for recursive predicates). It ships with Postgres and SQLite backends.
+Datamog is an educational Datalog dialect that translates into SQL. It supports Horn clauses with extensional predicate declarations, stratified negation, and aggregates, and compiles rules into views (including recursive views for recursive predicates). It ships with Postgres and SQLite backends.
 
 ## Syntax
 
@@ -19,6 +19,13 @@ ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
 - **Extensional declarations** (`extensional`) define predicates backed by tables with typed columns (`text`, `integer`, `real`, `boolean`).
 - **Rules** define intensional predicates. Multiple rules for the same predicate are combined with `UNION`. Recursive predicates use recursive views.
 - **Facts** are rules with no body: `base_case("x").`
+- **Negation**: `not pred(X)` in a rule body compiles to `NOT EXISTS`. Negation must be stratifiable (no negation within recursive cycles).
+- **Aggregates**: aggregate functions in rule heads define grouped views. Non-aggregate head arguments become `GROUP BY` columns:
+  ```datalog
+  num_children(P, count(C)) :- parent(P, C).
+  total_score(sum(S)) :- scores(_, S).
+  ```
+  Supported functions: `count`, `sum`, `avg`, `min`, `max`, `group_concat`. Use `count(_)` for `COUNT(*)`. Aggregate predicates cannot be recursive.
 - **Queries** (`?-`) execute `SELECT` statements against the generated views.
 - **Comments** start with `%` and run to end of line.
 
@@ -67,6 +74,7 @@ The CLI looks for `<predicate>.csv` files (e.g. `parent.csv`) in the same direct
 | `graph` | Reachability in a directed graph | `bun run datamog packages/cli/examples/graph/graph.dl` |
 | `courses` | Transitive course prerequisites | `bun run datamog packages/cli/examples/courses/courses.dl` |
 | `social` | Mutual friends (JSONL data) | `bun run datamog packages/cli/examples/social/social.dl` |
+| `aggregates` | Aggregate functions on student scores | `bun run datamog packages/cli/examples/aggregates/aggregates.dl` |
 
 ### Programmatic API
 

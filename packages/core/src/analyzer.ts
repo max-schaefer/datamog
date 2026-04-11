@@ -37,6 +37,9 @@ function collectVars(term: Term, into: Set<string>) {
     case "call":
       for (const arg of term.args) collectVars(arg, into);
       break;
+    case "aggregate":
+      collectVars(term.arg, into);
+      break;
     case "subscript":
       collectVars(term.object, into);
       collectVars(term.index, into);
@@ -129,6 +132,49 @@ export function analyze(program: Program): AnalyzedProgram {
     }
   }
 
+  // Validate aggregate rules
+  for (const [predicate, predicateRules] of rules) {
+    const hasAggregate = predicateRules.some((r) => r.head.args.some((a) => containsAggregate(a)));
+    if (!hasAggregate) continue;
+
+    for (const rule of predicateRules) {
+      // All rules must be aggregate rules
+      const ruleHasAgg = rule.head.args.some((a) => containsAggregate(a));
+      if (!ruleHasAgg) {
+        throw new AnalyzerError(
+          `Predicate '${predicate}' has both aggregate and non-aggregate rules`,
+        );
+      }
+      for (const arg of rule.head.args) {
+        if (arg.kind === "aggregate") {
+          // No nested aggregates
+          if (containsAggregate(arg.arg)) {
+            throw new AnalyzerError(`Nested aggregate in head of rule for '${predicate}'`);
+          }
+        } else if (containsAggregate(arg)) {
+          // Aggregate must be top-level, not embedded in an expression
+          throw new AnalyzerError(
+            `Aggregate must be a top-level head argument in rule for '${predicate}'`,
+          );
+        }
+      }
+    }
+
+    // All rules must agree on which positions are aggregate vs grouping
+    const firstRule = predicateRules[0]!;
+    const aggPositions = firstRule.head.args.map((a) => a.kind === "aggregate");
+    for (let r = 1; r < predicateRules.length; r++) {
+      const rule = predicateRules[r]!;
+      for (let i = 0; i < rule.head.args.length; i++) {
+        if ((rule.head.args[i]!.kind === "aggregate") !== aggPositions[i]) {
+          throw new AnalyzerError(
+            `Rules for '${predicate}' disagree on which head positions are aggregates`,
+          );
+        }
+      }
+    }
+  }
+
   // Build dependency graph (IDB predicates only), tracking positive and negative deps
   const dependencies = new Map<string, Set<string>>();
   const negativeDependencies = new Map<string, Set<string>>();
@@ -168,6 +214,14 @@ export function analyze(program: Program): AnalyzedProgram {
     }
   }
 
+  // Aggregate predicates cannot be recursive
+  for (const pred of recursivePredicates) {
+    const predRules = rules.get(pred);
+    if (predRules?.some((r) => r.head.args.some((a) => a.kind === "aggregate"))) {
+      throw new AnalyzerError(`Aggregate predicate '${pred}' cannot be recursive`);
+    }
+  }
+
   // Stratification check: no negation within an SCC
   const sccOf = new Map<string, Set<string>>();
   for (const scc of sccs) {
@@ -201,6 +255,30 @@ export function analyze(program: Program): AnalyzedProgram {
     sortedStrata,
     recursivePredicates,
   };
+}
+
+/** Check whether a term contains any aggregate call. */
+function containsAggregate(term: Term): boolean {
+  switch (term.kind) {
+    case "aggregate":
+      return true;
+    case "binary":
+      return containsAggregate(term.left) || containsAggregate(term.right);
+    case "unary":
+      return containsAggregate(term.operand);
+    case "call":
+      return term.args.some(containsAggregate);
+    case "subscript":
+      return containsAggregate(term.object) || containsAggregate(term.index);
+    case "slice":
+      return (
+        containsAggregate(term.object) ||
+        (term.start !== undefined && containsAggregate(term.start)) ||
+        (term.end !== undefined && containsAggregate(term.end))
+      );
+    default:
+      return false;
+  }
 }
 
 /**
@@ -274,7 +352,15 @@ function checkSafety(rule: Rule) {
 
   // Check head variables
   for (const arg of rule.head.args) {
-    checkTermSafe(arg, `head of rule for '${rule.head.predicate}'`);
+    if (arg.kind === "aggregate") {
+      // For count(_), allow anonymous variables (they translate to COUNT(*))
+      if (arg.func === "count" && arg.arg.kind === "variable" && arg.arg.name.startsWith("_")) {
+        continue;
+      }
+      checkTermSafe(arg.arg, `aggregate in head of rule for '${rule.head.predicate}'`);
+    } else {
+      checkTermSafe(arg, `head of rule for '${rule.head.predicate}'`);
+    }
   }
 
   // Check body elements left-to-right

@@ -1,4 +1,6 @@
 export type {
+  AggregateCall,
+  AggregateFunction,
   Atom,
   BinaryExpr,
   BinaryOp,

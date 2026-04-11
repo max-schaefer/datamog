@@ -1,4 +1,12 @@
-import type { AnalyzedProgram, Atom, Comparison, Rule, SqlType, Term } from "datamog-core";
+import type {
+  AggregateCall,
+  AnalyzedProgram,
+  Atom,
+  Comparison,
+  Rule,
+  SqlType,
+  Term,
+} from "datamog-core";
 
 export type Dialect = "postgres" | "sqlite";
 
@@ -256,21 +264,31 @@ function translateRule(
     return b.kind === "col" ? `${b.alias}.${ident(b.col)}` : b.sql;
   }
 
-  // SELECT clause
+  // SELECT clause (with GROUP BY support for aggregate rules)
+  const isAggregateRule = rule.head.args.some((a) => a.kind === "aggregate");
   const selectParts: string[] = [];
+  const groupByExprs: string[] = [];
+
   for (let i = 0; i < rule.head.args.length; i++) {
     const term = rule.head.args[i]!;
     const targetCol = `col${i + 1}`;
-    if (term.kind === "variable") {
+    if (term.kind === "aggregate") {
+      const aggSql = translateAggregate(term, bindings, varTypes, dialect);
+      selectParts.push(`${aggSql} AS ${targetCol}`);
+    } else if (term.kind === "variable") {
       const refs = bindings.get(term.name);
       if (!refs || refs.length === 0) {
         throw new Error(
           `Unbound variable '${term.name}' in head of rule for '${rule.head.predicate}'`,
         );
       }
-      selectParts.push(`${bindingToSql(refs[0]!)} AS ${targetCol}`);
+      const expr = bindingToSql(refs[0]!);
+      selectParts.push(`${expr} AS ${targetCol}`);
+      if (isAggregateRule) groupByExprs.push(expr);
     } else {
-      selectParts.push(`${termToSql(term, bindings, varTypes)} AS ${targetCol}`);
+      const expr = termToSql(term, bindings, varTypes);
+      selectParts.push(`${expr} AS ${targetCol}`);
+      if (isAggregateRule) groupByExprs.push(expr);
     }
   }
 
@@ -377,6 +395,9 @@ function translateRule(
   if (conditions.length > 0) {
     sql += ` WHERE ${conditions.join(" AND ")}`;
   }
+  if (groupByExprs.length > 0) {
+    sql += ` GROUP BY ${groupByExprs.join(", ")}`;
+  }
   return sql;
 }
 
@@ -472,6 +493,8 @@ function termToSql(
       return `(-${termToSql(term.operand, bindings, varTypes)})`;
     case "call":
       return translateCall(term.name, term.args, bindings, varTypes);
+    case "aggregate":
+      throw new Error("Aggregate function not allowed in this position");
     case "subscript": {
       const obj = termToSql(term.object, bindings, varTypes);
       const idx = termToSql(term.index, bindings, varTypes);
@@ -517,6 +540,39 @@ function isTextType(term: Term, varTypes?: Map<string, SqlType>): boolean {
   if (term.kind === "subscript" || term.kind === "slice") return true;
   if (term.kind === "variable" && varTypes?.get(term.name) === "text") return true;
   return false;
+}
+
+/** Translate an aggregate function call to SQL. */
+function translateAggregate(
+  agg: AggregateCall,
+  bindings: Map<string, Binding[]>,
+  varTypes: Map<string, SqlType> | undefined,
+  dialect: Dialect,
+): string {
+  // count(_) → COUNT(*)
+  if (agg.func === "count" && agg.arg.kind === "variable" && agg.arg.name.startsWith("_")) {
+    return "COUNT(*)";
+  }
+
+  const argSql = termToSql(agg.arg, bindings, varTypes);
+
+  switch (agg.func) {
+    case "count":
+      return `COUNT(${argSql})`;
+    case "sum":
+      return `SUM(${argSql})`;
+    case "avg":
+      return `AVG(${argSql})`;
+    case "min":
+      return `MIN(${argSql})`;
+    case "max":
+      return `MAX(${argSql})`;
+    case "group_concat":
+      if (dialect === "sqlite") {
+        return `GROUP_CONCAT(${argSql}, ',')`;
+      }
+      return `STRING_AGG(${argSql}::TEXT, ',')`;
+  }
 }
 
 /** Translate a built-in function call to SQL. */
