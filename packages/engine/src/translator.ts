@@ -1,13 +1,4 @@
-import type {
-  AnalyzedProgram,
-  Atom,
-  Comparison,
-  Equality,
-  RangeAtom,
-  Rule,
-  SqlType,
-  Term,
-} from "datamog-core";
+import type { AnalyzedProgram, Atom, Comparison, Rule, SqlType, Term } from "datamog-core";
 
 export type Dialect = "postgres" | "sqlite";
 
@@ -187,92 +178,77 @@ function translateRule(
     return translateFact(rule);
   }
 
-  // Separate body elements
+  // Single left-to-right pass: categorize body elements and register bindings in order.
   const positiveAtoms: { atom: Atom; index: number }[] = [];
   const negatedAtoms: { atom: Atom }[] = [];
-  const equalities: Equality[] = [];
   const comparisons: Comparison[] = [];
-  const rangeAtoms: { range: RangeAtom; index: number }[] = [];
-
-  for (let i = 0; i < rule.body.length; i++) {
-    const elem = rule.body[i]!;
-    if (elem.kind === "equality") {
-      equalities.push(elem);
-    } else if (elem.kind === "comparison") {
-      comparisons.push(elem);
-    } else if (elem.kind === "range") {
-      rangeAtoms.push({ range: elem, index: i });
-    } else if (elem.negated) {
-      negatedAtoms.push({ atom: elem });
-    } else {
-      positiveAtoms.push({ atom: elem, index: i });
-    }
-  }
+  const bindingRanges: { alias: string; lowSql: string; highSql: string }[] = [];
+  const filterRanges: { exprSql: string; lowSql: string; highSql: string }[] = [];
 
   const aliases = rule.body.map((_, i) => `__b${i}`);
-
-  // Build variable bindings and type map from positive atoms
   const bindings = new Map<string, Binding[]>();
   const varTypes = new Map<string, SqlType>();
   const columnTypes = (analyzed as { columnTypes?: Map<string, SqlType[]> }).columnTypes;
-
-  for (const { atom, index } of positiveAtoms) {
-    const alias = aliases[index]!;
-    const predTypes = columnTypes?.get(atom.predicate);
-    for (let j = 0; j < atom.args.length; j++) {
-      const term = atom.args[j]!;
-      if (term.kind === "variable") {
-        const col = resolveColumnRef(atom.predicate, j, analyzed);
-        const list = bindings.get(term.name) ?? [];
-        list.push({ kind: "col", alias, col });
-        bindings.set(term.name, list);
-        if (predTypes?.[j] && !varTypes.has(term.name)) {
-          varTypes.set(term.name, predTypes[j]!);
-        }
-      }
-    }
-  }
-
-  // Register range atoms before equalities, since range-bound variables
-  // may be referenced in equality expressions (e.g., C = S[I] where I is range-bound).
-  // Binding (generate_series) when expr is a variable and bounds are integer-typed;
-  // filter (BETWEEN) otherwise.
   let rangeCounter = 0;
-  const bindingRanges: {
-    alias: string;
-    lowSql: string;
-    highSql: string;
-  }[] = [];
-  const filterRanges: { exprSql: string; lowSql: string; highSql: string }[] = [];
 
-  for (const { range } of rangeAtoms) {
-    const lowSql = termToSql(range.low, bindings, varTypes);
-    const highSql = termToSql(range.high, bindings, varTypes);
-    if (
-      range.expr.kind === "variable" &&
-      isIntegerTerm(range.low, varTypes) &&
-      isIntegerTerm(range.high, varTypes)
-    ) {
-      const rangeAlias = `__range_${rangeCounter++}`;
-      const list = bindings.get(range.expr.name) ?? [];
-      list.push({ kind: "col", alias: rangeAlias, col: "value" });
-      bindings.set(range.expr.name, list);
-      bindingRanges.push({ alias: rangeAlias, lowSql, highSql });
-    } else {
-      filterRanges.push({
-        exprSql: termToSql(range.expr, bindings, varTypes),
-        lowSql,
-        highSql,
-      });
+  for (let i = 0; i < rule.body.length; i++) {
+    const elem = rule.body[i]!;
+    switch (elem.kind) {
+      case "atom": {
+        if (elem.negated) {
+          negatedAtoms.push({ atom: elem });
+        } else {
+          const alias = aliases[i]!;
+          const predTypes = columnTypes?.get(elem.predicate);
+          for (let j = 0; j < elem.args.length; j++) {
+            const term = elem.args[j]!;
+            if (term.kind === "variable") {
+              const col = resolveColumnRef(elem.predicate, j, analyzed);
+              const list = bindings.get(term.name) ?? [];
+              list.push({ kind: "col", alias, col });
+              bindings.set(term.name, list);
+              if (predTypes?.[j] && !varTypes.has(term.name)) {
+                varTypes.set(term.name, predTypes[j]!);
+              }
+            }
+          }
+          positiveAtoms.push({ atom: elem, index: i });
+        }
+        break;
+      }
+      case "range": {
+        const lowSql = termToSql(elem.low, bindings, varTypes);
+        const highSql = termToSql(elem.high, bindings, varTypes);
+        if (
+          elem.expr.kind === "variable" &&
+          isIntegerTerm(elem.low, varTypes) &&
+          isIntegerTerm(elem.high, varTypes)
+        ) {
+          const rangeAlias = `__range_${rangeCounter++}`;
+          const list = bindings.get(elem.expr.name) ?? [];
+          list.push({ kind: "col", alias: rangeAlias, col: "value" });
+          bindings.set(elem.expr.name, list);
+          bindingRanges.push({ alias: rangeAlias, lowSql, highSql });
+        } else {
+          filterRanges.push({
+            exprSql: termToSql(elem.expr, bindings, varTypes),
+            lowSql,
+            highSql,
+          });
+        }
+        break;
+      }
+      case "equality": {
+        const sql = termToSql(elem.expr, bindings, varTypes);
+        const list = bindings.get(elem.variable) ?? [];
+        list.push({ kind: "expr", sql });
+        bindings.set(elem.variable, list);
+        break;
+      }
+      case "comparison":
+        comparisons.push(elem);
+        break;
     }
-  }
-
-  // Register equality bindings: X = expr → bind X to the SQL expression
-  for (const eq of equalities) {
-    const sql = termToSql(eq.expr, bindings, varTypes);
-    const list = bindings.get(eq.variable) ?? [];
-    list.push({ kind: "expr", sql });
-    bindings.set(eq.variable, list);
   }
 
   // Helper: resolve a binding to SQL

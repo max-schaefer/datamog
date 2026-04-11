@@ -63,11 +63,9 @@ Typical touch points (in dependency order):
 2. **Core exports** (`core/src/index.ts`): export the new type
 3. **Lexer** (`parser/src/lexer.ts`): add new `TokenType` enum values, keywords in `KEYWORDS` map, multi-char ops before single-char `punctMap`
 4. **Parser** (`parser/src/parser.ts`): handle in `parseBodyElement()` (body elements) or expression parsing chain; watch for ambiguity with existing dispatch (ident+lparen → atom vs function call, variable+equals → equality)
-5. **Analyzer** (`core/src/analyzer.ts`): update `checkSafety()` — phase 1 collects safe vars from positive atoms, phase 2 is fixed-point for equalities/ranges, phase 3 checks all terms
+5. **Analyzer** (`core/src/analyzer.ts`): update `checkSafety()` — phase 1 collects safe vars (fixed-point for equalities/ranges), phase 2 checks all body elements left-to-right
 6. **Type inference** (`core/src/types.ts`): update var type environment building in the fixed-point loop, add validation if needed
-7. **Translator** (`engine/src/translator.ts`): update `translateRule()` — body elements separated into positiveAtoms/negatedAtoms/equalities/comparisons/rangeAtoms; bindings built in order: positive atoms → ranges → equalities; FROM/WHERE assembled from these
-
-Processing order in the translator matters: range bindings must be registered before equalities, since equality expressions may reference range-bound variables.
+7. **Translator** (`engine/src/translator.ts`): update `translateRule()` — single left-to-right pass over body elements registers bindings and categorizes into positiveAtoms/negatedAtoms/comparisons/bindingRanges/filterRanges; FROM/WHERE assembled from these
 
 ## SQLite vs Postgres dialect differences
 

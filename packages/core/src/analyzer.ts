@@ -277,49 +277,36 @@ function checkSafety(rule: Rule) {
     checkTermSafe(arg, `head of rule for '${rule.head.predicate}'`);
   }
 
-  // Check negated atom variables
+  // Check body elements left-to-right
   for (const elem of rule.body) {
-    if (elem.kind === "atom" && elem.negated) {
-      for (const arg of elem.args) {
-        checkTermSafe(arg, `'not ${elem.predicate}(...)'`);
-      }
-    }
-  }
-
-  // Check equality RHS variables
-  for (const eq of equalities) {
-    for (const v of eq.exprVars) {
-      checkVarSafe(v, `equality '${eq.variable} = ...'`);
-    }
-  }
-
-  // Check complex expressions in positive atom arguments
-  for (const elem of rule.body) {
-    if (elem.kind === "atom" && !elem.negated) {
-      for (const arg of elem.args) {
-        if (arg.kind !== "variable") {
-          checkTermSafe(arg, `argument of '${elem.predicate}(...)'`);
+    switch (elem.kind) {
+      case "atom":
+        if (elem.negated) {
+          for (const arg of elem.args) {
+            checkTermSafe(arg, `'not ${elem.predicate}(...)'`);
+          }
+        } else {
+          for (const arg of elem.args) {
+            if (arg.kind !== "variable") {
+              checkTermSafe(arg, `argument of '${elem.predicate}(...)'`);
+            }
+          }
         }
-      }
-    }
-  }
-
-  // Check comparison variables
-  for (const elem of rule.body) {
-    if (elem.kind === "comparison") {
-      checkTermSafe(elem.left, "comparison");
-      checkTermSafe(elem.right, "comparison");
-    }
-  }
-
-  // Check range atom variables
-  for (const elem of rule.body) {
-    if (elem.kind === "range") {
-      checkTermSafe(elem.low, "range lower bound");
-      checkTermSafe(elem.high, "range upper bound");
-      if (elem.expr.kind !== "variable") {
-        checkTermSafe(elem.expr, "range expression");
-      }
+        break;
+      case "equality":
+        checkTermSafe(elem.expr, `equality '${elem.variable} = ...'`);
+        break;
+      case "comparison":
+        checkTermSafe(elem.left, "comparison");
+        checkTermSafe(elem.right, "comparison");
+        break;
+      case "range":
+        checkTermSafe(elem.low, "range lower bound");
+        checkTermSafe(elem.high, "range upper bound");
+        if (elem.expr.kind !== "variable") {
+          checkTermSafe(elem.expr, "range expression");
+        }
+        break;
     }
   }
 }
