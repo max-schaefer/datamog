@@ -7,7 +7,9 @@
   },
   "dependencies": {
     "datamog-core": "workspace:*",
-    "datamog-engine": "workspace:*"
+    "datamog-engine": "workspace:*",
+    "google-auth-library": "^10.6.2",
+    "google-spreadsheet": "^5.2.0"
   },
   "devDependencies": {
     "datamog-parser": "workspace:*"

@@ -57,7 +57,7 @@ bun run datamog --backend sqlite packages/cli/examples/family/family.dl
 DATABASE_URL=postgres://localhost:5432/mydb bun run datamog --backend postgres program.dl
 ```
 
-The CLI looks for `<predicate>.csv` files (e.g. `parent.csv`) in the same directory as the `.dl` file.
+The CLI looks for `<predicate>.csv` files (e.g. `parent.csv`) in the same directory as the `.dl` file. You can also load data from Google Sheets — see the [datamog-gsheet README](packages/loader/gsheet/README.md) for setup instructions.
 
 ### Examples
 

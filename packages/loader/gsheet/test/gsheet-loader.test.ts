@@ -8,10 +8,52 @@ function getExtDecl(source: string): ExtDecl {
   return program.statements[0] as ExtDecl;
 }
 
+function makeAuth() {
+  return { apiKey: "fake-key" };
+}
+
+function makeMockBackend() {
+  const insertedQueries: { query: string; params: unknown[] }[] = [];
+  return {
+    insertedQueries,
+    backend: {
+      dialect: "sqlite" as const,
+      async execute(query: string, params?: unknown[]) {
+        insertedQueries.push({ query, params: params ?? [] });
+        return [];
+      },
+      close() {},
+    },
+  };
+}
+
+function mockDocWithSheet(
+  loader: GSheetLoader,
+  sheetTitle: string,
+  headers: string[],
+  rowData: Record<string, string>[],
+) {
+  const fakeRows = rowData.map((data) => ({
+    get: (col: string) => data[col],
+  }));
+  const fakeSheet = {
+    headerValues: headers,
+    loadHeaderRow: mock(async () => {}),
+    getRows: mock(async () => fakeRows),
+  };
+  loader.createDoc = mock(
+    () =>
+      ({
+        loadInfo: mock(async () => {}),
+        sheetsByTitle: { [sheetTitle]: fakeSheet },
+      }) as unknown as ReturnType<typeof loader.createDoc>,
+  );
+}
+
 describe("GSheetLoader", () => {
   test("canLoad returns true when predicate is mapped", async () => {
     const loader = new GSheetLoader({
-      apiKey: "fake-key",
+      auth: makeAuth(),
       sheets: { parent: { spreadsheetId: "abc123" } },
     });
     const decl = getExtDecl("extensional parent(name: text, child: text).");
@@ -20,146 +62,120 @@ describe("GSheetLoader", () => {
 
   test("canLoad returns false when predicate is not mapped", async () => {
     const loader = new GSheetLoader({
-      apiKey: "fake-key",
+      auth: makeAuth(),
       sheets: {},
     });
     const decl = getExtDecl("extensional parent(name: text, child: text).");
     expect(await loader.canLoad(decl)).toBe(false);
   });
 
-  test("parseResponse extracts rows with header mapping", () => {
+  test("createDoc uses API key auth", () => {
     const loader = new GSheetLoader({
-      apiKey: "fake-key",
+      auth: { apiKey: "my-key" },
+      sheets: {},
+    });
+    expect(loader.createDoc("abc123")).toBeDefined();
+  });
+
+  test("createDoc uses service account auth", () => {
+    const loader = new GSheetLoader({
+      auth: {
+        serviceAccountEmail: "test@example.iam.gserviceaccount.com",
+        privateKey: "-----BEGIN PRIVATE KEY-----\nfake\n-----END PRIVATE KEY-----\n",
+      },
+      sheets: {},
+    });
+    expect(loader.createDoc("abc123")).toBeDefined();
+  });
+
+  test("load fetches rows and inserts them", async () => {
+    const loader = new GSheetLoader({
+      auth: makeAuth(),
       sheets: { parent: { spreadsheetId: "abc123" } },
     });
     const decl = getExtDecl("extensional parent(name: text, child: text).");
 
-    const apiResponse = {
-      values: [
-        ["name", "child"],
-        ["alice", "bob"],
-        ["carol", "dave"],
+    mockDocWithSheet(
+      loader,
+      "Sheet1",
+      ["name", "child"],
+      [
+        { name: "alice", child: "bob" },
+        { name: "carol", child: "dave" },
       ],
-    };
+    );
 
-    const rows = loader.parseResponse(apiResponse, decl);
-    expect(rows).toEqual([
-      { name: "alice", child: "bob" },
-      { name: "carol", child: "dave" },
-    ]);
+    const { backend, insertedQueries } = makeMockBackend();
+    const result = await loader.load(decl, backend);
+
+    expect(result.rowsLoaded).toBe(2);
+    expect(insertedQueries).toHaveLength(2);
+    expect(insertedQueries[0]?.query).toContain("INSERT INTO");
+    expect(insertedQueries[0]?.params).toEqual(["alice", "bob"]);
+    expect(insertedQueries[1]?.params).toEqual(["carol", "dave"]);
   });
 
-  test("parseResponse coerces types", () => {
+  test("load coerces types", async () => {
     const loader = new GSheetLoader({
-      apiKey: "fake-key",
+      auth: makeAuth(),
       sheets: { t: { spreadsheetId: "abc123" } },
     });
     const decl = getExtDecl("extensional t(a: text, b: integer, c: real, d: boolean).");
 
-    const apiResponse = {
-      values: [
-        ["a", "b", "c", "d"],
-        ["hello", "42", "3.14", "true"],
-      ],
-    };
-
-    const rows = loader.parseResponse(apiResponse, decl);
-    expect(rows).toEqual([{ a: "hello", b: 42, c: 3.14, d: true }]);
-  });
-
-  test("parseResponse handles empty response", () => {
-    const loader = new GSheetLoader({
-      apiKey: "fake-key",
-      sheets: { parent: { spreadsheetId: "abc123" } },
-    });
-    const decl = getExtDecl("extensional parent(name: text, child: text).");
-
-    const rows = loader.parseResponse({ values: [["name", "child"]] }, decl);
-    expect(rows).toEqual([]);
-  });
-
-  test("parseResponse handles missing values key", () => {
-    const loader = new GSheetLoader({
-      apiKey: "fake-key",
-      sheets: { parent: { spreadsheetId: "abc123" } },
-    });
-    const decl = getExtDecl("extensional parent(name: text, child: text).");
-
-    const rows = loader.parseResponse({}, decl);
-    expect(rows).toEqual([]);
-  });
-
-  test("parseResponse rejects missing columns in header", () => {
-    const loader = new GSheetLoader({
-      apiKey: "fake-key",
-      sheets: { parent: { spreadsheetId: "abc123" } },
-    });
-    const decl = getExtDecl("extensional parent(name: text, child: text).");
-    const apiResponse = { values: [["name"], ["alice"]] };
-    expect(() => loader.parseResponse(apiResponse, decl)).toThrow(/missing column 'child'/);
-  });
-
-  test("builds correct API URL", () => {
-    const loader = new GSheetLoader({
-      apiKey: "my-key",
-      sheets: { parent: { spreadsheetId: "abc123", range: "Data!A:Z" } },
-    });
-
-    const url = loader.buildUrl("parent");
-    expect(url).toBe(
-      "https://sheets.googleapis.com/v4/spreadsheets/abc123/values/Data!A%3AZ?key=my-key",
+    mockDocWithSheet(
+      loader,
+      "Sheet1",
+      ["a", "b", "c", "d"],
+      [{ a: "hello", b: "42", c: "3.14", d: "true" }],
     );
+
+    const { backend, insertedQueries } = makeMockBackend();
+    const result = await loader.load(decl, backend);
+
+    expect(result.rowsLoaded).toBe(1);
+    expect(insertedQueries[0]?.params).toEqual(["hello", 42, 3.14, true]);
   });
 
-  test("builds URL with default range", () => {
+  test("load throws on missing column in header", async () => {
     const loader = new GSheetLoader({
-      apiKey: "my-key",
+      auth: makeAuth(),
       sheets: { parent: { spreadsheetId: "abc123" } },
     });
+    const decl = getExtDecl("extensional parent(name: text, child: text).");
 
-    const url = loader.buildUrl("parent");
-    expect(url).toBe(
-      "https://sheets.googleapis.com/v4/spreadsheets/abc123/values/Sheet1?key=my-key",
-    );
+    mockDocWithSheet(loader, "Sheet1", ["name"], []);
+
+    const { backend } = makeMockBackend();
+    expect(loader.load(decl, backend)).rejects.toThrow(/missing column 'child'/);
   });
 
-  test("load fetches and inserts rows", async () => {
-    const apiResponse = {
-      values: [
-        ["name", "child"],
-        ["alice", "bob"],
-      ],
-    };
+  test("load throws on missing sheet", async () => {
+    const loader = new GSheetLoader({
+      auth: makeAuth(),
+      sheets: { parent: { spreadsheetId: "abc123", range: "Missing" } },
+    });
+    const decl = getExtDecl("extensional parent(name: text, child: text).");
 
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = mock(
-      async () => new Response(JSON.stringify(apiResponse), { status: 200 }),
-    ) as typeof fetch;
+    // Mock with only "Sheet1", not "Missing"
+    mockDocWithSheet(loader, "Sheet1", ["name", "child"], []);
 
-    try {
-      const loader = new GSheetLoader({
-        apiKey: "fake-key",
-        sheets: { parent: { spreadsheetId: "abc123" } },
-      });
-      const decl = getExtDecl("extensional parent(name: text, child: text).");
+    const { backend } = makeMockBackend();
+    expect(loader.load(decl, backend)).rejects.toThrow(/sheet 'Missing' not found/);
+  });
 
-      const insertedQueries: { query: string; params: unknown[] }[] = [];
-      const mockBackend = {
-        dialect: "sqlite" as const,
-        async execute(query: string, params?: unknown[]) {
-          insertedQueries.push({ query, params: params ?? [] });
-          return [];
-        },
-        close() {},
-      };
+  test("load uses custom sheet name from range config", async () => {
+    const loader = new GSheetLoader({
+      auth: makeAuth(),
+      sheets: { parent: { spreadsheetId: "abc123", range: "Data" } },
+    });
+    const decl = getExtDecl("extensional parent(name: text, child: text).");
 
-      const result = await loader.load(decl, mockBackend);
-      expect(result.rowsLoaded).toBe(1);
-      expect(insertedQueries).toHaveLength(1);
-      expect(insertedQueries[0]?.query).toContain("INSERT INTO");
-      expect(insertedQueries[0]?.params).toEqual(["alice", "bob"]);
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
+    mockDocWithSheet(loader, "Data", ["name", "child"], [{ name: "alice", child: "bob" }]);
+
+    const { backend, insertedQueries } = makeMockBackend();
+    const result = await loader.load(decl, backend);
+
+    expect(result.rowsLoaded).toBe(1);
+    expect(insertedQueries[0]?.params).toEqual(["alice", "bob"]);
   });
 });

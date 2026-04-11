@@ -12,7 +12,7 @@ import {
   coerceValue,
   translate,
 } from "datamog-engine";
-import { GSheetLoader } from "datamog-gsheet";
+import { type GSheetAuth, GSheetLoader } from "datamog-gsheet";
 import { JsonlLoader } from "datamog-jsonl";
 import { parse } from "datamog-parser";
 
@@ -32,8 +32,16 @@ function usage(): never {
   console.error("  -h, --help                 Show this help message");
   console.error();
   console.error("Environment:");
-  console.error("  DATABASE_URL     Postgres connection string (uses in-memory SQLite if not set)");
-  console.error("  GOOGLE_API_KEY   API key for Google Sheets");
+  console.error(
+    "  DATABASE_URL                    Postgres connection string (uses in-memory SQLite if not set)",
+  );
+  console.error(
+    "  GOOGLE_API_KEY                  API key for Google Sheets (public sheets, read-only)",
+  );
+  console.error("  GOOGLE_SERVICE_ACCOUNT_EMAIL    Service account email (for private sheets)");
+  console.error(
+    "  GOOGLE_PRIVATE_KEY              Service account private key (for private sheets)",
+  );
   process.exit(1);
 }
 
@@ -148,6 +156,24 @@ function parseExtensionalArg(arg: string): { name: string; source: string } {
   return { name: arg.slice(0, eqIdx), source: arg.slice(eqIdx + 1) };
 }
 
+function resolveGSheetAuth(): GSheetAuth {
+  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  const key = process.env.GOOGLE_PRIVATE_KEY;
+  if (email && key) {
+    return { serviceAccountEmail: email, privateKey: key };
+  }
+
+  const apiKey = process.env.GOOGLE_API_KEY;
+  if (apiKey) {
+    return { apiKey };
+  }
+
+  console.error(
+    "Google Sheets requires either GOOGLE_SERVICE_ACCOUNT_EMAIL + GOOGLE_PRIVATE_KEY, or GOOGLE_API_KEY",
+  );
+  process.exit(1);
+}
+
 function buildExplicitLoaders(mappings: { name: string; source: string }[]): ExtensionalLoader[] {
   const loaders: ExtensionalLoader[] = [];
   const gsheetSheets: Record<string, { spreadsheetId: string }> = {};
@@ -169,12 +195,8 @@ function buildExplicitLoaders(mappings: { name: string; source: string }[]): Ext
   }
 
   if (Object.keys(gsheetSheets).length > 0) {
-    const apiKey = process.env.GOOGLE_API_KEY;
-    if (!apiKey) {
-      console.error("GOOGLE_API_KEY environment variable is required for Google Sheets sources");
-      process.exit(1);
-    }
-    loaders.push(new GSheetLoader({ apiKey, sheets: gsheetSheets }));
+    const auth = resolveGSheetAuth();
+    loaders.push(new GSheetLoader({ auth, sheets: gsheetSheets }));
   }
 
   return loaders;

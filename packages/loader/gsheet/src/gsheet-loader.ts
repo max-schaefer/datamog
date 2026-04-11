@@ -1,29 +1,27 @@
 import type { ExtDecl } from "datamog-core";
 import { type Backend, type ExtensionalLoader, type LoadResult, coerceValue } from "datamog-engine";
+import { JWT } from "google-auth-library";
+import { GoogleSpreadsheet } from "google-spreadsheet";
 
 export interface SheetConfig {
   spreadsheetId: string;
   range?: string;
 }
 
+export type GSheetAuth = { apiKey: string } | { serviceAccountEmail: string; privateKey: string };
+
 export interface GSheetLoaderOptions {
-  apiKey: string;
+  auth: GSheetAuth;
   sheets: Record<string, SheetConfig>;
 }
 
-interface SheetsApiResponse {
-  values?: string[][];
-}
-
-const API_BASE = "https://sheets.googleapis.com/v4/spreadsheets";
-
 export class GSheetLoader implements ExtensionalLoader {
   readonly name = "gsheet";
-  private apiKey: string;
+  private auth: GSheetAuth;
   private sheets: Record<string, SheetConfig>;
 
   constructor(options: GSheetLoaderOptions) {
-    this.apiKey = options.apiKey;
+    this.auth = options.auth;
     this.sheets = options.sheets;
   }
 
@@ -32,21 +30,42 @@ export class GSheetLoader implements ExtensionalLoader {
   }
 
   async load(decl: ExtDecl, backend: Backend): Promise<LoadResult> {
-    const url = this.buildUrl(decl.predicate);
-    const response = await fetch(url);
-    if (!response.ok) {
+    const config = this.sheets[decl.predicate]!;
+    const doc = this.createDoc(config.spreadsheetId);
+    await doc.loadInfo();
+
+    const sheetTitle = config.range ?? "Sheet1";
+    const sheet = doc.sheetsByTitle[sheetTitle];
+    if (!sheet) {
+      const available = Object.keys(doc.sheetsByTitle).join(", ");
       throw new Error(
-        `Google Sheets API error for '${decl.predicate}': ${response.status} ${response.statusText}`,
+        `Google Sheet for '${decl.predicate}': sheet '${sheetTitle}' not found (available: ${available})`,
       );
     }
 
-    const data = (await response.json()) as SheetsApiResponse;
-    const rows = this.parseResponse(data, decl);
+    await sheet.loadHeaderRow();
+    const headers = sheet.headerValues;
+
+    // Verify all declared columns exist in the sheet headers
+    for (const col of decl.columns) {
+      if (!headers.includes(col.name)) {
+        throw new Error(`Google Sheet for '${decl.predicate}': missing column '${col.name}'`);
+      }
+    }
+
+    const rows = await sheet.getRows();
 
     for (const row of rows) {
+      const values = decl.columns.map((col) => {
+        const raw = row.get(col.name) ?? "";
+        return coerceValue(
+          String(raw),
+          col.type,
+          `sheet '${decl.predicate}', column '${col.name}'`,
+        );
+      });
       const columns = decl.columns.map((c) => `"${c.name}"`).join(", ");
       const placeholders = decl.columns.map((_, i) => `$${i + 1}`).join(", ");
-      const values = decl.columns.map((c) => row[c.name]);
       await backend.execute(
         `INSERT INTO "${decl.predicate}" (${columns}) VALUES (${placeholders})`,
         values as unknown[],
@@ -56,43 +75,16 @@ export class GSheetLoader implements ExtensionalLoader {
     return { rowsLoaded: rows.length };
   }
 
-  /** Build the Google Sheets API URL for a predicate. Exposed for testing. */
-  buildUrl(predicate: string): string {
-    const config = this.sheets[predicate]!;
-    const range = encodeURIComponent(config.range ?? "Sheet1");
-    return `${API_BASE}/${config.spreadsheetId}/values/${range}?key=${this.apiKey}`;
-  }
-
-  /** Parse the API response into typed rows. Exposed for testing. */
-  parseResponse(data: SheetsApiResponse, decl: ExtDecl): Record<string, unknown>[] {
-    const values = data.values;
-    if (!values || values.length <= 1) {
-      return [];
+  /** Create a GoogleSpreadsheet instance with the configured auth. Exposed for testing. */
+  createDoc(spreadsheetId: string): GoogleSpreadsheet {
+    if ("apiKey" in this.auth) {
+      return new GoogleSpreadsheet(spreadsheetId, { apiKey: this.auth.apiKey });
     }
-
-    const headers = values[0]!;
-    const colIndexes = decl.columns.map((col) => headers.indexOf(col.name));
-    for (let i = 0; i < decl.columns.length; i++) {
-      if (colIndexes[i] === -1) {
-        throw new Error(
-          `Google Sheet for '${decl.predicate}': missing column '${decl.columns[i]!.name}'`,
-        );
-      }
-    }
-
-    return values.slice(1).map((row) => {
-      const result: Record<string, unknown> = {};
-      for (let i = 0; i < decl.columns.length; i++) {
-        const col = decl.columns[i]!;
-        const idx = colIndexes[i]!;
-        const raw = idx >= 0 ? (row[idx] ?? "") : "";
-        result[col.name] = coerceValue(
-          raw,
-          col.type,
-          `sheet '${decl.predicate}', column '${col.name}'`,
-        );
-      }
-      return result;
+    const jwt = new JWT({
+      email: this.auth.serviceAccountEmail,
+      key: this.auth.privateKey,
+      scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
     });
+    return new GoogleSpreadsheet(spreadsheetId, jwt);
   }
 }
