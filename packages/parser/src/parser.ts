@@ -9,6 +9,7 @@ import type {
   ExtDecl,
   Program,
   Query,
+  RangeAtom,
   Rule,
   SqlType,
   Statement,
@@ -148,15 +149,15 @@ export class Parser {
       return { ...atom, negated: true };
     }
 
-    // Atom: ident(...) — but only if not followed by a comparison operator
-    // (which would make it a function call in a comparison, e.g. len(X) >= 3)
+    // Atom: ident(...) — but only if not followed by a comparison operator or 'in'
+    // (which would make it a function call in a comparison/range, e.g. len(X) >= 3)
     if (this.isAt(TokenType.Ident) && this.peekAt(1)?.type === TokenType.LParen) {
       const saved = this.pos;
       const atom = this.parseAtom();
-      if (this.isComparisonOp()) {
-        // Reinterpret as comparison: function call on left side
+      if (this.isComparisonOp() || this.isAt(TokenType.In)) {
+        // Reinterpret as comparison or range: function call on left side
         this.pos = saved;
-        return this.parseComparison();
+        return this.parseComparisonOrRange();
       }
       return atom;
     }
@@ -175,12 +176,27 @@ export class Parser {
       } satisfies Equality;
     }
 
-    // Comparison: expr <op> expr
-    return this.parseComparison();
+    // Comparison or range: expr <op> expr, or expr in [expr .. expr]
+    return this.parseComparisonOrRange();
   }
 
-  private parseComparison(): Comparison {
+  private parseComparisonOrRange(): Comparison | RangeAtom {
     const left = this.parseExpr();
+    if (this.isAt(TokenType.In)) {
+      this.advance(); // consume 'in'
+      this.expect(TokenType.LBracket);
+      const low = this.parseExpr();
+      this.expect(TokenType.DotDot);
+      const high = this.parseExpr();
+      const rbracket = this.expect(TokenType.RBracket);
+      return {
+        kind: "range",
+        expr: left,
+        low,
+        high,
+        span: { ...left.span, end: rbracket.span.end },
+      } satisfies RangeAtom;
+    }
     const op = this.parseComparisonOp();
     const right = this.parseExpr();
     return {

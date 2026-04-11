@@ -97,4 +97,37 @@ describe("type inference", () => {
     const typed = getTypes('base(42, "hello").');
     expect(typed.columnTypes.get("base")).toEqual(["integer", "text"]);
   });
+
+  test("range-bound variable has integer type", () => {
+    const typed = getTypes(`
+      nums(X) :- X in [1 .. 10].
+    `);
+    expect(typed.columnTypes.get("nums")).toEqual(["integer"]);
+  });
+
+  test("rejects range with non-numeric bounds", () => {
+    expect(() =>
+      getTypes(`
+        extensional words(w: text).
+        bad(X) :- words(X), X in ["a" .. "z"].
+      `),
+    ).toThrow(/non-numeric type/);
+  });
+
+  test("range variable with real bounds infers real type", () => {
+    const typed = getTypes(`
+      extensional base(x: real).
+      ranged(X, Y) :- base(X), Y in [X .. X + 1.0].
+    `);
+    // Y gets real type from bounds (not integer, so not a binding range)
+    expect(typed.columnTypes.get("ranged")).toEqual(["real", "real"]);
+  });
+
+  test("accepts range filter with real expression", () => {
+    const typed = getTypes(`
+      extensional vals(x: real).
+      filtered(X) :- vals(X), X in [0 .. 100].
+    `);
+    expect(typed.columnTypes.get("filtered")).toEqual(["real"]);
+  });
 });

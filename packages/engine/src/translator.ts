@@ -3,6 +3,7 @@ import type {
   Atom,
   Comparison,
   Equality,
+  RangeAtom,
   Rule,
   SqlType,
   Term,
@@ -59,7 +60,9 @@ function translateViews(analyzed: AnalyzedProgram, dialect: Dialect): string[] {
     if (!isRecursive) {
       const predicate = stratum[0]!;
       const rules = analyzed.rules.get(predicate)!;
-      const ruleQueries = rules.map((rule) => translateRule(rule, analyzed));
+      const ruleQueries = rules.map((rule) =>
+        translateRule(rule, analyzed, undefined, undefined, dialect),
+      );
       const unionBody = ruleQueries.join("\n  UNION\n");
 
       if (dialect === "sqlite") {
@@ -71,7 +74,9 @@ function translateViews(analyzed: AnalyzedProgram, dialect: Dialect): string[] {
       const predicate = stratum[0]!;
       const rules = analyzed.rules.get(predicate)!;
       const arity = analyzed.arities.get(predicate)!;
-      const ruleQueries = rules.map((rule) => translateRule(rule, analyzed));
+      const ruleQueries = rules.map((rule) =>
+        translateRule(rule, analyzed, undefined, undefined, dialect),
+      );
       const unionBody = ruleQueries.join("\n  UNION\n");
       const colNames = colList(arity);
 
@@ -117,7 +122,7 @@ function translateViews(analyzed: AnalyzedProgram, dialect: Dialect): string[] {
               rule.body.some(
                 (elem) => elem.kind === "atom" && !elem.negated && stratumSet.has(elem.predicate),
               );
-            const ruleSql = translateRule(rule, analyzed, renameMap, tagMap);
+            const ruleSql = translateRule(rule, analyzed, renameMap, tagMap, dialect);
             const part = `SELECT '${predicate}' AS __tag, ${ruleSql.replace(/^SELECT /, "")}${nullPad}`;
             if (isRecursive) {
               recParts.push(part);
@@ -142,7 +147,9 @@ function translateViews(analyzed: AnalyzedProgram, dialect: Dialect): string[] {
         const cteParts = stratum.map((predicate) => {
           const rules = analyzed.rules.get(predicate)!;
           const arity = analyzed.arities.get(predicate)!;
-          const ruleQueries = rules.map((rule) => translateRule(rule, analyzed));
+          const ruleQueries = rules.map((rule) =>
+            translateRule(rule, analyzed, undefined, undefined, dialect),
+          );
           const unionBody = ruleQueries.join("\n    UNION\n  ");
           const colNames = colList(arity);
           return `  ${ident(predicate)}(${colNames}) AS (\n  ${unionBody}\n  )`;
@@ -167,12 +174,14 @@ type Binding = { kind: "col"; alias: string; col: string } | { kind: "expr"; sql
  * Translate a single rule to a SQL SELECT statement.
  * @param renameMap - Optional map from predicate name to table/CTE name (for SQLite mutual recursion)
  * @param tagMap - Optional map from predicate name to tag value (for SQLite combined CTE discrimination)
+ * @param dialect - SQL dialect (defaults to "postgres")
  */
 function translateRule(
   rule: Rule,
   analyzed: AnalyzedProgram,
   renameMap?: Map<string, string>,
   tagMap?: Map<string, string>,
+  dialect: Dialect = "postgres",
 ): string {
   if (rule.body.length === 0) {
     return translateFact(rule);
@@ -183,6 +192,7 @@ function translateRule(
   const negatedAtoms: { atom: Atom }[] = [];
   const equalities: Equality[] = [];
   const comparisons: Comparison[] = [];
+  const rangeAtoms: { range: RangeAtom; index: number }[] = [];
 
   for (let i = 0; i < rule.body.length; i++) {
     const elem = rule.body[i]!;
@@ -190,6 +200,8 @@ function translateRule(
       equalities.push(elem);
     } else if (elem.kind === "comparison") {
       comparisons.push(elem);
+    } else if (elem.kind === "range") {
+      rangeAtoms.push({ range: elem, index: i });
     } else if (elem.negated) {
       negatedAtoms.push({ atom: elem });
     } else {
@@ -218,6 +230,40 @@ function translateRule(
           varTypes.set(term.name, predTypes[j]!);
         }
       }
+    }
+  }
+
+  // Register range atoms before equalities, since range-bound variables
+  // may be referenced in equality expressions (e.g., C = S[I] where I is range-bound).
+  // Binding (generate_series) when expr is a variable and bounds are integer-typed;
+  // filter (BETWEEN) otherwise.
+  let rangeCounter = 0;
+  const bindingRanges: {
+    alias: string;
+    lowSql: string;
+    highSql: string;
+  }[] = [];
+  const filterRanges: { exprSql: string; lowSql: string; highSql: string }[] = [];
+
+  for (const { range } of rangeAtoms) {
+    const lowSql = termToSql(range.low, bindings, varTypes);
+    const highSql = termToSql(range.high, bindings, varTypes);
+    if (
+      range.expr.kind === "variable" &&
+      isIntegerTerm(range.low, varTypes) &&
+      isIntegerTerm(range.high, varTypes)
+    ) {
+      const rangeAlias = `__range_${rangeCounter++}`;
+      const list = bindings.get(range.expr.name) ?? [];
+      list.push({ kind: "col", alias: rangeAlias, col: "value" });
+      bindings.set(range.expr.name, list);
+      bindingRanges.push({ alias: rangeAlias, lowSql, highSql });
+    } else {
+      filterRanges.push({
+        exprSql: termToSql(range.expr, bindings, varTypes),
+        lowSql,
+        highSql,
+      });
     }
   }
 
@@ -252,11 +298,23 @@ function translateRule(
     }
   }
 
-  // FROM clause: only positive atoms
+  // FROM clause: positive atoms + binding ranges
   const fromParts = positiveAtoms.map(
     ({ atom, index }) =>
       `${ident(renameMap?.get(atom.predicate) ?? atom.predicate)} AS ${aliases[index]}`,
   );
+  for (const { alias, lowSql, highSql } of bindingRanges) {
+    if (dialect === "postgres") {
+      fromParts.push(`generate_series(${lowSql}, ${highSql}) AS ${alias}("value")`);
+    } else {
+      // SQLite: use a recursive CTE subquery to generate integers, then
+      // filter with WHERE conditions for the actual (possibly correlated) bounds.
+      const gen = `__gen_${alias}`;
+      fromParts.push(
+        `(WITH RECURSIVE ${gen}("value") AS (SELECT 0 AS "value" UNION ALL SELECT "value" + 1 FROM ${gen} WHERE "value" < 10000) SELECT "value" FROM ${gen}) AS ${alias}`,
+      );
+    }
+  }
 
   // WHERE conditions
   const conditions: string[] = [];
@@ -267,6 +325,14 @@ function translateRule(
     const first = refs[0]!;
     for (let i = 1; i < refs.length; i++) {
       conditions.push(`${bindingToSql(first)} = ${bindingToSql(refs[i]!)}`);
+    }
+  }
+
+  // SQLite range bound conditions (Postgres uses generate_series directly)
+  if (dialect === "sqlite") {
+    for (const { alias, lowSql, highSql } of bindingRanges) {
+      conditions.push(`${alias}."value" >= ${lowSql}`);
+      conditions.push(`${alias}."value" <= ${highSql}`);
     }
   }
 
@@ -324,6 +390,11 @@ function translateRule(
     conditions.push(
       `${termToSql(cmp.left, bindings, varTypes)} ${sqlOp} ${termToSql(cmp.right, bindings, varTypes)}`,
     );
+  }
+
+  // Filter range conditions (non-binding ranges)
+  for (const { exprSql, lowSql, highSql } of filterRanges) {
+    conditions.push(`${exprSql} BETWEEN ${lowSql} AND ${highSql}`);
   }
 
   let sql = `SELECT ${selectParts.join(", ")} FROM ${fromParts.join(", ")}`;
@@ -448,6 +519,19 @@ function termToSql(
       return obj;
     }
   }
+}
+
+/** Check whether a term has integer type. */
+function isIntegerTerm(term: Term, varTypes?: Map<string, SqlType>): boolean {
+  if (term.kind === "number") return Number.isInteger(term.value);
+  if (term.kind === "variable") return varTypes?.get(term.name) === "integer";
+  if (term.kind === "call" && term.name === "len") return true;
+  if (term.kind === "binary") {
+    // Arithmetic on integers stays integer (except / which may produce real)
+    return isIntegerTerm(term.left, varTypes) && isIntegerTerm(term.right, varTypes);
+  }
+  if (term.kind === "unary") return isIntegerTerm(term.operand, varTypes);
+  return false;
 }
 
 /** Check whether a term has text type (for choosing || over +). */

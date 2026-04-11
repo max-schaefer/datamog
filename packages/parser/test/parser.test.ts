@@ -313,4 +313,49 @@ describe("parser", () => {
     expect(rule.span.line).toBe(1);
     expect(rule.span.column).toBe(1);
   });
+
+  test("range atom with variable", () => {
+    const program = parse("foo(X) :- X in [1 .. 10].");
+    const rule = program.statements[0] as Rule;
+    expect(rule.body).toHaveLength(1);
+    const range = rule.body[0]!;
+    expect(range.kind).toBe("range");
+    if (range.kind === "range") {
+      expect(range.expr).toMatchObject({ kind: "variable", name: "X" });
+      expect(range.low).toMatchObject({ kind: "number", value: 1 });
+      expect(range.high).toMatchObject({ kind: "number", value: 10 });
+    }
+  });
+
+  test("range atom with expression", () => {
+    const program = parse("foo(X) :- bar(X, Y), Y + 1 in [0 .. 100].");
+    const rule = program.statements[0] as Rule;
+    expect(rule.body).toHaveLength(2);
+    const range = rule.body[1]!;
+    expect(range.kind).toBe("range");
+    if (range.kind === "range") {
+      expect(range.expr.kind).toBe("binary");
+    }
+  });
+
+  test("range atom with expression bounds", () => {
+    const program = parse("foo(X) :- bar(X, Y), X in [Y .. Y + 10].");
+    const rule = program.statements[0] as Rule;
+    const range = rule.body[1]!;
+    expect(range.kind).toBe("range");
+    if (range.kind === "range") {
+      expect(range.low).toMatchObject({ kind: "variable", name: "Y" });
+      expect(range.high.kind).toBe("binary");
+    }
+  });
+
+  test("range atom with function call expression", () => {
+    const program = parse("foo(X) :- bar(X), len(X) in [1 .. 10].");
+    const rule = program.statements[0] as Rule;
+    const range = rule.body[1]!;
+    expect(range.kind).toBe("range");
+    if (range.kind === "range") {
+      expect(range.expr.kind).toBe("call");
+    }
+  });
 });

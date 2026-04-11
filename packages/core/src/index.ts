@@ -12,6 +12,7 @@ export type {
   NumberLiteral,
   Program,
   Query,
+  RangeAtom,
   Rule,
   Slice,
   SourceElement,

@@ -226,6 +226,14 @@ function checkSafety(rule: Rule) {
       const exprVars = new Set<string>();
       collectVars(elem.expr, exprVars);
       equalities.push({ variable: elem.variable, exprVars });
+    } else if (elem.kind === "range") {
+      // If expr is a variable, it may be bound by the range (like an equality)
+      if (elem.expr.kind === "variable") {
+        const boundVars = new Set<string>();
+        collectVars(elem.low, boundVars);
+        collectVars(elem.high, boundVars);
+        equalities.push({ variable: elem.expr.name, exprVars: boundVars });
+      }
     }
   }
 
@@ -301,6 +309,17 @@ function checkSafety(rule: Rule) {
     if (elem.kind === "comparison") {
       checkTermSafe(elem.left, "comparison");
       checkTermSafe(elem.right, "comparison");
+    }
+  }
+
+  // Check range atom variables
+  for (const elem of rule.body) {
+    if (elem.kind === "range") {
+      checkTermSafe(elem.low, "range lower bound");
+      checkTermSafe(elem.high, "range upper bound");
+      if (elem.expr.kind !== "variable") {
+        checkTermSafe(elem.expr, "range expression");
+      }
     }
   }
 }

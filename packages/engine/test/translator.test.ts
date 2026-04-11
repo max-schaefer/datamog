@@ -301,6 +301,44 @@ describe("translator", () => {
     expect(norm(oddView!)).toContain('SELECT * FROM "odd"');
   });
 
+  test("generates generate_series for binding range (postgres)", () => {
+    const result = translateTyped(`
+      nums(X) :- X in [1 .. 5].
+    `);
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("generate_series(1, 5)");
+    expect(sql).toContain('"value"');
+  });
+
+  test("generates BETWEEN for filter range (non-variable expr)", () => {
+    const result = translateTyped(`
+      extensional vals(x: integer).
+      filtered(X) :- vals(X), X + 1 in [1 .. 100].
+    `);
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("BETWEEN 1 AND 100");
+  });
+
+  test("generates BETWEEN for variable range with non-integer bounds", () => {
+    const result = translateTyped(`
+      extensional base(x: real).
+      filtered(X) :- base(X), X in [0.5 .. 9.5].
+    `);
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("BETWEEN 0.5 AND 9.5");
+    expect(sql).not.toContain("generate_series");
+  });
+
+  test("generates generate_series with expression bounds", () => {
+    const result = translateTyped(`
+      extensional base(x: integer, y: integer).
+      inrange(X, Z) :- base(X, Y), Z in [Y .. Y + 10].
+    `);
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("generate_series(");
+    expect(sql).toContain("+ 10)");
+  });
+
   test("mutual recursion with dependent non-recursive predicate", () => {
     const result = translateSource(`
       extensional base(x: integer).
@@ -345,6 +383,22 @@ describe("translator (sqlite dialect)", () => {
     expect(sql).toContain("CREATE VIEW IF NOT EXISTS");
     expect(sql).toContain("WITH RECURSIVE");
     expect(sql).toContain('SELECT * FROM "ancestor"');
+  });
+
+  test("generates recursive CTE for binding range (sqlite)", () => {
+    const result = translateTyped(
+      `
+      nums(X) :- X in [1 .. 5].
+    `,
+      "sqlite",
+    );
+    const sql = norm(result.createViews[0]!);
+    // SQLite uses a recursive CTE subquery instead of generate_series
+    expect(sql).toContain("WITH RECURSIVE");
+    expect(sql).toContain('"value"');
+    expect(sql).toContain(">= 1");
+    expect(sql).toContain("<= 5");
+    expect(sql).not.toContain("generate_series");
   });
 
   test("generates WITH RECURSIVE for mutual recursion", () => {

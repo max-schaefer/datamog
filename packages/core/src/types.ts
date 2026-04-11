@@ -1,5 +1,6 @@
+import { AnalyzerError } from "./analyzer.ts";
 import type { AnalyzedProgram } from "./analyzer.ts";
-import type { SqlType, Term } from "./ast.ts";
+import type { RangeAtom, SqlType, Term } from "./ast.ts";
 
 export interface TypedProgram extends AnalyzedProgram {
   /** Column types for every predicate (EDB and IDB). */
@@ -81,6 +82,17 @@ export function inferTypes(analyzed: AnalyzedProgram): TypedProgram {
               if (exprType) {
                 varTypes.set(elem.variable, exprType);
               }
+            } else if (elem.kind === "range") {
+              if (elem.expr.kind === "variable" && !varTypes.has(elem.expr.name)) {
+                // Infer type from bounds
+                const lowType = inferTermType(elem.low, varTypes, types);
+                const highType = inferTermType(elem.high, varTypes, types);
+                const rangeType =
+                  lowType && highType ? joinTypes(lowType, highType) : (lowType ?? highType);
+                if (rangeType) {
+                  varTypes.set(elem.expr.name, rangeType);
+                }
+              }
             }
           }
 
@@ -107,6 +119,9 @@ export function inferTypes(analyzed: AnalyzedProgram): TypedProgram {
     }
   }
 
+  // Validate range atom types
+  validateRangeTypes(analyzed, types);
+
   // Finalize: convert undefined to "text" as default
   const columnTypes = new Map<string, SqlType[]>();
   for (const [pred, predTypes] of types) {
@@ -117,6 +132,74 @@ export function inferTypes(analyzed: AnalyzedProgram): TypedProgram {
   }
 
   return { ...analyzed, columnTypes };
+}
+
+function isNumericType(t: SqlType | undefined): boolean {
+  return t === "integer" || t === "real";
+}
+
+/** Validate that range atom expressions have numeric types. */
+function validateRangeTypes(
+  analyzed: AnalyzedProgram,
+  types: Map<string, (SqlType | undefined)[]>,
+): void {
+  for (const [, predicateRules] of analyzed.rules) {
+    for (const rule of predicateRules) {
+      // Rebuild variable type environment for this rule
+      const varTypes = new Map<string, SqlType>();
+      for (const elem of rule.body) {
+        if (elem.kind === "atom" && !elem.negated) {
+          const predTypes = types.get(elem.predicate);
+          if (!predTypes) continue;
+          for (let j = 0; j < elem.args.length; j++) {
+            const arg = elem.args[j]!;
+            if (arg.kind === "variable" && !varTypes.has(arg.name)) {
+              const colType = predTypes[j];
+              if (colType) varTypes.set(arg.name, colType);
+            }
+          }
+        } else if (elem.kind === "equality") {
+          const exprType = inferTermType(elem.expr, varTypes, types);
+          if (exprType) varTypes.set(elem.variable, exprType);
+        } else if (elem.kind === "range") {
+          if (elem.expr.kind === "variable" && !varTypes.has(elem.expr.name)) {
+            const lowType = inferTermType(elem.low, varTypes, types);
+            const highType = inferTermType(elem.high, varTypes, types);
+            const rangeType =
+              lowType && highType ? joinTypes(lowType, highType) : (lowType ?? highType);
+            if (rangeType) varTypes.set(elem.expr.name, rangeType);
+          }
+        }
+      }
+
+      // Check range atoms
+      for (const elem of rule.body) {
+        if (elem.kind === "range") {
+          checkRangeExprTypes(elem, varTypes, types);
+        }
+      }
+    }
+  }
+}
+
+function checkRangeExprTypes(
+  range: RangeAtom,
+  varTypes: Map<string, SqlType>,
+  types: Map<string, (SqlType | undefined)[]>,
+): void {
+  const lowType = inferTermType(range.low, varTypes, types);
+  const highType = inferTermType(range.high, varTypes, types);
+  const exprType = inferTermType(range.expr, varTypes, types);
+
+  if (lowType && !isNumericType(lowType)) {
+    throw new AnalyzerError(`Range lower bound has non-numeric type '${lowType}'`);
+  }
+  if (highType && !isNumericType(highType)) {
+    throw new AnalyzerError(`Range upper bound has non-numeric type '${highType}'`);
+  }
+  if (exprType && !isNumericType(exprType)) {
+    throw new AnalyzerError(`Range expression has non-numeric type '${exprType}'`);
+  }
 }
 
 /** Infer the type of a term expression given variable types and predicate column types. */

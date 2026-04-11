@@ -23,8 +23,9 @@ export enum TokenType {
   Turnstile = 16,
   QueryMark = 17,
 
+  In = 18,
   Not = 19,
-
+  DotDot = 20,
   Plus = 21,
   Minus = 22,
   Star = 23,
@@ -48,6 +49,7 @@ export interface Token {
 
 const KEYWORDS: Record<string, TokenType> = {
   extensional: TokenType.Extensional,
+  in: TokenType.In,
   mod: TokenType.Percent,
   not: TokenType.Not,
   text: TokenType.TextType,
@@ -156,6 +158,18 @@ export function tokenize(source: string): Token[] {
       tokens.push({
         type: TokenType.NotEq,
         value: "!=",
+        span: span(startPos, startLine, startCol),
+      });
+      continue;
+    }
+
+    // Two-character: ..
+    if (ch === "." && source[pos + 1] === ".") {
+      pos += 2;
+      column += 2;
+      tokens.push({
+        type: TokenType.DotDot,
+        value: "..",
         span: span(startPos, startLine, startCol),
       });
       continue;

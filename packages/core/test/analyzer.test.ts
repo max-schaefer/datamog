@@ -223,4 +223,46 @@ describe("analyzer", () => {
     expect(result.rules.get("base")).toHaveLength(1);
     expect(result.rules.get("base")?.[0]?.body).toHaveLength(0);
   });
+
+  test("accepts range atom binding a variable", () => {
+    const program = parse(`
+      foo(X) :- X in [1 .. 10].
+    `);
+    const result = analyze(program);
+    expect(result.rules.has("foo")).toBe(true);
+  });
+
+  test("accepts range atom with bound expression", () => {
+    const program = parse(`
+      extensional nums(x: integer).
+      filtered(X) :- nums(X), X in [1 .. 100].
+    `);
+    const result = analyze(program);
+    expect(result.rules.has("filtered")).toBe(true);
+  });
+
+  test("accepts range with expression bounds from safe variables", () => {
+    const program = parse(`
+      extensional base(x: integer, y: integer).
+      inrange(X) :- base(X, Y), X in [Y .. Y + 10].
+    `);
+    const result = analyze(program);
+    expect(result.rules.has("inrange")).toBe(true);
+  });
+
+  test("rejects range with unsafe variable in bounds", () => {
+    const program = parse(`
+      extensional base(x: integer).
+      bad(X) :- base(X), X in [Y .. 10].
+    `);
+    expect(() => analyze(program)).toThrow(/Unsafe variable 'Y'/);
+  });
+
+  test("rejects range with unsafe non-variable expression", () => {
+    const program = parse(`
+      extensional base(x: integer).
+      bad(X) :- base(X), Y + 1 in [1 .. 10].
+    `);
+    expect(() => analyze(program)).toThrow(/Unsafe variable 'Y'/);
+  });
 });

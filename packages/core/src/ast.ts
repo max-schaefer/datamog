@@ -107,7 +107,14 @@ export interface Comparison extends SourceElement {
   right: Term;
 }
 
-export type BodyElement = Atom | Equality | Comparison;
+export interface RangeAtom extends SourceElement {
+  kind: "range";
+  expr: Term;
+  low: Term;
+  high: Term;
+}
+
+export type BodyElement = Atom | Equality | Comparison | RangeAtom;
 
 // --- Statements ---
 
