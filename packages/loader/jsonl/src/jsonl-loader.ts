@@ -40,22 +40,57 @@ export class JsonlLoader implements ExtensionalLoader {
     const lines = content.split("\n").filter((line) => line.trim() !== "");
 
     return lines.map((line, lineIndex) => {
-      const obj = JSON.parse(line) as Record<string, unknown>;
-      const row: Record<string, unknown> = {};
-      for (const col of decl.columns) {
-        if (!(col.name in obj)) {
-          throw new Error(
-            `${decl.predicate}.jsonl line ${lineIndex + 1}: missing field '${col.name}'`,
-          );
-        }
-        row[col.name] = checkValue(
-          obj[col.name],
-          col.type,
-          `${decl.predicate}.jsonl line ${lineIndex + 1}, column '${col.name}'`,
+      const parsed: unknown = JSON.parse(line);
+
+      if (Array.isArray(parsed)) {
+        return this.readFlatRow(parsed, decl, lineIndex);
+      }
+      if (typeof parsed === "object" && parsed !== null) {
+        return this.readObjectRow(parsed as Record<string, unknown>, decl, lineIndex);
+      }
+      throw new Error(
+        `${decl.predicate}.jsonl line ${lineIndex + 1}: expected object or array, got ${typeof parsed}`,
+      );
+    });
+  }
+
+  private readObjectRow(
+    obj: Record<string, unknown>,
+    decl: ExtDecl,
+    lineIndex: number,
+  ): Record<string, unknown> {
+    const row: Record<string, unknown> = {};
+    for (const col of decl.columns) {
+      if (!(col.name in obj)) {
+        throw new Error(
+          `${decl.predicate}.jsonl line ${lineIndex + 1}: missing field '${col.name}'`,
         );
       }
-      return row;
-    });
+      row[col.name] = checkValue(
+        obj[col.name],
+        col.type,
+        `${decl.predicate}.jsonl line ${lineIndex + 1}, column '${col.name}'`,
+      );
+    }
+    return row;
+  }
+
+  private readFlatRow(arr: unknown[], decl: ExtDecl, lineIndex: number): Record<string, unknown> {
+    if (arr.length !== decl.columns.length) {
+      throw new Error(
+        `${decl.predicate}.jsonl line ${lineIndex + 1}: expected ${decl.columns.length} values but got ${arr.length}`,
+      );
+    }
+    const row: Record<string, unknown> = {};
+    for (let i = 0; i < decl.columns.length; i++) {
+      const col = decl.columns[i]!;
+      row[col.name] = checkValue(
+        arr[i],
+        col.type,
+        `${decl.predicate}.jsonl line ${lineIndex + 1}, column '${col.name}'`,
+      );
+    }
+    return row;
   }
 
   private filePath(decl: ExtDecl): string {

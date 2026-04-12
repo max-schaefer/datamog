@@ -97,6 +97,67 @@ describe("JsonlLoader", () => {
     expect(rows).toEqual([{ name: "alice", child: "bob" }]);
   });
 
+  test("reads flat array rows from JSONL", async () => {
+    await Bun.write(join(tempDir, "parent.jsonl"), '["alice","bob"]\n["carol","dave"]\n');
+    const loader = new JsonlLoader({ directory: tempDir });
+    const decl = getExtDecl("extensional parent(name: text, child: text).");
+    const rows = await loader.readRows(decl);
+    expect(rows).toEqual([
+      { name: "alice", child: "bob" },
+      { name: "carol", child: "dave" },
+    ]);
+  });
+
+  test("validates types in flat array rows", async () => {
+    await Bun.write(join(tempDir, "t.jsonl"), '["hello",42,3.14,true]\n');
+    const loader = new JsonlLoader({ directory: tempDir });
+    const decl = getExtDecl("extensional t(a: text, b: integer, c: real, d: boolean).");
+    const rows = await loader.readRows(decl);
+    expect(rows).toEqual([{ a: "hello", b: 42, c: 3.14, d: true }]);
+  });
+
+  test("rejects flat array with wrong arity", async () => {
+    await Bun.write(join(tempDir, "parent.jsonl"), '["alice"]\n');
+    const loader = new JsonlLoader({ directory: tempDir });
+    const decl = getExtDecl("extensional parent(name: text, child: text).");
+    expect(loader.readRows(decl)).rejects.toThrow(/expected 2 values but got 1/);
+  });
+
+  test("rejects flat array with excess values", async () => {
+    await Bun.write(join(tempDir, "parent.jsonl"), '["alice","bob","extra"]\n');
+    const loader = new JsonlLoader({ directory: tempDir });
+    const decl = getExtDecl("extensional parent(name: text, child: text).");
+    expect(loader.readRows(decl)).rejects.toThrow(/expected 2 values but got 3/);
+  });
+
+  test("rejects wrong type in flat array", async () => {
+    await Bun.write(join(tempDir, "t.jsonl"), '["hello"]\n');
+    const loader = new JsonlLoader({ directory: tempDir });
+    const decl = getExtDecl("extensional t(val: integer).");
+    expect(loader.readRows(decl)).rejects.toThrow(/Expected integer/);
+  });
+
+  test("supports mixed object and array rows", async () => {
+    await Bun.write(
+      join(tempDir, "parent.jsonl"),
+      '{"name":"alice","child":"bob"}\n["carol","dave"]\n',
+    );
+    const loader = new JsonlLoader({ directory: tempDir });
+    const decl = getExtDecl("extensional parent(name: text, child: text).");
+    const rows = await loader.readRows(decl);
+    expect(rows).toEqual([
+      { name: "alice", child: "bob" },
+      { name: "carol", child: "dave" },
+    ]);
+  });
+
+  test("rejects non-object non-array JSON line", async () => {
+    await Bun.write(join(tempDir, "t.jsonl"), "42\n");
+    const loader = new JsonlLoader({ directory: tempDir });
+    const decl = getExtDecl("extensional t(val: integer).");
+    expect(loader.readRows(decl)).rejects.toThrow(/expected object or array/);
+  });
+
   test("load calls backend with correct inserts", async () => {
     await Bun.write(join(tempDir, "parent.jsonl"), '{"name":"alice","child":"bob"}\n');
     const loader = new JsonlLoader({ directory: tempDir });

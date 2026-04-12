@@ -28,8 +28,9 @@ function usage(): never {
   console.error("  --extensional name=source  Map a predicate to a file (.csv/.jsonl/.mmd) or");
   console.error("                             a Google Sheets URL (requires GOOGLE_API_KEY)");
   console.error(
-    "  --output-format <format>   Output format: table (default), csv, jsonl, mermaid, or ascii",
+    "  --output-format <format>   Output format: table (default), csv, jsonl, jsonl-flat,",
   );
+  console.error("                             mermaid, or ascii-graph");
   console.error("  --dry-run                  Print generated SQL without executing");
   console.error("  --backend <backend>        Backend: postgres or sqlite (default: auto)");
   console.error("  -h, --help                 Show this help message");
@@ -49,7 +50,7 @@ function usage(): never {
 }
 
 type BackendName = "postgres" | "sqlite";
-type OutputFormat = "table" | "csv" | "jsonl" | "mermaid" | "ascii";
+type OutputFormat = "table" | "csv" | "jsonl" | "jsonl-flat" | "mermaid" | "ascii-graph";
 
 async function createBackend(name: BackendName): Promise<Backend> {
   if (name === "postgres") {
@@ -249,11 +250,16 @@ async function printResult(sql: string, rows: Record<string, unknown>[], format:
         console.log(JSON.stringify(row));
       }
       break;
+    case "jsonl-flat":
+      for (const row of rows) {
+        console.log(JSON.stringify(Object.values(row)));
+      }
+      break;
     case "mermaid":
       if (rows.length === 0) break;
       console.log(rowsToMermaid(rows));
       break;
-    case "ascii": {
+    case "ascii-graph": {
       if (rows.length === 0) break;
       const { renderMermaidASCII } = await import("beautiful-mermaid");
       console.log(renderMermaidASCII(rowsToMermaid(rows)));
@@ -309,19 +315,19 @@ async function main() {
       backendOverride = value;
     } else if (arg === "--output-format") {
       const value = args[++i];
-      if (
-        value !== "table" &&
-        value !== "csv" &&
-        value !== "jsonl" &&
-        value !== "mermaid" &&
-        value !== "ascii"
-      ) {
-        console.error(
-          `Invalid output format: ${value} (expected "table", "csv", "jsonl", "mermaid", or "ascii")`,
-        );
+      const validFormats: OutputFormat[] = [
+        "table",
+        "csv",
+        "jsonl",
+        "jsonl-flat",
+        "mermaid",
+        "ascii-graph",
+      ];
+      if (!validFormats.includes(value as OutputFormat)) {
+        console.error(`Invalid output format: ${value} (expected ${validFormats.join(", ")})`);
         process.exit(1);
       }
-      outputFormat = value;
+      outputFormat = value as OutputFormat;
     } else if (arg === "--extensional") {
       const value = args[++i];
       if (!value) {
@@ -411,7 +417,7 @@ async function main() {
   try {
     const results = await executor.execute(source);
 
-    if (outputFormat === "mermaid" || outputFormat === "ascii") {
+    if (outputFormat === "mermaid" || outputFormat === "ascii-graph") {
       for (const result of results) {
         if (result.rows.length > 0) {
           const colCount = Object.keys(result.rows[0]!).length;
