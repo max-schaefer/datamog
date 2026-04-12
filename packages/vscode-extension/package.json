@@ -1,0 +1,51 @@
+{
+  "name": "datamog-vscode",
+  "displayName": "Datamog",
+  "description": "Language support for the Datamog Datalog dialect",
+  "version": "0.1.0",
+  "publisher": "max-schaefer",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/max-schaefer/datamog",
+    "directory": "packages/vscode-extension"
+  },
+  "engines": {
+    "vscode": "^1.67.0"
+  },
+  "categories": ["Programming Languages"],
+  "activationEvents": ["onLanguage:datamog"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "datamog",
+        "aliases": ["Datamog", "datamog"],
+        "extensions": [".dl"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "datamog",
+        "scopeName": "source.datamog",
+        "path": "./syntaxes/datamog.tmLanguage.json"
+      }
+    ]
+  },
+  "dependencies": {
+    "langium": "^4.2.2",
+    "vscode-languageclient": "^9.0.1",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.12"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.67.0",
+    "datamog-core": "workspace:*",
+    "datamog-parser": "workspace:*",
+    "esbuild": "^0.28.0"
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch"
+  }
+}

@@ -23,6 +23,7 @@ export type {
   Subscript,
   UnaryExpr,
   Variable,
+  DatamogAstType,
 } from "./generated/ast.js";
 
 export {
@@ -49,6 +50,13 @@ export {
 export type AggregateFunction = "count" | "sum" | "avg" | "min" | "max" | "group_concat";
 
 export type BinaryOp = "+" | "-" | "*" | "/" | "%";
+
+export { postProcess } from "./post-process.js";
+export { createDatamogServices } from "./datamog-module.js";
+export {
+  DatamogGeneratedModule,
+  DatamogGeneratedSharedModule,
+} from "./generated/module.js";
 
 import { createDatamogServices } from "./datamog-module.js";
 import type { Program } from "./generated/ast.js";

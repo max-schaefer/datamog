@@ -9,7 +9,8 @@
     { "path": "packages/loader/jsonl" },
     { "path": "packages/loader/gsheet" },
     { "path": "packages/loader/mermaid" },
-    { "path": "packages/cli" }
+    { "path": "packages/cli" },
+    { "path": "packages/vscode-extension" }
   ],
   "files": []
 }
