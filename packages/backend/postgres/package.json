@@ -6,6 +6,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "datamog-core": "workspace:*",
     "datamog-engine": "workspace:*"
   }
 }

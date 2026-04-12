@@ -8,6 +8,7 @@ import {
   DatamogExecutor,
   type ExtensionalLoader,
   type LoadResult,
+  type SqlDialect,
   checkValue,
   coerceValue,
   translate,
@@ -51,6 +52,15 @@ function usage(): never {
 
 type BackendName = "postgres" | "sqlite";
 type OutputFormat = "table" | "csv" | "jsonl" | "jsonl-flat" | "mermaid" | "ascii-graph";
+
+async function createSqlDialect(name: BackendName): Promise<SqlDialect> {
+  if (name === "postgres") {
+    const { PostgresSqlDialect } = await import("datamog-backend-postgres");
+    return new PostgresSqlDialect();
+  }
+  const { SqliteSqlDialect } = await import("datamog-backend-sqlite");
+  return new SqliteSqlDialect();
+}
 
 async function createBackend(name: BackendName): Promise<Backend> {
   if (name === "postgres") {
@@ -382,8 +392,8 @@ async function main() {
   if (dryRun) {
     const program = parse(source);
     const analyzed = analyze(program);
-    const dialect = backendName === "postgres" ? "postgres" : "sqlite";
-    const translation = translate(analyzed, { dialect });
+    const sqlDialect = await createSqlDialect(backendName);
+    const translation = translate(analyzed, sqlDialect);
 
     for (const stmt of translation.createTables) {
       console.log(stmt);

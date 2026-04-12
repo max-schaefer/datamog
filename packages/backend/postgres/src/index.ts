@@ -1,9 +1,12 @@
 import type { Backend } from "datamog-engine";
+import { PostgresSqlDialect } from "./dialect.ts";
+
+export { PostgresSqlDialect } from "./dialect.ts";
 
 export function create(): Backend {
   const sql = Bun.sql;
   return {
-    dialect: "postgres",
+    sqlDialect: new PostgresSqlDialect(),
     async execute(query: string, params?: unknown[]): Promise<Record<string, unknown>[]> {
       if (params && params.length > 0) {
         return sql.unsafe(query, params) as Promise<Record<string, unknown>[]>;

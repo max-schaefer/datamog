@@ -7,12 +7,7 @@ import type {
   Rule,
   SqlType,
 } from "datamog-core";
-
-export type Dialect = "postgres" | "sqlite";
-
-export interface TranslateOptions {
-  dialect?: Dialect;
-}
+import { type SqlDialect, colList, ident } from "./dialect.ts";
 
 export interface TranslationResult {
   createTables: string[];
@@ -20,11 +15,7 @@ export interface TranslationResult {
   queries: string[];
 }
 
-export function translate(
-  analyzed: AnalyzedProgram,
-  options: TranslateOptions = {},
-): TranslationResult {
-  const dialect = options.dialect ?? "postgres";
+export function translate(analyzed: AnalyzedProgram, dialect: SqlDialect): TranslationResult {
   const createTables = translateTables(analyzed);
   const createViews = translateViews(analyzed, dialect);
   const queries = translateQueries(analyzed);
@@ -51,7 +42,7 @@ function translateTables(analyzed: AnalyzedProgram): string[] {
 
 // --- Views ---
 
-function translateViews(analyzed: AnalyzedProgram, dialect: Dialect): string[] {
+function translateViews(analyzed: AnalyzedProgram, dialect: SqlDialect): string[] {
   const views: string[] = [];
   for (const stratum of analyzed.sortedStrata) {
     const isRecursive = analyzed.recursivePredicates.has(stratum[0]!);
@@ -63,12 +54,7 @@ function translateViews(analyzed: AnalyzedProgram, dialect: Dialect): string[] {
         translateRule(rule, analyzed, undefined, undefined, dialect),
       );
       const unionBody = ruleQueries.join("\n  UNION\n");
-
-      if (dialect === "sqlite") {
-        views.push(`CREATE VIEW IF NOT EXISTS ${ident(predicate)} AS\n  ${unionBody}\n;`);
-      } else {
-        views.push(`CREATE OR REPLACE VIEW ${ident(predicate)} AS\n  ${unionBody}\n;`);
-      }
+      views.push(dialect.createView(predicate, unionBody));
     } else if (stratum.length === 1) {
       const predicate = stratum[0]!;
       const rules = analyzed.rules.get(predicate)!;
@@ -78,89 +64,23 @@ function translateViews(analyzed: AnalyzedProgram, dialect: Dialect): string[] {
       );
       const unionBody = ruleQueries.join("\n  UNION\n");
       const colNames = colList(arity);
-
-      if (dialect === "sqlite") {
-        views.push(
-          `CREATE VIEW IF NOT EXISTS ${ident(predicate)} AS\n  WITH RECURSIVE ${ident(predicate)}(${colNames}) AS (\n  ${unionBody}\n  )\n  SELECT * FROM ${ident(predicate)}\n;`,
-        );
-      } else {
-        views.push(
-          `CREATE RECURSIVE VIEW ${ident(predicate)} (${colNames}) AS (\n  ${unionBody}\n);`,
-        );
-      }
+      views.push(dialect.createRecursiveView(predicate, colNames, unionBody));
     } else {
-      if (dialect === "sqlite") {
-        // SQLite does not support mutually recursive CTEs. We merge all
-        // predicates in the SCC into a single self-recursive CTE with a
-        // discriminator tag column, then create views that filter by tag.
-        const maxArity = Math.max(...stratum.map((p) => analyzed.arities.get(p)!));
-        const combinedName = `__mutual_${stratum.join("_")}`;
-        const combinedCols = `__tag, ${colList(maxArity)}`;
+      const ruleTranslator = (
+        rule: Rule,
+        renameMap?: Map<string, string>,
+        tagMap?: Map<string, string>,
+      ) => translateRule(rule, analyzed, renameMap, tagMap, dialect);
 
-        // Build UNION of all rules, each tagged with its predicate name.
-        // References to sibling predicates in the SCC are rewritten to
-        // query the combined CTE with a tag filter.
-        const renameMap = new Map(stratum.map((p) => [p, combinedName]));
-        const tagMap = new Map(stratum.map((p) => [p, p]));
-
-        // SQLite requires non-recursive (base) terms before recursive terms
-        // in a WITH RECURSIVE UNION, so we partition rules into base cases
-        // (facts / rules that don't reference the SCC) and recursive cases.
-        const stratumSet = new Set(stratum);
-        const baseParts: string[] = [];
-        const recParts: string[] = [];
-        for (const predicate of stratum) {
-          const rules = analyzed.rules.get(predicate)!;
-          const arity = analyzed.arities.get(predicate)!;
-          const padding = maxArity - arity;
-          const nullPad = padding > 0 ? `, ${Array(padding).fill("NULL").join(", ")}` : "";
-
-          for (const rule of rules) {
-            const isRecursive =
-              rule.body.length > 0 &&
-              rule.body.some(
-                (elem) => elem.$type === "Atom" && !elem.negated && stratumSet.has(elem.predicate),
-              );
-            const ruleSql = translateRule(rule, analyzed, renameMap, tagMap, dialect);
-            const part = `SELECT '${predicate}' AS __tag, ${ruleSql.replace(/^SELECT /, "")}${nullPad}`;
-            if (isRecursive) {
-              recParts.push(part);
-            } else {
-              baseParts.push(part);
-            }
-          }
-        }
-        const unionParts = [...baseParts, ...recParts];
-
-        const unionBody = unionParts.join("\n    UNION\n  ");
-        const withBlock = `WITH RECURSIVE ${ident(combinedName)}(${combinedCols}) AS (\n  ${unionBody}\n  )`;
-
-        for (const predicate of stratum) {
-          const arity = analyzed.arities.get(predicate)!;
-          const selectCols = colList(arity);
-          views.push(
-            `CREATE VIEW IF NOT EXISTS ${ident(predicate)} AS\n  ${withBlock}\n  SELECT ${selectCols} FROM ${ident(combinedName)} WHERE __tag = '${predicate}'\n;`,
-          );
-        }
-      } else {
-        const cteParts = stratum.map((predicate) => {
-          const rules = analyzed.rules.get(predicate)!;
-          const arity = analyzed.arities.get(predicate)!;
-          const ruleQueries = rules.map((rule) =>
-            translateRule(rule, analyzed, undefined, undefined, dialect),
-          );
-          const unionBody = ruleQueries.join("\n    UNION\n  ");
-          const colNames = colList(arity);
-          return `  ${ident(predicate)}(${colNames}) AS (\n  ${unionBody}\n  )`;
-        });
-        const withBlock = `WITH RECURSIVE\n${cteParts.join(",\n")}`;
-
-        for (const predicate of stratum) {
-          views.push(
-            `CREATE OR REPLACE VIEW ${ident(predicate)} AS\n  ${withBlock}\n  SELECT * FROM ${ident(predicate)}\n;`,
-          );
-        }
-      }
+      views.push(
+        ...dialect.createMutuallyRecursiveViews(
+          stratum,
+          analyzed.arities,
+          analyzed.rules,
+          analyzed,
+          ruleTranslator,
+        ),
+      );
     }
   }
   return views;
@@ -173,14 +93,14 @@ type Binding = { kind: "col"; alias: string; col: string } | { kind: "expr"; sql
  * Translate a single rule to a SQL SELECT statement.
  * @param renameMap - Optional map from predicate name to table/CTE name (for SQLite mutual recursion)
  * @param tagMap - Optional map from predicate name to tag value (for SQLite combined CTE discrimination)
- * @param dialect - SQL dialect (defaults to "postgres")
+ * @param dialect - SQL dialect for dialect-specific expressions
  */
 function translateRule(
   rule: Rule,
   analyzed: AnalyzedProgram,
-  renameMap?: Map<string, string>,
-  tagMap?: Map<string, string>,
-  dialect: Dialect = "postgres",
+  renameMap: Map<string, string> | undefined,
+  tagMap: Map<string, string> | undefined,
+  dialect: SqlDialect,
 ): string {
   if (rule.body.length === 0) {
     return translateFact(rule);
@@ -298,16 +218,7 @@ function translateRule(
       `${ident(renameMap?.get(atom.predicate) ?? atom.predicate)} AS ${aliases[index]}`,
   );
   for (const { alias, lowSql, highSql } of bindingRanges) {
-    if (dialect === "postgres") {
-      fromParts.push(`generate_series(${lowSql}, ${highSql}) AS ${alias}("value")`);
-    } else {
-      // SQLite: use a recursive CTE subquery to generate integers, then
-      // filter with WHERE conditions for the actual (possibly correlated) bounds.
-      const gen = `__gen_${alias}`;
-      fromParts.push(
-        `(WITH RECURSIVE ${gen}("value") AS (SELECT 0 AS "value" UNION ALL SELECT "value" + 1 FROM ${gen} WHERE "value" < 10000) SELECT "value" FROM ${gen}) AS ${alias}`,
-      );
-    }
+    fromParts.push(dialect.rangeSource(alias, lowSql, highSql));
   }
 
   // WHERE conditions
@@ -322,12 +233,9 @@ function translateRule(
     }
   }
 
-  // SQLite range bound conditions (Postgres uses generate_series directly)
-  if (dialect === "sqlite") {
-    for (const { alias, lowSql, highSql } of bindingRanges) {
-      conditions.push(`${alias}."value" >= ${lowSql}`);
-      conditions.push(`${alias}."value" <= ${highSql}`);
-    }
+  // Range bound conditions (dialect-specific: empty for Postgres, present for SQLite)
+  for (const { alias, lowSql, highSql } of bindingRanges) {
+    conditions.push(...dialect.rangeConditions(alias, lowSql, highSql));
   }
 
   // Tag filter conditions for combined mutual-recursion CTE
@@ -454,10 +362,6 @@ function resolveColumnRef(predicate: string, argIndex: number, analyzed: Analyze
   return `col${argIndex + 1}`;
 }
 
-function ident(name: string): string {
-  return `"${name}"`;
-}
-
 /**
  * Convert a Term AST node to a SQL expression string.
  * @param varTypes - Optional variable type map for type-aware operator selection (+ vs ||)
@@ -546,7 +450,7 @@ function translateAggregate(
   agg: AggregateCall,
   bindings: Map<string, Binding[]>,
   varTypes: Map<string, SqlType> | undefined,
-  dialect: Dialect,
+  dialect: SqlDialect,
 ): string {
   // count(_) → COUNT(*)
   if (agg.func === "count" && agg.arg.$type === "Variable" && agg.arg.name.startsWith("_")) {
@@ -567,10 +471,7 @@ function translateAggregate(
     case "max":
       return `MAX(${argSql})`;
     case "group_concat":
-      if (dialect === "sqlite") {
-        return `GROUP_CONCAT(${argSql}, ',')`;
-      }
-      return `STRING_AGG(${argSql}::TEXT, ',')`;
+      return dialect.groupConcat(argSql);
     default:
       return `${agg.func.toUpperCase()}(${argSql})`;
   }
@@ -590,8 +491,4 @@ function translateCall(
     default:
       return `${name.toUpperCase()}(${sqlArgs.join(", ")})`;
   }
-}
-
-function colList(arity: number): string {
-  return Array.from({ length: arity }, (_, i) => `col${i + 1}`).join(", ");
 }

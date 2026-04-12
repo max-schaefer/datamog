@@ -8,5 +8,9 @@
   "dependencies": {
     "datamog-core": "workspace:*",
     "datamog-parser": "workspace:*"
+  },
+  "devDependencies": {
+    "datamog-backend-postgres": "workspace:*",
+    "datamog-backend-sqlite": "workspace:*"
   }
 }

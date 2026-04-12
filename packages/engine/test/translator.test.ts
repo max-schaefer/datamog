@@ -1,16 +1,20 @@
 import { describe, expect, test } from "bun:test";
+import { PostgresSqlDialect } from "datamog-backend-postgres";
+import { SqliteSqlDialect } from "datamog-backend-sqlite";
 import { analyze, inferTypes } from "datamog-core";
 import { parse } from "datamog-parser";
+import type { SqlDialect } from "../src/dialect.ts";
 import { translate } from "../src/translator.ts";
 
-import type { Dialect } from "../src/translator.ts";
+const postgres = new PostgresSqlDialect();
+const sqlite = new SqliteSqlDialect();
 
-function translateSource(source: string, dialect: Dialect = "postgres") {
-  return translate(analyze(parse(source)), { dialect });
+function translateSource(source: string, dialect: SqlDialect = postgres) {
+  return translate(analyze(parse(source)), dialect);
 }
 
-function translateTyped(source: string, dialect: Dialect = "postgres") {
-  return translate(inferTypes(analyze(parse(source))), { dialect });
+function translateTyped(source: string, dialect: SqlDialect = postgres) {
+  return translate(inferTypes(analyze(parse(source))), dialect);
 }
 
 /** Normalize whitespace for comparison */
@@ -443,7 +447,7 @@ describe("translator (sqlite dialect)", () => {
       extensional parent(name: text, child: text).
       grandparent(X, Y) :- parent(X, Z), parent(Z, Y).
     `,
-      "sqlite",
+      sqlite,
     );
     const sql = norm(result.createViews[0]!);
     expect(sql).toContain("CREATE VIEW IF NOT EXISTS");
@@ -458,7 +462,7 @@ describe("translator (sqlite dialect)", () => {
       ancestor(X, Y) :- parent(X, Y).
       ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
     `,
-      "sqlite",
+      sqlite,
     );
     const sql = norm(result.createViews[0]!);
     expect(sql).toContain("CREATE VIEW IF NOT EXISTS");
@@ -471,7 +475,7 @@ describe("translator (sqlite dialect)", () => {
       `
       nums(X) :- X in [1 .. 5].
     `,
-      "sqlite",
+      sqlite,
     );
     const sql = norm(result.createViews[0]!);
     // SQLite uses a recursive CTE subquery instead of generate_series
@@ -488,7 +492,7 @@ describe("translator (sqlite dialect)", () => {
       extensional items(group_name: text, item: text).
       concat_items(G, group_concat(I)) :- items(G, I).
     `,
-      "sqlite",
+      sqlite,
     );
     const sql = norm(result.createViews[0]!);
     expect(sql).toContain("GROUP_CONCAT(");
@@ -501,7 +505,7 @@ describe("translator (sqlite dialect)", () => {
       extensional parent(name: text, child: text).
       num_children(P, count(C)) :- parent(P, C).
     `,
-      "sqlite",
+      sqlite,
     );
     const sql = norm(result.createViews[0]!);
     expect(sql).toContain("CREATE VIEW IF NOT EXISTS");
@@ -517,7 +521,7 @@ describe("translator (sqlite dialect)", () => {
       even(X) :- odd(X).
       odd(X) :- even(X).
     `,
-      "sqlite",
+      sqlite,
     );
     expect(result.createViews).toHaveLength(2);
     const evenView = result.createViews.find((v) => norm(v).includes('NOT EXISTS "even"'));

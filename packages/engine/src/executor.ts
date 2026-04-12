@@ -26,7 +26,7 @@ export class DatamogExecutor {
   async execute(source: string): Promise<QueryResult[]> {
     const program = parse(source);
     const analyzed = inferTypes(analyze(program));
-    const translation = translate(analyzed, { dialect: this.backend.dialect });
+    const translation = translate(analyzed, this.backend.sqlDialect);
 
     // 1. Create tables
     for (const stmt of translation.createTables) {
