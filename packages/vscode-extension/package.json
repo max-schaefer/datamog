@@ -3,6 +3,7 @@
   "displayName": "Datamog",
   "description": "Language support for the Datamog Datalog dialect",
   "version": "0.1.0",
+  "license": "MIT",
   "publisher": "max-schaefer",
   "repository": {
     "type": "git",

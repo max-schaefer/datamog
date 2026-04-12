@@ -1,5 +1,6 @@
 {
   "name": "datamog",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "workspaces": ["packages/*", "packages/backend/*", "packages/loader/*"],
