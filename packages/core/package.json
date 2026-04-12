@@ -5,7 +5,7 @@
   "exports": {
     ".": "./src/index.ts"
   },
-  "devDependencies": {
+  "dependencies": {
     "datamog-parser": "workspace:*"
   }
 }

@@ -15,7 +15,8 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1",
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "langium-cli": "^4.2.0"
   },
   "peerDependencies": {
     "typescript": "^5"

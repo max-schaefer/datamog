@@ -22,6 +22,6 @@
     }
   },
   "files": {
-    "ignore": ["node_modules", "dist", "*.lockb", ".claude"]
+    "ignore": ["node_modules", "dist", "*.lockb", ".claude", "packages/parser/src/generated"]
   }
 }

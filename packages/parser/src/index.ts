@@ -1,35 +1,85 @@
 export type {
+  AggregateCall,
   Atom,
   BinaryExpr,
-  BinaryOp,
   BodyElement,
   ColumnDecl,
   Comparison,
   ComparisonOp,
-  Equality,
+  Expression,
   ExtDecl,
+  FunctionCall,
+  HeadAtom,
+  HeadTerm,
   NumberLiteral,
   Program,
   Query,
+  RangeAtom,
   Rule,
-  SourceElement,
-  SourcePosition,
+  Slice,
   SqlType,
   Statement,
   StringLiteral,
-  Term,
+  Subscript,
   UnaryExpr,
   Variable,
-} from "datamog-core";
-export { ParseError } from "./errors.ts";
-export { type Token, TokenType, tokenize } from "./lexer.ts";
-export { Parser } from "./parser.ts";
+} from "./generated/ast.js";
 
-import type { Program } from "datamog-core";
-import { tokenize } from "./lexer.ts";
-import { Parser } from "./parser.ts";
+export {
+  isAggregateCall,
+  isAtom,
+  isBinaryExpr,
+  isBodyElement,
+  isComparison,
+  isEquality,
+  isExpression,
+  isExtDecl,
+  isFunctionCall,
+  isNumberLiteral,
+  isQuery,
+  isRangeAtom,
+  isRule,
+  isSlice,
+  isStringLiteral,
+  isSubscript,
+  isUnaryExpr,
+  isVariable,
+} from "./generated/ast.js";
+
+export type AggregateFunction = "count" | "sum" | "avg" | "min" | "max" | "group_concat";
+
+export type BinaryOp = "+" | "-" | "*" | "/" | "%";
+
+import { createDatamogServices } from "./datamog-module.js";
+import type { Program } from "./generated/ast.js";
+import { postProcess } from "./post-process.js";
+
+export class ParseError extends Error {
+  line: number;
+  column: number;
+
+  constructor(message: string, line: number, column: number) {
+    super(`${message} at line ${line}, column ${column}`);
+    this.name = "ParseError";
+    this.line = line;
+    this.column = column;
+  }
+}
+
+const services = createDatamogServices();
+const parser = services.Datamog.parser.LangiumParser;
 
 export function parse(source: string): Program {
-  const tokens = tokenize(source);
-  return new Parser(tokens).parse();
+  const result = parser.parse<Program>(source);
+  if (result.lexerErrors.length > 0) {
+    const err = result.lexerErrors[0]!;
+    throw new ParseError(err.message, err.line ?? 1, err.column ?? 1);
+  }
+  if (result.parserErrors.length > 0) {
+    const err = result.parserErrors[0]!;
+    throw new ParseError(err.message, err.token.startLine ?? 1, err.token.startColumn ?? 1);
+  }
+  const program = result.value;
+  postProcess(program);
+  return program;
 }

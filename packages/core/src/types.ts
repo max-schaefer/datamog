@@ -1,6 +1,6 @@
 import { AnalyzerError } from "./analyzer.ts";
 import type { AnalyzedProgram } from "./analyzer.ts";
-import type { RangeAtom, SqlType, Term } from "./ast.ts";
+import type { HeadTerm, RangeAtom, SqlType } from "./ast.ts";
 
 export interface TypedProgram extends AnalyzedProgram {
   /** Column types for every predicate (EDB and IDB). */
@@ -35,8 +35,8 @@ export function inferTypes(analyzed: AnalyzedProgram): TypedProgram {
       if (rule.body.length === 0) {
         for (let i = 0; i < rule.head.args.length; i++) {
           const arg = rule.head.args[i]!;
-          if (arg.kind === "string") seedTypes[i] = joinTypes(seedTypes[i], "text");
-          else if (arg.kind === "number")
+          if (arg.$type === "StringLiteral") seedTypes[i] = joinTypes(seedTypes[i], "text");
+          else if (arg.$type === "NumberLiteral")
             seedTypes[i] = joinTypes(
               seedTypes[i],
               Number.isInteger(arg.value) ? "integer" : "real",
@@ -65,25 +65,25 @@ export function inferTypes(analyzed: AnalyzedProgram): TypedProgram {
           const varTypes = new Map<string, SqlType>();
 
           for (const elem of rule.body) {
-            if (elem.kind === "atom" && !elem.negated) {
+            if (elem.$type === "Atom" && !elem.negated) {
               const predTypes = types.get(elem.predicate);
               if (!predTypes) continue;
               for (let j = 0; j < elem.args.length; j++) {
                 const arg = elem.args[j]!;
-                if (arg.kind === "variable" && !varTypes.has(arg.name)) {
+                if (arg.$type === "Variable" && !varTypes.has(arg.name)) {
                   const colType = predTypes[j];
                   if (colType) {
                     varTypes.set(arg.name, colType);
                   }
                 }
               }
-            } else if (elem.kind === "equality") {
+            } else if (elem.$type === "Equality") {
               const exprType = inferTermType(elem.expr, varTypes, types);
               if (exprType) {
                 varTypes.set(elem.variable, exprType);
               }
-            } else if (elem.kind === "range") {
-              if (elem.expr.kind === "variable" && !varTypes.has(elem.expr.name)) {
+            } else if (elem.$type === "RangeAtom") {
+              if (elem.expr.$type === "Variable" && !varTypes.has(elem.expr.name)) {
                 // Infer type from bounds
                 const lowType = inferTermType(elem.low, varTypes, types);
                 const highType = inferTermType(elem.high, varTypes, types);
@@ -148,21 +148,21 @@ function validateRangeTypes(
       // Rebuild variable type environment for this rule
       const varTypes = new Map<string, SqlType>();
       for (const elem of rule.body) {
-        if (elem.kind === "atom" && !elem.negated) {
+        if (elem.$type === "Atom" && !elem.negated) {
           const predTypes = types.get(elem.predicate);
           if (!predTypes) continue;
           for (let j = 0; j < elem.args.length; j++) {
             const arg = elem.args[j]!;
-            if (arg.kind === "variable" && !varTypes.has(arg.name)) {
+            if (arg.$type === "Variable" && !varTypes.has(arg.name)) {
               const colType = predTypes[j];
               if (colType) varTypes.set(arg.name, colType);
             }
           }
-        } else if (elem.kind === "equality") {
+        } else if (elem.$type === "Equality") {
           const exprType = inferTermType(elem.expr, varTypes, types);
           if (exprType) varTypes.set(elem.variable, exprType);
-        } else if (elem.kind === "range") {
-          if (elem.expr.kind === "variable" && !varTypes.has(elem.expr.name)) {
+        } else if (elem.$type === "RangeAtom") {
+          if (elem.expr.$type === "Variable" && !varTypes.has(elem.expr.name)) {
             const lowType = inferTermType(elem.low, varTypes, types);
             const highType = inferTermType(elem.high, varTypes, types);
             const rangeType =
@@ -174,7 +174,7 @@ function validateRangeTypes(
 
       // Check range atoms
       for (const elem of rule.body) {
-        if (elem.kind === "range") {
+        if (elem.$type === "RangeAtom") {
           checkRangeExprTypes(elem, varTypes, types);
         }
       }
@@ -204,18 +204,18 @@ function checkRangeExprTypes(
 
 /** Infer the type of a term expression given variable types and predicate column types. */
 function inferTermType(
-  term: Term,
+  term: HeadTerm,
   varTypes: Map<string, SqlType>,
   types: Map<string, (SqlType | undefined)[]>,
 ): SqlType | undefined {
-  switch (term.kind) {
-    case "string":
+  switch (term.$type) {
+    case "StringLiteral":
       return "text";
-    case "number":
+    case "NumberLiteral":
       return Number.isInteger(term.value) ? "integer" : "real";
-    case "variable":
+    case "Variable":
       return varTypes.get(term.name);
-    case "binary": {
+    case "BinaryExpr": {
       const leftType = inferTermType(term.left, varTypes, types);
       const rightType = inferTermType(term.right, varTypes, types);
       if (term.op === "+" && (leftType === "text" || rightType === "text")) {
@@ -223,15 +223,15 @@ function inferTermType(
       }
       return numericResultType(leftType, rightType, term.op);
     }
-    case "unary":
+    case "UnaryExpr":
       return inferTermType(term.operand, varTypes, types);
-    case "call":
+    case "FunctionCall":
       return inferCallType(term.name);
-    case "aggregate":
+    case "AggregateCall":
       return inferAggregateType(term.func, term.arg, varTypes, types);
-    case "subscript":
+    case "Subscript":
       return "text";
-    case "slice":
+    case "Slice":
       return "text";
   }
 }
@@ -249,7 +249,7 @@ function inferCallType(name: string): SqlType | undefined {
 /** Return type of an aggregate function call. */
 function inferAggregateType(
   func: string,
-  arg: Term,
+  arg: HeadTerm,
   varTypes: Map<string, SqlType>,
   types: Map<string, (SqlType | undefined)[]>,
 ): SqlType | undefined {

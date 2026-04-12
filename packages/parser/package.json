@@ -6,6 +6,6 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "datamog-core": "workspace:*"
+    "langium": "^4.2.2"
   }
 }

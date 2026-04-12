@@ -364,7 +364,7 @@ async function main() {
   // Check query count for machine-readable formats
   if (outputFormat !== "table") {
     const program = parse(source);
-    const queryCount = program.statements.filter((s) => s.kind === "query").length;
+    const queryCount = program.statements.filter((s) => s.$type === "Query").length;
     if (queryCount > 1) {
       console.error(
         `--output-format ${outputFormat} requires exactly one query clause, but found ${queryCount}`,

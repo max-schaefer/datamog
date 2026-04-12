@@ -346,4 +346,19 @@ describe("analyzer", () => {
     const result = analyze(program);
     expect(result.rules.has("totals")).toBe(true);
   });
+
+  test("rejects aggregate function name as predicate", () => {
+    const program = parse(`
+      extensional base(x: integer).
+      count(X) :- base(X).
+    `);
+    expect(() => analyze(program)).toThrow(/conflicts with aggregate function/);
+  });
+
+  test("rejects aggregate function name as extensional predicate", () => {
+    const program = parse(`
+      extensional sum(x: integer).
+    `);
+    expect(() => analyze(program)).toThrow(/conflicts with aggregate function/);
+  });
 });

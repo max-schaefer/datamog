@@ -1,0 +1,11 @@
+{
+  "projectName": "Datamog",
+  "languages": [
+    {
+      "id": "datamog",
+      "grammar": "src/datamog.langium",
+      "fileExtensions": [".dl"]
+    }
+  ],
+  "out": "src/generated"
+}

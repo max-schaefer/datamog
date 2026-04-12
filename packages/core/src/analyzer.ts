@@ -1,4 +1,6 @@
-import type { ExtDecl, Program, Query, Rule, Term } from "./ast.ts";
+import type { ExtDecl, HeadTerm, Program, Query, Rule } from "./ast.ts";
+
+const AGGREGATE_NAMES = new Set(["count", "sum", "avg", "min", "max", "group_concat"]);
 
 export class AnalyzerError extends Error {
   constructor(message: string) {
@@ -22,29 +24,29 @@ export interface AnalyzedProgram {
 }
 
 /** Collect all variable names from an expression tree. */
-function collectVars(term: Term, into: Set<string>) {
-  switch (term.kind) {
-    case "variable":
+function collectVars(term: HeadTerm, into: Set<string>) {
+  switch (term.$type) {
+    case "Variable":
       into.add(term.name);
       break;
-    case "binary":
+    case "BinaryExpr":
       collectVars(term.left, into);
       collectVars(term.right, into);
       break;
-    case "unary":
+    case "UnaryExpr":
       collectVars(term.operand, into);
       break;
-    case "call":
+    case "FunctionCall":
       for (const arg of term.args) collectVars(arg, into);
       break;
-    case "aggregate":
+    case "AggregateCall":
       collectVars(term.arg, into);
       break;
-    case "subscript":
+    case "Subscript":
       collectVars(term.object, into);
       collectVars(term.index, into);
       break;
-    case "slice":
+    case "Slice":
       collectVars(term.object, into);
       if (term.start) collectVars(term.start, into);
       if (term.end) collectVars(term.end, into);
@@ -60,8 +62,8 @@ export function analyze(program: Program): AnalyzedProgram {
 
   // Classify statements
   for (const stmt of program.statements) {
-    switch (stmt.kind) {
-      case "ext_decl":
+    switch (stmt.$type) {
+      case "ExtDecl":
         if (extDecls.has(stmt.predicate)) {
           throw new AnalyzerError(
             `Predicate '${stmt.predicate}' is declared as extensional multiple times`,
@@ -70,7 +72,7 @@ export function analyze(program: Program): AnalyzedProgram {
         extDecls.set(stmt.predicate, stmt);
         arities.set(stmt.predicate, stmt.columns.length);
         break;
-      case "rule": {
+      case "Rule": {
         const existing = rules.get(stmt.head.predicate);
         if (existing) {
           const expectedArity = arities.get(stmt.head.predicate)!;
@@ -86,7 +88,7 @@ export function analyze(program: Program): AnalyzedProgram {
         }
         break;
       }
-      case "query":
+      case "Query":
         queries.push(stmt);
         break;
     }
@@ -97,6 +99,15 @@ export function analyze(program: Program): AnalyzedProgram {
     if (extDecls.has(predicate)) {
       throw new AnalyzerError(
         `Predicate '${predicate}' is declared as both extensional and intensional`,
+      );
+    }
+  }
+
+  // Check no predicate uses an aggregate function name
+  for (const predicate of [...extDecls.keys(), ...rules.keys()]) {
+    if (AGGREGATE_NAMES.has(predicate)) {
+      throw new AnalyzerError(
+        `Predicate name '${predicate}' conflicts with aggregate function '${predicate}'`,
       );
     }
   }
@@ -114,7 +125,7 @@ export function analyze(program: Program): AnalyzedProgram {
   for (const predicateRules of rules.values()) {
     for (const rule of predicateRules) {
       for (const elem of rule.body) {
-        if (elem.kind === "atom") {
+        if (elem.$type === "Atom") {
           checkAtomArity(elem.predicate, elem.args.length);
         }
       }
@@ -146,7 +157,7 @@ export function analyze(program: Program): AnalyzedProgram {
         );
       }
       for (const arg of rule.head.args) {
-        if (arg.kind === "aggregate") {
+        if (arg.$type === "AggregateCall") {
           // No nested aggregates
           if (containsAggregate(arg.arg)) {
             throw new AnalyzerError(`Nested aggregate in head of rule for '${predicate}'`);
@@ -162,11 +173,11 @@ export function analyze(program: Program): AnalyzedProgram {
 
     // All rules must agree on which positions are aggregate vs grouping
     const firstRule = predicateRules[0]!;
-    const aggPositions = firstRule.head.args.map((a) => a.kind === "aggregate");
+    const aggPositions = firstRule.head.args.map((a) => a.$type === "AggregateCall");
     for (let r = 1; r < predicateRules.length; r++) {
       const rule = predicateRules[r]!;
       for (let i = 0; i < rule.head.args.length; i++) {
-        if ((rule.head.args[i]!.kind === "aggregate") !== aggPositions[i]) {
+        if ((rule.head.args[i]!.$type === "AggregateCall") !== aggPositions[i]) {
           throw new AnalyzerError(
             `Rules for '${predicate}' disagree on which head positions are aggregates`,
           );
@@ -183,7 +194,7 @@ export function analyze(program: Program): AnalyzedProgram {
     const negDeps = new Set<string>();
     for (const rule of predicateRules) {
       for (const elem of rule.body) {
-        if (elem.kind === "atom") {
+        if (elem.$type === "Atom") {
           deps.add(elem.predicate);
           if (elem.negated) {
             negDeps.add(elem.predicate);
@@ -217,7 +228,7 @@ export function analyze(program: Program): AnalyzedProgram {
   // Aggregate predicates cannot be recursive
   for (const pred of recursivePredicates) {
     const predRules = rules.get(pred);
-    if (predRules?.some((r) => r.head.args.some((a) => a.kind === "aggregate"))) {
+    if (predRules?.some((r) => r.head.args.some((a) => a.$type === "AggregateCall"))) {
       throw new AnalyzerError(`Aggregate predicate '${pred}' cannot be recursive`);
     }
   }
@@ -258,19 +269,19 @@ export function analyze(program: Program): AnalyzedProgram {
 }
 
 /** Check whether a term contains any aggregate call. */
-function containsAggregate(term: Term): boolean {
-  switch (term.kind) {
-    case "aggregate":
+function containsAggregate(term: HeadTerm): boolean {
+  switch (term.$type) {
+    case "AggregateCall":
       return true;
-    case "binary":
+    case "BinaryExpr":
       return containsAggregate(term.left) || containsAggregate(term.right);
-    case "unary":
+    case "UnaryExpr":
       return containsAggregate(term.operand);
-    case "call":
-      return term.args.some(containsAggregate);
-    case "subscript":
+    case "FunctionCall":
+      return AGGREGATE_NAMES.has(term.name) || term.args.some(containsAggregate);
+    case "Subscript":
       return containsAggregate(term.object) || containsAggregate(term.index);
-    case "slice":
+    case "Slice":
       return (
         containsAggregate(term.object) ||
         (term.start !== undefined && containsAggregate(term.start)) ||
@@ -294,19 +305,19 @@ function checkSafety(rule: Rule) {
   const equalities: { variable: string; exprVars: Set<string> }[] = [];
 
   for (const elem of rule.body) {
-    if (elem.kind === "atom" && !elem.negated) {
+    if (elem.$type === "Atom" && !elem.negated) {
       for (const arg of elem.args) {
-        if (arg.kind === "variable") {
+        if (arg.$type === "Variable") {
           safeVars.add(arg.name);
         }
       }
-    } else if (elem.kind === "equality") {
+    } else if (elem.$type === "Equality") {
       const exprVars = new Set<string>();
       collectVars(elem.expr, exprVars);
       equalities.push({ variable: elem.variable, exprVars });
-    } else if (elem.kind === "range") {
+    } else if (elem.$type === "RangeAtom") {
       // If expr is a variable, it may be bound by the range (like an equality)
-      if (elem.expr.kind === "variable") {
+      if (elem.expr.$type === "Variable") {
         const boundVars = new Set<string>();
         collectVars(elem.low, boundVars);
         collectVars(elem.high, boundVars);
@@ -342,7 +353,7 @@ function checkSafety(rule: Rule) {
     }
   }
 
-  function checkTermSafe(term: Term, context: string) {
+  function checkTermSafe(term: HeadTerm, context: string) {
     const vars = new Set<string>();
     collectVars(term, vars);
     for (const v of vars) {
@@ -352,9 +363,9 @@ function checkSafety(rule: Rule) {
 
   // Check head variables
   for (const arg of rule.head.args) {
-    if (arg.kind === "aggregate") {
+    if (arg.$type === "AggregateCall") {
       // For count(_), allow anonymous variables (they translate to COUNT(*))
-      if (arg.func === "count" && arg.arg.kind === "variable" && arg.arg.name.startsWith("_")) {
+      if (arg.func === "count" && arg.arg.$type === "Variable" && arg.arg.name.startsWith("_")) {
         continue;
       }
       checkTermSafe(arg.arg, `aggregate in head of rule for '${rule.head.predicate}'`);
@@ -365,31 +376,31 @@ function checkSafety(rule: Rule) {
 
   // Check body elements left-to-right
   for (const elem of rule.body) {
-    switch (elem.kind) {
-      case "atom":
+    switch (elem.$type) {
+      case "Atom":
         if (elem.negated) {
           for (const arg of elem.args) {
             checkTermSafe(arg, `'not ${elem.predicate}(...)'`);
           }
         } else {
           for (const arg of elem.args) {
-            if (arg.kind !== "variable") {
+            if (arg.$type !== "Variable") {
               checkTermSafe(arg, `argument of '${elem.predicate}(...)'`);
             }
           }
         }
         break;
-      case "equality":
+      case "Equality":
         checkTermSafe(elem.expr, `equality '${elem.variable} = ...'`);
         break;
-      case "comparison":
+      case "Comparison":
         checkTermSafe(elem.left, "comparison");
         checkTermSafe(elem.right, "comparison");
         break;
-      case "range":
+      case "RangeAtom":
         checkTermSafe(elem.low, "range lower bound");
         checkTermSafe(elem.high, "range upper bound");
-        if (elem.expr.kind !== "variable") {
+        if (elem.expr.$type !== "Variable") {
           checkTermSafe(elem.expr, "range expression");
         }
         break;

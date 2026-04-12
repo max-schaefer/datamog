@@ -3,9 +3,9 @@ import type {
   AnalyzedProgram,
   Atom,
   Comparison,
+  Expression,
   Rule,
   SqlType,
-  Term,
 } from "datamog-core";
 
 export type Dialect = "postgres" | "sqlite";
@@ -119,7 +119,7 @@ function translateViews(analyzed: AnalyzedProgram, dialect: Dialect): string[] {
             const isRecursive =
               rule.body.length > 0 &&
               rule.body.some(
-                (elem) => elem.kind === "atom" && !elem.negated && stratumSet.has(elem.predicate),
+                (elem) => elem.$type === "Atom" && !elem.negated && stratumSet.has(elem.predicate),
               );
             const ruleSql = translateRule(rule, analyzed, renameMap, tagMap, dialect);
             const part = `SELECT '${predicate}' AS __tag, ${ruleSql.replace(/^SELECT /, "")}${nullPad}`;
@@ -201,8 +201,8 @@ function translateRule(
 
   for (let i = 0; i < rule.body.length; i++) {
     const elem = rule.body[i]!;
-    switch (elem.kind) {
-      case "atom": {
+    switch (elem.$type) {
+      case "Atom": {
         if (elem.negated) {
           negatedAtoms.push({ atom: elem });
         } else {
@@ -210,7 +210,7 @@ function translateRule(
           const predTypes = columnTypes?.get(elem.predicate);
           for (let j = 0; j < elem.args.length; j++) {
             const term = elem.args[j]!;
-            if (term.kind === "variable") {
+            if (term.$type === "Variable") {
               const col = resolveColumnRef(elem.predicate, j, analyzed);
               const list = bindings.get(term.name) ?? [];
               list.push({ kind: "col", alias, col });
@@ -224,11 +224,11 @@ function translateRule(
         }
         break;
       }
-      case "range": {
+      case "RangeAtom": {
         const lowSql = termToSql(elem.low, bindings, varTypes);
         const highSql = termToSql(elem.high, bindings, varTypes);
         if (
-          elem.expr.kind === "variable" &&
+          elem.expr.$type === "Variable" &&
           isIntegerTerm(elem.low, varTypes) &&
           isIntegerTerm(elem.high, varTypes)
         ) {
@@ -246,14 +246,14 @@ function translateRule(
         }
         break;
       }
-      case "equality": {
+      case "Equality": {
         const sql = termToSql(elem.expr, bindings, varTypes);
         const list = bindings.get(elem.variable) ?? [];
         list.push({ kind: "expr", sql });
         bindings.set(elem.variable, list);
         break;
       }
-      case "comparison":
+      case "Comparison":
         comparisons.push(elem);
         break;
     }
@@ -265,17 +265,17 @@ function translateRule(
   }
 
   // SELECT clause (with GROUP BY support for aggregate rules)
-  const isAggregateRule = rule.head.args.some((a) => a.kind === "aggregate");
+  const isAggregateRule = rule.head.args.some((a) => a.$type === "AggregateCall");
   const selectParts: string[] = [];
   const groupByExprs: string[] = [];
 
   for (let i = 0; i < rule.head.args.length; i++) {
     const term = rule.head.args[i]!;
     const targetCol = `col${i + 1}`;
-    if (term.kind === "aggregate") {
+    if (term.$type === "AggregateCall") {
       const aggSql = translateAggregate(term, bindings, varTypes, dialect);
       selectParts.push(`${aggSql} AS ${targetCol}`);
-    } else if (term.kind === "variable") {
+    } else if (term.$type === "Variable") {
       const refs = bindings.get(term.name);
       if (!refs || refs.length === 0) {
         throw new Error(
@@ -345,7 +345,7 @@ function translateRule(
     const alias = aliases[index]!;
     for (let j = 0; j < atom.args.length; j++) {
       const term = atom.args[j]!;
-      if (term.kind !== "variable") {
+      if (term.$type !== "Variable") {
         const col = resolveColumnRef(atom.predicate, j, analyzed);
         conditions.push(`${alias}.${ident(col)} = ${termToSql(term, bindings, varTypes)}`);
       }
@@ -358,7 +358,7 @@ function translateRule(
     for (let j = 0; j < atom.args.length; j++) {
       const term = atom.args[j]!;
       const col = resolveColumnRef(atom.predicate, j, analyzed);
-      if (term.kind === "variable") {
+      if (term.$type === "Variable") {
         const refs = bindings.get(term.name);
         if (refs && refs.length > 0) {
           subConditions.push(`${ident(col)} = ${bindingToSql(refs[0]!)}`);
@@ -404,7 +404,7 @@ function translateRule(
 function translateFact(rule: Rule): string {
   const emptyBindings = new Map<string, Binding[]>();
   const selectParts = rule.head.args.map(
-    (term, i) => `${termToSql(term, emptyBindings)} AS col${i + 1}`,
+    (term, i) => `${termToSql(term as Expression, emptyBindings)} AS col${i + 1}`,
   );
   return `SELECT ${selectParts.join(", ")}`;
 }
@@ -424,7 +424,7 @@ function translateQueries(analyzed: AnalyzedProgram): string[] {
       const term = atom.args[i]!;
       const col = isIDB ? `col${i + 1}` : resolveColumnRef(atom.predicate, i, analyzed);
 
-      if (term.kind === "variable") {
+      if (term.$type === "Variable") {
         selectParts.push(`${ident(col)} AS ${ident(term.name)}`);
       } else {
         conditions.push(`${ident(col)} = ${termToSql(term, emptyBindings)}`);
@@ -463,16 +463,16 @@ function ident(name: string): string {
  * @param varTypes - Optional variable type map for type-aware operator selection (+ vs ||)
  */
 function termToSql(
-  term: Term,
+  term: Expression,
   bindings: Map<string, Binding[]>,
   varTypes?: Map<string, SqlType>,
 ): string {
-  switch (term.kind) {
-    case "string":
+  switch (term.$type) {
+    case "StringLiteral":
       return `'${term.value.replace(/'/g, "''")}'`;
-    case "number":
+    case "NumberLiteral":
       return String(term.value);
-    case "variable": {
+    case "Variable": {
       const refs = bindings.get(term.name);
       if (!refs || refs.length === 0) {
         throw new Error(`Unbound variable '${term.name}'`);
@@ -480,7 +480,7 @@ function termToSql(
       const b = refs[0]!;
       return b.kind === "col" ? `${b.alias}.${ident(b.col)}` : b.sql;
     }
-    case "binary": {
+    case "BinaryExpr": {
       const leftSql = termToSql(term.left, bindings, varTypes);
       const rightSql = termToSql(term.right, bindings, varTypes);
       let op = term.op;
@@ -489,18 +489,16 @@ function termToSql(
       }
       return `(${leftSql} ${op} ${rightSql})`;
     }
-    case "unary":
+    case "UnaryExpr":
       return `(-${termToSql(term.operand, bindings, varTypes)})`;
-    case "call":
+    case "FunctionCall":
       return translateCall(term.name, term.args, bindings, varTypes);
-    case "aggregate":
-      throw new Error("Aggregate function not allowed in this position");
-    case "subscript": {
+    case "Subscript": {
       const obj = termToSql(term.object, bindings, varTypes);
       const idx = termToSql(term.index, bindings, varTypes);
       return `SUBSTR(${obj}, (${idx}) + 1, 1)`;
     }
-    case "slice": {
+    case "Slice": {
       const obj = termToSql(term.object, bindings, varTypes);
       if (term.start && term.end) {
         const s = termToSql(term.start, bindings, varTypes);
@@ -518,27 +516,28 @@ function termToSql(
       return obj;
     }
   }
+  throw new Error(`Unexpected term type: ${(term as { $type: string }).$type}`);
 }
 
 /** Check whether a term has integer type. */
-function isIntegerTerm(term: Term, varTypes?: Map<string, SqlType>): boolean {
-  if (term.kind === "number") return Number.isInteger(term.value);
-  if (term.kind === "variable") return varTypes?.get(term.name) === "integer";
-  if (term.kind === "call" && term.name === "len") return true;
-  if (term.kind === "binary") {
+function isIntegerTerm(term: Expression, varTypes?: Map<string, SqlType>): boolean {
+  if (term.$type === "NumberLiteral") return Number.isInteger(term.value);
+  if (term.$type === "Variable") return varTypes?.get(term.name) === "integer";
+  if (term.$type === "FunctionCall" && term.name === "len") return true;
+  if (term.$type === "BinaryExpr") {
     // Arithmetic on integers stays integer (except / which may produce real)
     return isIntegerTerm(term.left, varTypes) && isIntegerTerm(term.right, varTypes);
   }
-  if (term.kind === "unary") return isIntegerTerm(term.operand, varTypes);
+  if (term.$type === "UnaryExpr") return isIntegerTerm(term.operand, varTypes);
   return false;
 }
 
 /** Check whether a term has text type (for choosing || over +). */
-function isTextType(term: Term, varTypes?: Map<string, SqlType>): boolean {
-  if (term.kind === "string") return true;
-  if (term.kind === "call" && term.name === "len") return false;
-  if (term.kind === "subscript" || term.kind === "slice") return true;
-  if (term.kind === "variable" && varTypes?.get(term.name) === "text") return true;
+function isTextType(term: Expression, varTypes?: Map<string, SqlType>): boolean {
+  if (term.$type === "StringLiteral") return true;
+  if (term.$type === "FunctionCall" && term.name === "len") return false;
+  if (term.$type === "Subscript" || term.$type === "Slice") return true;
+  if (term.$type === "Variable" && varTypes?.get(term.name) === "text") return true;
   return false;
 }
 
@@ -550,7 +549,7 @@ function translateAggregate(
   dialect: Dialect,
 ): string {
   // count(_) → COUNT(*)
-  if (agg.func === "count" && agg.arg.kind === "variable" && agg.arg.name.startsWith("_")) {
+  if (agg.func === "count" && agg.arg.$type === "Variable" && agg.arg.name.startsWith("_")) {
     return "COUNT(*)";
   }
 
@@ -572,13 +571,15 @@ function translateAggregate(
         return `GROUP_CONCAT(${argSql}, ',')`;
       }
       return `STRING_AGG(${argSql}::TEXT, ',')`;
+    default:
+      return `${agg.func.toUpperCase()}(${argSql})`;
   }
 }
 
 /** Translate a built-in function call to SQL. */
 function translateCall(
   name: string,
-  args: Term[],
+  args: Expression[],
   bindings: Map<string, Binding[]>,
   varTypes?: Map<string, SqlType>,
 ): string {

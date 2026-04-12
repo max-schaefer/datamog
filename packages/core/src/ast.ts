@@ -1,153 +1,37 @@
-export interface SourcePosition {
-  /** 0-based byte offset of the first character in the source string. */
-  start: number;
-  /** 0-based byte offset one past the last character (exclusive). */
-  end: number;
-  /** 1-based line number of the first character. */
-  line: number;
-  /** 1-based column number of the first character. */
-  column: number;
-}
+// Re-export Langium-generated AST types as the canonical AST.
+// The grammar and generated types live in datamog-parser; this module
+// provides backward-compatible type aliases consumed by the rest of the codebase.
 
-export interface SourceElement {
-  span: SourcePosition;
-}
+export type {
+  AggregateCall,
+  Atom,
+  BinaryExpr,
+  BodyElement,
+  ColumnDecl,
+  Comparison,
+  ComparisonOp,
+  Expression,
+  ExtDecl,
+  FunctionCall,
+  HeadAtom,
+  HeadTerm,
+  NumberLiteral,
+  Program,
+  Query,
+  RangeAtom,
+  Rule,
+  Slice,
+  SqlType,
+  Statement,
+  StringLiteral,
+  Subscript,
+  UnaryExpr,
+  Variable,
+} from "datamog-parser";
 
-// --- Expressions (terms) ---
+export type { AggregateFunction, BinaryOp } from "datamog-parser";
 
-export interface Variable extends SourceElement {
-  kind: "variable";
-  name: string;
-}
+// Alias: the old AST called the expression union "Term"
+export type { Expression as Term } from "datamog-parser";
 
-export interface StringLiteral extends SourceElement {
-  kind: "string";
-  value: string;
-}
-
-export interface NumberLiteral extends SourceElement {
-  kind: "number";
-  value: number;
-}
-
-export type BinaryOp = "+" | "-" | "*" | "/" | "%";
-
-export interface BinaryExpr extends SourceElement {
-  kind: "binary";
-  op: BinaryOp;
-  left: Term;
-  right: Term;
-}
-
-export interface UnaryExpr extends SourceElement {
-  kind: "unary";
-  op: "-";
-  operand: Term;
-}
-
-export interface FunctionCall extends SourceElement {
-  kind: "call";
-  name: string;
-  args: Term[];
-}
-
-export interface Subscript extends SourceElement {
-  kind: "subscript";
-  object: Term;
-  index: Term;
-}
-
-export interface Slice extends SourceElement {
-  kind: "slice";
-  object: Term;
-  start?: Term;
-  end?: Term;
-}
-
-export type AggregateFunction = "count" | "sum" | "avg" | "min" | "max" | "group_concat";
-
-export interface AggregateCall extends SourceElement {
-  kind: "aggregate";
-  func: AggregateFunction;
-  arg: Term;
-}
-
-export type Term =
-  | Variable
-  | StringLiteral
-  | NumberLiteral
-  | BinaryExpr
-  | UnaryExpr
-  | FunctionCall
-  | Subscript
-  | Slice
-  | AggregateCall;
-
-// --- Column declarations (for extensional predicates) ---
-
-export type SqlType = "text" | "integer" | "real" | "boolean";
-
-export interface ColumnDecl {
-  name: string;
-  type: SqlType;
-}
-
-// --- Body elements ---
-
-export interface Atom extends SourceElement {
-  kind: "atom";
-  predicate: string;
-  args: Term[];
-  negated?: boolean;
-}
-
-export interface Equality extends SourceElement {
-  kind: "equality";
-  variable: string;
-  expr: Term;
-}
-
-export type ComparisonOp = "<" | ">" | "<=" | ">=" | "!=";
-
-export interface Comparison extends SourceElement {
-  kind: "comparison";
-  op: ComparisonOp;
-  left: Term;
-  right: Term;
-}
-
-export interface RangeAtom extends SourceElement {
-  kind: "range";
-  expr: Term;
-  low: Term;
-  high: Term;
-}
-
-export type BodyElement = Atom | Equality | Comparison | RangeAtom;
-
-// --- Statements ---
-
-export interface ExtDecl extends SourceElement {
-  kind: "ext_decl";
-  predicate: string;
-  columns: ColumnDecl[];
-}
-
-export interface Rule extends SourceElement {
-  kind: "rule";
-  head: Atom;
-  body: BodyElement[];
-}
-
-export interface Query extends SourceElement {
-  kind: "query";
-  atom: Atom;
-}
-
-export type Statement = ExtDecl | Rule | Query;
-
-// --- Program ---
-
-export interface Program {
-  statements: Statement[];
-}
+export type ComparisonOp_Alias = "<" | ">" | "<=" | ">=" | "!=";
