@@ -1,0 +1,35 @@
+% Find the Thief — tutorial solution
+%
+% A thief has stolen the king's golden crown. Using clues from witnesses,
+% narrow down the list of 20 villagers to find the culprit.
+
+extensional person(name: text, age: integer, hair: text, height: integer, location: text).
+
+% Helper: hair colors that count as "dark"
+dark_hair("black").
+dark_hair("brown").
+
+% Helper: the thief's height is NOT between 180 and 190 cm
+height_180_190(Name) :- person(Name, _, _, Height, _), Height > 180, Height < 190.
+
+% Aggregate helpers
+max_age(max(Age)) :- person(_, Age, _, _, _).
+max_height(max(Height)) :- person(_, _, _, Height, _).
+avg_height(avg(Height)) :- person(_, _, _, Height, _).
+max_east_age(max(Age)) :- person(_, Age, _, _, "east").
+
+% The suspect must match all 11 clues
+suspect(Name) :-
+  person(Name, Age, Hair, Height, "east"),
+  Height > 150,
+  Hair != "blond",
+  Hair != "bald",
+  Age >= 30,
+  dark_hair(Hair),
+  not height_180_190(Name),
+  max_age(MaxAge), Age != MaxAge,
+  max_height(MaxH), Height != MaxH,
+  avg_height(AvgH), Height < AvgH,
+  max_east_age(MaxEAge), Age = MaxEAge.
+
+?- suspect(X).

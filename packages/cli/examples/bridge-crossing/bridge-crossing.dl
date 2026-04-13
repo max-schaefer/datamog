@@ -1,0 +1,82 @@
+% Bridge Crossing — challenge solution
+%
+% Four people must cross a bridge at night with one torch.
+% At most two can cross at a time, and the torch must go with them.
+% Each person has a different crossing time (1, 2, 5, 10 minutes).
+% When two cross together, the slower person sets the pace.
+% Warriors arrive in 19 minutes. Can everyone escape in time?
+%
+% Adapted from the Datalog Educational System (DES) by Fernando Saenz-Perez.
+
+shore("n").
+shore("s").
+opp("n", "s").
+opp("s", "n").
+
+% Crossing time for each person
+time(1, 1).
+time(2, 2).
+time(3, 5).
+time(4, 10).
+
+% Time limit
+bound(19).
+
+% The slower of two crossing times
+slower(X, Y, X) :- time(_, X), time(_, Y), X >= Y.
+slower(X, Y, Y) :- time(_, X), time(_, Y), X < Y.
+
+% state(P1, P2, P3, P4, Torch, ElapsedTime)
+% Initial state: everyone on the north shore, 0 minutes elapsed
+state("n", "n", "n", "n", "n", 0).
+
+% --- Solo crossings ---
+% Person 1
+state(X, Y, U, V, X, T) :-
+  opp(X, X1), state(X1, Y, U, V, X1, TT),
+  time(1, T1), T = TT + T1, bound(B), T < B.
+% Person 2
+state(X, Y, U, V, Y, T) :-
+  opp(Y, Y1), state(X, Y1, U, V, Y1, TT),
+  time(2, T1), T = TT + T1, bound(B), T < B.
+% Person 3
+state(X, Y, U, V, U, T) :-
+  opp(U, U1), state(X, Y, U1, V, U1, TT),
+  time(3, T1), T = TT + T1, bound(B), T < B.
+% Person 4
+state(X, Y, U, V, V, T) :-
+  opp(V, V1), state(X, Y, U, V1, V1, TT),
+  time(4, T1), T = TT + T1, bound(B), T < B.
+
+% --- Pair crossings ---
+% Persons 1 and 2
+state(X, X, U, V, X, T) :-
+  opp(X, X1), state(X1, X1, U, V, X1, TT),
+  time(1, T1), time(2, T2), slower(T1, T2, MT), T = TT + MT, bound(B), T < B.
+% Persons 1 and 3
+state(X, Y, X, V, X, T) :-
+  opp(X, X1), state(X1, Y, X1, V, X1, TT),
+  time(1, T1), time(3, T2), slower(T1, T2, MT), T = TT + MT, bound(B), T < B.
+% Persons 1 and 4
+state(X, Y, U, X, X, T) :-
+  opp(X, X1), state(X1, Y, U, X1, X1, TT),
+  time(1, T1), time(4, T2), slower(T1, T2, MT), T = TT + MT, bound(B), T < B.
+% Persons 2 and 3
+state(X, Y, Y, V, Y, T) :-
+  opp(Y, Y1), state(X, Y1, Y1, V, Y1, TT),
+  time(2, T1), time(3, T2), slower(T1, T2, MT), T = TT + MT, bound(B), T < B.
+% Persons 2 and 4
+state(X, Y, U, Y, Y, T) :-
+  opp(Y, Y1), state(X, Y1, U, Y1, Y1, TT),
+  time(2, T1), time(4, T2), slower(T1, T2, MT), T = TT + MT, bound(B), T < B.
+% Persons 3 and 4
+state(X, Y, U, U, U, T) :-
+  opp(U, U1), state(X, Y, U1, U1, U1, TT),
+  time(3, T1), time(4, T2), slower(T1, T2, MT), T = TT + MT, bound(B), T < B.
+
+% Find all times at which everyone reaches the south shore
+?- state("s", "s", "s", "s", "s", T).
+
+% What is the fastest crossing?
+fastest(min(T)) :- state("s", "s", "s", "s", "s", T).
+?- fastest(T).
