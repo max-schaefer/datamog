@@ -1,10 +1,11 @@
 # Datamog Tutorials
 
 Learn Datamog by solving puzzles. These tutorials are adapted from the
-[CodeQL QL tutorials](https://codeql.github.com/docs/writing-codeql-queries/ql-tutorials/)
-and from examples in the
+[CodeQL QL tutorials](https://codeql.github.com/docs/writing-codeql-queries/ql-tutorials/),
+examples in the
 [Datalog Educational System (DES)](http://des.sourceforge.net/)
-by Fernando Saenz-Perez.
+by Fernando Saenz-Perez, and the
+[Soufflé tutorial](https://souffle-lang.github.io/tutorial).
 They progressively introduce the features of the Datamog language.
 
 Each tutorial builds on the previous ones, but they can also be worked through
@@ -18,6 +19,7 @@ independently.
 | 4 | [Crown the rightful heir](04-crown-the-rightful-heir.md) | Recursion, transitive closure, ancestor queries |
 | 5 | [Cross the river](05-cross-the-river.md) | State-space search, recursive modeling, safety constraints |
 | 6 | [Find the shortest path](06-find-the-shortest-path.md) | Recursion + aggregation, graph optimization |
+| 7 | [Analyze a program](07-analyze-a-program.md) | Static analysis, data-flow, pointer analysis |
 
 ## Running the examples
 
@@ -33,4 +35,4 @@ To see the generated SQL without executing it:
 bun run datamog --dry-run <file.dl>
 ```
 
-The complete solutions for tutorials 2--6 are in `packages/cli/examples/`.
+The complete solutions for tutorials 2--7 are in `packages/cli/examples/`.

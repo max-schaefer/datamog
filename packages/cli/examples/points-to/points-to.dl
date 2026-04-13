@@ -1,0 +1,40 @@
+% Points-to analysis (Andersen's style)
+%
+% A simplified pointer analysis that determines which memory locations
+% each variable may point to. This is a foundational technique in static
+% analysis used by compilers and security tools to reason about aliasing.
+%
+% Two kinds of pointer operations are modeled:
+%   address_of(V, L)  — V = &L  (V gets the address of location L)
+%   assign(V, W)      — V = W   (pointer copy)
+%
+% Because this is a "may" analysis, a variable can point to multiple
+% locations — the analysis computes all possibilities.
+%
+% Based on Andersen's analysis as described in:
+%   Smaragdakis & Bravenboer, "Using Datalog for Fast and Easy
+%   Program Analysis", Springer, 2011.
+
+% Example program:
+%   p = &x;  q = &y;  r = &z;
+%   a = p;   b = a;   c = q;   a = r;
+
+address_of("p", "x").
+address_of("q", "y").
+address_of("r", "z").
+assign("a", "p").
+assign("b", "a").
+assign("c", "q").
+assign("a", "r").
+
+% Base: V points to L if V = &L
+points_to(V, L) :- address_of(V, L).
+
+% Propagation: V = W, so V inherits W's points-to set
+points_to(V, L) :- assign(V, W), points_to(W, L).
+
+% Two variables may alias if they may point to the same location
+may_alias(X, Y) :- points_to(X, L), points_to(Y, L), X != Y.
+
+?- points_to(Var, Location).
+?- may_alias(X, Y).

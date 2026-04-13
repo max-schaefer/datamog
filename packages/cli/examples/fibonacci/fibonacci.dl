@@ -1,0 +1,27 @@
+% Fibonacci sequence
+%
+% Compute the first 10 Fibonacci numbers using recursion and arithmetic.
+% Each step carries both the previous and current value so the recursive
+% rule only references fib_step once in the body (linear recursion),
+% which is required by SQLite.
+%
+% Adapted from the Soufflé tutorial (https://souffle-lang.github.io/tutorial).
+%
+% The natural formulation is non-linearly recursive (two self-references):
+%
+%   fib(1, 1).
+%   fib(2, 1).
+%   fib(I + 1, A + B) :- fib(I, A), I2 = I - 1, fib(I2, B), I > 1, I < 10.
+%
+% That works on Postgres but not on SQLite. The version below linearizes
+% the recursion by carrying both the previous and current value.
+
+% fib_step(I, Prev, Curr): the I-th Fibonacci number is Curr,
+% and the (I-1)-th is Prev.
+fib_step(1, 0, 1).
+fib_step(I + 1, Curr, Prev + Curr) :- fib_step(I, Prev, Curr), I < 10.
+
+% Extract the sequence: the I-th Fibonacci number is V.
+fibonacci(I, V) :- fib_step(I, _, V).
+
+?- fibonacci(I, V).

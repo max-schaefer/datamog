@@ -246,18 +246,7 @@ Then rewrite `path` to use `biroad` instead of `road`.
 
 ## What's next?
 
-This concludes the Datamog tutorial series. Here is a summary of what you have
-learned:
-
-| Tutorial | Concepts |
-|----------|----------|
-| [Introduction](01-introduction.md) | Facts, rules, queries |
-| [Find the thief](02-find-the-thief.md) | Comparisons, negation, aggregates |
-| [Catch the fire starter](03-catch-the-fire-starter.md) | Derived predicates, rule composition |
-| [Crown the rightful heir](04-crown-the-rightful-heir.md) | Recursion, transitive closure |
-| [Cross the river](05-cross-the-river.md) | State-space search |
-| **Find the shortest path** | Recursion + aggregation for optimization |
-
-Use `--dry-run` on any of the examples to see the SQL that Datamog generates —
-it is a great way to deepen your understanding of how logic programs map to
-relational queries.
+So far, every tutorial has used Datalog to query **data** — facts about people,
+roads, or puzzle states. In the [next tutorial](07-analyze-a-program.md), you
+will use Datalog to analyze **programs** — a domain where it has been
+remarkably successful in practice.

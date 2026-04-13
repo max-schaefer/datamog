@@ -1,0 +1,23 @@
+% Sieve of Eratosthenes — finding prime numbers
+%
+% Generates all prime numbers up to 30 using ranges, arithmetic,
+% and negation. A number is prime if no smaller number (greater than 1)
+% divides it evenly.
+%
+% This is a Datalog encoding of the classic Sieve of Eratosthenes:
+% generate candidate numbers, identify composites via divisibility,
+% and define primes as non-composite numbers.
+
+% Candidate numbers from 2 to 30
+num(I) :- I in [2 .. 30].
+
+% D divides X if D * (X / D) = X, using integer division.
+divides(D, X) :- num(D), num(X), D > 1, D < X, Q = X / D, P = D * Q, P = X.
+
+% X is composite if some number divides it
+composite(X) :- divides(_, X).
+
+% X is prime if it's a candidate and not composite
+prime(X) :- num(X), not composite(X).
+
+?- prime(X).
