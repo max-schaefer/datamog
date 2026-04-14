@@ -13,6 +13,8 @@
     { "path": "../loader/csv" },
     { "path": "../loader/mermaid" },
     { "path": "../backend/postgres" },
-    { "path": "../backend/sqlite" }
+    { "path": "../backend/sqlite" },
+    { "path": "../backend/duckdb" },
+    { "path": "../backend/sqljs" }
   ]
 }

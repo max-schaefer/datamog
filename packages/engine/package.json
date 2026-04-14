@@ -11,6 +11,7 @@
     "datamog-parser": "workspace:*"
   },
   "devDependencies": {
+    "datamog-backend-duckdb": "workspace:*",
     "datamog-backend-postgres": "workspace:*",
     "datamog-backend-sqlite": "workspace:*"
   }

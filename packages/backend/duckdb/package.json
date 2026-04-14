@@ -1,0 +1,14 @@
+{
+  "name": "datamog-backend-duckdb",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@duckdb/node-api": "^1.5.2-r.1",
+    "datamog-core": "workspace:*",
+    "datamog-engine": "workspace:*"
+  }
+}

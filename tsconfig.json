@@ -5,6 +5,8 @@
     { "path": "packages/engine" },
     { "path": "packages/backend/postgres" },
     { "path": "packages/backend/sqlite" },
+    { "path": "packages/backend/duckdb" },
+    { "path": "packages/backend/sqljs" },
     { "path": "packages/loader/csv" },
     { "path": "packages/loader/jsonl" },
     { "path": "packages/loader/gsheet" },

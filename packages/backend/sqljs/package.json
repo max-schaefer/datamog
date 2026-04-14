@@ -1,0 +1,14 @@
+{
+  "name": "datamog-backend-sqljs",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "datamog-backend-sqlite": "workspace:*",
+    "datamog-engine": "workspace:*",
+    "sql.js": "^1"
+  }
+}

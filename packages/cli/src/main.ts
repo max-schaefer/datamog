@@ -33,7 +33,9 @@ function usage(): never {
   );
   console.error("                             mermaid, or ascii-graph");
   console.error("  --dry-run                  Print generated SQL without executing");
-  console.error("  --backend <backend>        Backend: postgres or sqlite (default: auto)");
+  console.error(
+    "  --backend <backend>        Backend: postgres, sqlite, duckdb, or sqljs (default: auto)",
+  );
   console.error("  -h, --help                 Show this help message");
   console.error();
   console.error("Environment:");
@@ -50,25 +52,46 @@ function usage(): never {
   process.exit(1);
 }
 
-type BackendName = "postgres" | "sqlite";
+type BackendName = "postgres" | "sqlite" | "duckdb" | "sqljs";
 type OutputFormat = "table" | "csv" | "jsonl" | "jsonl-flat" | "mermaid" | "ascii-graph";
 
 async function createSqlDialect(name: BackendName): Promise<SqlDialect> {
-  if (name === "postgres") {
-    const { PostgresSqlDialect } = await import("datamog-backend-postgres");
-    return new PostgresSqlDialect();
+  switch (name) {
+    case "postgres": {
+      const { PostgresSqlDialect } = await import("datamog-backend-postgres");
+      return new PostgresSqlDialect();
+    }
+    case "duckdb": {
+      const { DuckDbSqlDialect } = await import("datamog-backend-duckdb");
+      return new DuckDbSqlDialect();
+    }
+    case "sqljs":
+    case "sqlite": {
+      const { SqliteSqlDialect } = await import("datamog-backend-sqlite");
+      return new SqliteSqlDialect();
+    }
   }
-  const { SqliteSqlDialect } = await import("datamog-backend-sqlite");
-  return new SqliteSqlDialect();
 }
 
 async function createBackend(name: BackendName): Promise<Backend> {
-  if (name === "postgres") {
-    const { create } = await import("datamog-backend-postgres");
-    return create();
+  switch (name) {
+    case "postgres": {
+      const { create } = await import("datamog-backend-postgres");
+      return create();
+    }
+    case "duckdb": {
+      const { create } = await import("datamog-backend-duckdb");
+      return create();
+    }
+    case "sqljs": {
+      const { create } = await import("datamog-backend-sqljs");
+      return create();
+    }
+    case "sqlite": {
+      const { create } = await import("datamog-backend-sqlite");
+      return create();
+    }
   }
-  const { create } = await import("datamog-backend-sqlite");
-  return create();
 }
 
 const GSHEET_URL_RE = /^https:\/\/docs\.google\.com\/spreadsheets\/d\/([^/]+)/;
@@ -318,11 +341,12 @@ async function main() {
       dryRun = true;
     } else if (arg === "--backend") {
       const value = args[++i];
-      if (value !== "postgres" && value !== "sqlite") {
-        console.error(`Invalid backend: ${value} (expected "postgres" or "sqlite")`);
+      const validBackends: BackendName[] = ["postgres", "sqlite", "duckdb", "sqljs"];
+      if (!validBackends.includes(value as BackendName)) {
+        console.error(`Invalid backend: ${value} (expected ${validBackends.join(", ")})`);
         process.exit(1);
       }
-      backendOverride = value;
+      backendOverride = value as BackendName;
     } else if (arg === "--output-format") {
       const value = args[++i];
       const validFormats: OutputFormat[] = [

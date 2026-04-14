@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { DuckDbSqlDialect } from "datamog-backend-duckdb";
 import { PostgresSqlDialect } from "datamog-backend-postgres";
 import { SqliteSqlDialect } from "datamog-backend-sqlite";
 import { analyze, inferTypes } from "datamog-core";
@@ -6,6 +7,7 @@ import { parse } from "datamog-parser";
 import type { SqlDialect } from "../src/dialect.ts";
 import { translate } from "../src/translator.ts";
 
+const duckdb = new DuckDbSqlDialect();
 const postgres = new PostgresSqlDialect();
 const sqlite = new SqliteSqlDialect();
 
@@ -556,5 +558,93 @@ describe("translator (sqlite dialect)", () => {
     expect(sql).toContain("__tag");
     expect(sql).toContain("'even'");
     expect(sql).toContain("'odd'");
+  });
+});
+
+describe("translator (duckdb dialect)", () => {
+  test("generates CREATE OR REPLACE VIEW for non-recursive rule", () => {
+    const result = translateSource(
+      `
+      extensional parent(name: text, child: text).
+      grandparent(X, Y) :- parent(X, Z), parent(Z, Y).
+    `,
+      duckdb,
+    );
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("CREATE OR REPLACE VIEW");
+    expect(sql).not.toContain("RECURSIVE");
+  });
+
+  test("generates WITH RECURSIVE inside CREATE OR REPLACE VIEW for recursive rule", () => {
+    const result = translateSource(
+      `
+      extensional parent(name: text, child: text).
+      ancestor(X, Y) :- parent(X, Y).
+      ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
+    `,
+      duckdb,
+    );
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("CREATE OR REPLACE VIEW");
+    expect(sql).toContain("WITH RECURSIVE");
+    expect(sql).toContain('SELECT * FROM "ancestor"');
+  });
+
+  test("accepts non-linear recursion", () => {
+    const result = translateSource(
+      `
+      extensional edge(src: text, dst: text).
+      tc(X, Y) :- edge(X, Y).
+      tc(X, Z) :- tc(X, Y), tc(Y, Z).
+    `,
+      duckdb,
+    );
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("WITH RECURSIVE");
+    expect(sql).toContain('FROM "tc"');
+  });
+
+  test("generates shared WITH RECURSIVE for mutual recursion", () => {
+    const result = translateSource(
+      `
+      extensional base(x: integer).
+      even(X) :- base(X).
+      even(X) :- odd(X).
+      odd(X) :- even(X).
+    `,
+      duckdb,
+    );
+    expect(result.createViews).toHaveLength(2);
+    const evenView = result.createViews.find((v) => norm(v).includes('VIEW "even"'));
+    expect(evenView).toBeDefined();
+    const sql = norm(evenView!);
+    expect(sql).toContain("CREATE OR REPLACE VIEW");
+    expect(sql).toContain("WITH RECURSIVE");
+    expect(sql).toContain('"even"(col1)');
+    expect(sql).toContain('"odd"(col1)');
+  });
+
+  test("generates generate_series for binding range", () => {
+    const result = translateTyped(
+      `
+      nums(X) :- X in [1 .. 5].
+    `,
+      duckdb,
+    );
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("generate_series(1, 5)");
+  });
+
+  test("generates STRING_AGG for group_concat", () => {
+    const result = translateSource(
+      `
+      extensional items(group_name: text, item: text).
+      concat_items(G, group_concat(I)) :- items(G, I).
+    `,
+      duckdb,
+    );
+    const sql = norm(result.createViews[0]!);
+    expect(sql).toContain("STRING_AGG(");
+    expect(sql).toContain("::TEXT");
   });
 });
