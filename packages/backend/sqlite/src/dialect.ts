@@ -3,6 +3,7 @@ import { type SqlDialect, colList, ident } from "datamog-engine";
 
 export class SqliteSqlDialect implements SqlDialect {
   readonly name = "sqlite";
+  readonly supportsNonLinearRecursion = false;
 
   createView(name: string, body: string): string {
     return `CREATE VIEW IF NOT EXISTS ${ident(name)} AS\n  ${body}\n;`;

@@ -19,6 +19,8 @@ export interface AnalyzedProgram {
   /** Negative dependencies: predicate p negatively depends on q if some rule for p has `not q(...)` in its body. */
   negativeDependencies: Map<string, Set<string>>;
   recursivePredicates: Set<string>;
+  /** Predicates that are non-linearly recursive (some rule has >1 body atom from the same SCC). */
+  nonLinearPredicates: Set<string>;
   /** Predicates grouped into strata (SCCs) in dependency order. */
   sortedStrata: string[][];
 }
@@ -225,6 +227,38 @@ export function analyze(program: Program): AnalyzedProgram {
     }
   }
 
+  // Detect non-linear recursion: a rule is non-linear if its body has >1 atom
+  // referring to predicates in the same SCC. All predicates in such an SCC are
+  // marked non-linear because they share the same recursive evaluation.
+  const nonLinearPredicates = new Set<string>();
+  for (const scc of sccs) {
+    const sccSet = new Set(scc);
+    if (!scc.some((p) => recursivePredicates.has(p))) continue;
+    let isNonLinear = false;
+    for (const pred of scc) {
+      const predRules = rules.get(pred);
+      if (!predRules) continue;
+      for (const rule of predRules) {
+        let sccAtomCount = 0;
+        for (const elem of rule.body) {
+          if (elem.$type === "Atom" && !elem.negated && sccSet.has(elem.predicate)) {
+            sccAtomCount++;
+          }
+        }
+        if (sccAtomCount > 1) {
+          isNonLinear = true;
+          break;
+        }
+      }
+      if (isNonLinear) break;
+    }
+    if (isNonLinear) {
+      for (const pred of scc) {
+        nonLinearPredicates.add(pred);
+      }
+    }
+  }
+
   // Aggregate predicates cannot be recursive
   for (const pred of recursivePredicates) {
     const predRules = rules.get(pred);
@@ -265,6 +299,7 @@ export function analyze(program: Program): AnalyzedProgram {
     negativeDependencies,
     sortedStrata,
     recursivePredicates,
+    nonLinearPredicates,
   };
 }
 

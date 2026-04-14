@@ -361,4 +361,48 @@ describe("analyzer", () => {
     `);
     expect(() => analyze(program)).toThrow(/conflicts with aggregate function/);
   });
+
+  test("detects non-linear self-recursion", () => {
+    const program = parse(`
+      extensional edge(src: text, dst: text).
+      tc(X, Y) :- edge(X, Y).
+      tc(X, Z) :- tc(X, Y), tc(Y, Z).
+    `);
+    const result = analyze(program);
+    expect(result.nonLinearPredicates.has("tc")).toBe(true);
+  });
+
+  test("linear recursion is not flagged as non-linear", () => {
+    const program = parse(`
+      extensional edge(src: text, dst: text).
+      path(X, Y) :- edge(X, Y).
+      path(X, Y) :- edge(X, Z), path(Z, Y).
+    `);
+    const result = analyze(program);
+    expect(result.nonLinearPredicates.has("path")).toBe(false);
+  });
+
+  test("detects non-linear mutual recursion", () => {
+    const program = parse(`
+      extensional base(x: integer).
+      a(X) :- base(X).
+      a(X) :- b(X), a(X).
+      b(X) :- a(X).
+    `);
+    const result = analyze(program);
+    expect(result.nonLinearPredicates.has("a")).toBe(true);
+    expect(result.nonLinearPredicates.has("b")).toBe(true);
+  });
+
+  test("linear mutual recursion is not flagged", () => {
+    const program = parse(`
+      extensional base(x: integer).
+      even(X) :- base(X).
+      even(X) :- odd(X).
+      odd(X) :- even(X).
+    `);
+    const result = analyze(program);
+    expect(result.nonLinearPredicates.has("even")).toBe(false);
+    expect(result.nonLinearPredicates.has("odd")).toBe(false);
+  });
 });

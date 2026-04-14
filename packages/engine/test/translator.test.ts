@@ -424,6 +424,16 @@ describe("translator", () => {
     expect(sql).toContain("::TEXT");
   });
 
+  test("rejects non-linear recursion", () => {
+    expect(() =>
+      translateSource(`
+      extensional edge(src: text, dst: text).
+      tc(X, Y) :- edge(X, Y).
+      tc(X, Z) :- tc(X, Y), tc(Y, Z).
+    `),
+    ).toThrow(/Non-linear recursion is not supported by postgres.*'tc'/);
+  });
+
   test("mutual recursion with dependent non-recursive predicate", () => {
     const result = translateSource(`
       extensional base(x: integer).
@@ -511,6 +521,19 @@ describe("translator (sqlite dialect)", () => {
     expect(sql).toContain("CREATE VIEW IF NOT EXISTS");
     expect(sql).toContain("COUNT(");
     expect(sql).toContain("GROUP BY");
+  });
+
+  test("rejects non-linear recursion", () => {
+    expect(() =>
+      translateSource(
+        `
+      extensional edge(src: text, dst: text).
+      tc(X, Y) :- edge(X, Y).
+      tc(X, Z) :- tc(X, Y), tc(Y, Z).
+    `,
+        sqlite,
+      ),
+    ).toThrow(/Non-linear recursion is not supported by sqlite.*'tc'/);
   });
 
   test("generates WITH RECURSIVE for mutual recursion", () => {

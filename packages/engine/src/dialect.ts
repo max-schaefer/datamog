@@ -8,6 +8,9 @@ import type { AnalyzedProgram, Rule } from "datamog-core";
 export interface SqlDialect {
   readonly name: string;
 
+  /** Whether this dialect supports non-linear recursion (multiple recursive body atoms). */
+  readonly supportsNonLinearRecursion: boolean;
+
   /** Wrap a UNION body into a CREATE VIEW for a non-recursive predicate. */
   createView(name: string, body: string): string;
 

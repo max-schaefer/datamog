@@ -7,6 +7,7 @@ import type {
   Rule,
   SqlType,
 } from "datamog-core";
+import { AnalyzerError } from "datamog-core";
 import { type SqlDialect, colList, ident } from "./dialect.ts";
 
 export interface TranslationResult {
@@ -46,6 +47,14 @@ function translateViews(analyzed: AnalyzedProgram, dialect: SqlDialect): string[
   const views: string[] = [];
   for (const stratum of analyzed.sortedStrata) {
     const isRecursive = analyzed.recursivePredicates.has(stratum[0]!);
+
+    if (isRecursive && !dialect.supportsNonLinearRecursion && analyzed.nonLinearPredicates.has(stratum[0]!)) {
+      const preds = stratum.filter((p) => analyzed.nonLinearPredicates.has(p));
+      const predList = preds.map((p) => `'${p}'`).join(", ");
+      throw new AnalyzerError(
+        `Non-linear recursion is not supported by ${dialect.name}: ${stratum.length > 1 ? "predicates" : "predicate"} ${predList} ${preds.length > 1 ? "have" : "has"} rules with multiple recursive body atoms`,
+      );
+    }
 
     if (!isRecursive) {
       const predicate = stratum[0]!;

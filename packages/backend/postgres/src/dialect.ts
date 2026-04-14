@@ -3,6 +3,7 @@ import { type SqlDialect, colList, ident } from "datamog-engine";
 
 export class PostgresSqlDialect implements SqlDialect {
   readonly name = "postgres";
+  readonly supportsNonLinearRecursion = false;
 
   createView(name: string, body: string): string {
     return `CREATE OR REPLACE VIEW ${ident(name)} AS\n  ${body}\n;`;
