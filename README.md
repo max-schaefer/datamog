@@ -1,6 +1,6 @@
 # Datamog
 
-Datamog is an educational Datalog dialect that translates into SQL. It supports Horn clauses with extensional predicate declarations, stratified negation, and aggregates, and compiles rules into views (including recursive views for recursive predicates). It ships with Postgres and SQLite backends, and a VS Code extension for editor support.
+Datamog is an educational Datalog dialect that translates into SQL. It supports Horn clauses with extensional predicate declarations, stratified negation, and aggregates, and compiles rules into views (including recursive views for recursive predicates). It ships with Postgres, SQLite, DuckDB, and sql.js backends, and a VS Code extension for editor support.
 
 ## Syntax
 
@@ -44,6 +44,8 @@ ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
 | `datamog-engine` | SQL translator, executor, and pluggable loader interface |
 | `datamog-backend-postgres` | Postgres backend (via `Bun.sql`) |
 | `datamog-backend-sqlite` | SQLite backend (via `bun:sqlite`, in-memory by default) |
+| `datamog-backend-duckdb` | DuckDB backend (via `@duckdb/node-api`, supports non-linear recursion) |
+| `datamog-backend-sqljs` | sql.js backend (SQLite compiled to WASM via `sql.js`) |
 | `datamog-csv` | Loader plugin for CSV files |
 | `datamog-jsonl` | Loader plugin for JSONL files |
 | `datamog-gsheet` | Loader plugin for Google Sheets |
@@ -69,6 +71,8 @@ Select a backend explicitly:
 
 ```bash
 bun run datamog --backend sqlite packages/cli/examples/family/family.dl
+bun run datamog --backend duckdb packages/cli/examples/family/family.dl
+bun run datamog --backend sqljs packages/cli/examples/family/family.dl
 DATABASE_URL=postgres://localhost:5432/mydb bun run datamog --backend postgres program.dl
 ```
 
@@ -91,6 +95,7 @@ The CLI auto-discovers data files in the same directory as the `.dl` file: `<pre
 | `grammar` | Left-recursive grammar recognizer using string ops | `bun run datamog packages/cli/examples/grammar/grammar.dl` |
 | `same-generation` | Same-generation (cousin) problem with mutual recursion | `bun run datamog packages/cli/examples/same-generation/same-generation.dl` |
 | `river-crossing` | Farmer, wolf, goat, and cabbage puzzle | `bun run datamog packages/cli/examples/river-crossing/river-crossing.dl` |
+| `propositional-logic` | Propositional formula evaluator and tautology checker | `bun run datamog packages/cli/examples/propositional-logic/propositional-logic.dl` |
 
 ### Programmatic API
 

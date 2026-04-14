@@ -26,8 +26,7 @@ const result = analyze(program);
 result.extDecls;           // Map<string, ExtDecl> — extensional predicates
 result.rules;              // Map<string, Rule[]> — intensional predicates
 result.queries;            // Query[]
-result.recursivePredicates; // Set<string> — self-recursive predicates
-result.sortedPredicates;   // string[] — topological order for view creation
+result.recursivePredicates; // Set<string> — recursive predicates (self or mutual)
+result.nonLinearPredicates; // Set<string> — predicates with >1 recursive body atom
+result.sortedStrata;       // string[][] — SCCs in dependency order
 ```
-
-Mutual recursion is not supported in v1 and will throw an error.

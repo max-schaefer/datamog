@@ -12,6 +12,8 @@ bun run check:fix           # auto-fix lint + format
 bun run datamog <file.dl>   # run a Datamog program (in-memory SQLite)
 bun run datamog --dry-run <file.dl>  # preview generated SQL
 bun run datamog --backend postgres <file.dl>  # use Postgres backend
+bun run datamog --backend duckdb <file.dl>   # use DuckDB backend
+bun run datamog --backend sqljs <file.dl>    # use sql.js backend (WASM SQLite)
 ```
 
 ## Architecture
@@ -27,6 +29,8 @@ engine (SQL translator, executor, Backend interface, loader interface)
   ↑        ↑
   |    backend/postgres (Bun.sql)
   |    backend/sqlite (bun:sqlite)
+  |    backend/duckdb (@duckdb/node-api)
+  |    backend/sqljs (sql.js WASM — reuses sqlite dialect)
   ↑
 loader/csv, loader/jsonl, loader/gsheet
   ↑
@@ -36,12 +40,13 @@ cli (imports all packages, selects backend via --backend flag)
 ### Key modules
 
 - `packages/core/src/ast.ts` — AST node types (discriminated unions via `kind` field), `SourcePosition`, `SourceElement`
-- `packages/core/src/analyzer.ts` — EDB/IDB classification, arity tracking, safety checking, dependency graph, Tarjan's SCC, recursion detection
+- `packages/core/src/analyzer.ts` — EDB/IDB classification, arity tracking, safety checking, dependency graph, Tarjan's SCC, recursion detection, non-linear recursion detection
 - `packages/core/src/types.ts` — type inference (fixed-point iteration) and type validation for range atoms
 - `packages/parser/src/lexer.ts` — hand-written tokenizer; keywords in `KEYWORDS` map, two-char ops checked before single-char `punctMap`
 - `packages/parser/src/parser.ts` — recursive descent parser, don't-care variable (`_`) desugaring
 - `packages/engine/src/backend.ts` — `Backend` interface (implement to add new databases)
-- `packages/engine/src/translator.ts` — AST → SQL generation with `postgres` and `sqlite` dialects
+- `packages/engine/src/translator.ts` — AST → SQL generation; dialect-specific SQL controlled by `SqlDialect` interface
+- `packages/engine/src/dialect.ts` — `SqlDialect` interface (`supportsNonLinearRecursion`, view/CTE creation, range sources, aggregates)
 - `packages/engine/src/loader.ts` — `ExtensionalLoader` plugin interface, `coerceValue`/`checkValue` for type validation
 
 ## Datalog semantics
@@ -68,14 +73,18 @@ Typical touch points (in dependency order):
 6. **Type inference** (`core/src/types.ts`): update var type environment building in the fixed-point loop, add validation if needed
 7. **Translator** (`engine/src/translator.ts`): update `translateRule()` — single left-to-right pass over body elements registers bindings and categorizes into positiveAtoms/negatedAtoms/comparisons/bindingRanges/filterRanges; FROM/WHERE assembled from these
 
-## SQLite vs Postgres dialect differences
+## SQL dialect differences
 
-- Bun's embedded SQLite does **not** have `generate_series`; use recursive CTE subqueries instead
-- SQLite: `CREATE VIEW IF NOT EXISTS`; Postgres: `CREATE OR REPLACE VIEW`
-- SQLite mutual recursion: combined CTE with `__tag` discriminator column
-- Postgres mutual recursion: multiple CTEs in `WITH RECURSIVE` block
-- `group_concat` → `GROUP_CONCAT(expr, ',')` (SQLite) / `STRING_AGG(expr::TEXT, ',')` (Postgres)
-- `translateRule()` receives `dialect` parameter (passed through from `translateViews`)
+Each backend implements `SqlDialect` (in `engine/src/dialect.ts`). Key differences:
+
+- **Non-linear recursion**: only DuckDB (`supportsNonLinearRecursion = true`); Postgres/SQLite/sql.js reject it at translation time
+- **CREATE VIEW**: Postgres/DuckDB use `CREATE OR REPLACE VIEW`; SQLite/sql.js use `CREATE VIEW IF NOT EXISTS`
+- **Recursive views**: Postgres uses `CREATE RECURSIVE VIEW`; SQLite/sql.js/DuckDB embed `WITH RECURSIVE` inside `CREATE VIEW`
+- **DuckDB recursive CTEs**: require exactly two branches (anchor `UNION` recursive); multiple recursive rules are wrapped in `SELECT * FROM (... UNION ...)`
+- **Mutual recursion**: Postgres/DuckDB use multiple CTEs in `WITH RECURSIVE`; SQLite/sql.js use a combined CTE with `__tag` discriminator column
+- **Range sources**: Postgres/DuckDB use `generate_series`; SQLite/sql.js use recursive CTE subqueries
+- **`group_concat`**: `GROUP_CONCAT(expr, ',')` (SQLite/sql.js) / `STRING_AGG(expr::TEXT, ',')` (Postgres/DuckDB)
+- `translateRule()` receives a `dialect` parameter (passed through from `translateViews`)
 
 ## Conventions
 

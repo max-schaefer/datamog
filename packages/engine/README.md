@@ -10,13 +10,13 @@ Implement the `Backend` interface to add support for a new database:
 import type { Backend } from "datamog-engine";
 
 const myBackend: Backend = {
-  dialect: "postgres", // or "sqlite"
+  sqlDialect: new MyDialect(), // implements SqlDialect
   async execute(query, params?) { /* run SQL, return rows */ },
   async close() { /* clean up */ },
 };
 ```
 
-Built-in backend packages: `datamog-backend-postgres` and `datamog-backend-sqlite`.
+Built-in backend packages: `datamog-backend-postgres`, `datamog-backend-sqlite`, `datamog-backend-duckdb`, and `datamog-backend-sqljs`.
 
 ## Translation
 
@@ -27,7 +27,8 @@ import { translate } from "datamog-engine";
 
 const program = parse(source);
 const analyzed = analyze(program);
-const result = translate(analyzed, { dialect: "postgres" });
+const { PostgresSqlDialect } = await import("datamog-backend-postgres");
+const result = translate(analyzed, new PostgresSqlDialect());
 
 result.createTables; // CREATE TABLE statements for extensional predicates
 result.createViews;  // CREATE [RECURSIVE] VIEW statements for intensional predicates

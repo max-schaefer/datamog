@@ -14,6 +14,8 @@ DATABASE_URL=postgres://localhost:5432/mydb bun run datamog program.dl
 # Select a backend explicitly
 bun run datamog --backend sqlite program.dl
 bun run datamog --backend postgres program.dl
+bun run datamog --backend duckdb program.dl
+bun run datamog --backend sqljs program.dl
 
 # Specify a separate data directory
 bun run datamog program.dl ./data
@@ -80,7 +82,7 @@ The sheet must have a header row with column names matching the `extensional` de
 | `--extensional name=source` | Map a predicate to a file (.csv/.jsonl) or Google Sheets URL |
 | `--output-format <format>` | Output format: `table` (default), `csv`, or `jsonl` |
 | `--dry-run` | Print generated SQL without executing |
-| `--backend <postgres\|sqlite>` | Backend (default: auto-detected from `DATABASE_URL`) |
+| `--backend <postgres\|sqlite\|duckdb\|sqljs>` | Backend (default: auto-detected from `DATABASE_URL`) |
 | `-h`, `--help` | Show help message |
 
 ## Examples
