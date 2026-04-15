@@ -27,7 +27,7 @@ function usage(): never {
   console.error();
   console.error("Options:");
   console.error("  --extensional name=source  Map a predicate to a file (.csv/.jsonl/.mmd) or");
-  console.error("                             a Google Sheets URL (requires GOOGLE_API_KEY)");
+  console.error("                             a Google Sheets URL (public sheets work without auth)");
   console.error(
     "  --output-format <format>   Output format: table (default), csv, jsonl, jsonl-flat,",
   );
@@ -212,7 +212,7 @@ function parseExtensionalArg(arg: string): { name: string; source: string } {
   return { name: arg.slice(0, eqIdx), source: arg.slice(eqIdx + 1) };
 }
 
-function resolveGSheetAuth(): GSheetAuth {
+function resolveGSheetAuth(): GSheetAuth | undefined {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   const key = process.env.GOOGLE_PRIVATE_KEY;
   if (email && key) {
@@ -224,10 +224,7 @@ function resolveGSheetAuth(): GSheetAuth {
     return { apiKey };
   }
 
-  console.error(
-    "Google Sheets requires either GOOGLE_SERVICE_ACCOUNT_EMAIL + GOOGLE_PRIVATE_KEY, or GOOGLE_API_KEY",
-  );
-  process.exit(1);
+  return undefined;
 }
 
 function buildExplicitLoaders(mappings: { name: string; source: string }[]): ExtensionalLoader[] {

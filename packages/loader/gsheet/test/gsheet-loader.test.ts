@@ -179,3 +179,77 @@ describe("GSheetLoader", () => {
     expect(insertedQueries[0]?.params).toEqual(["alice", "bob"]);
   });
 });
+
+describe("GSheetLoader (public CSV fallback)", () => {
+  function makeLoaderWithCsv(
+    sheets: Record<string, { spreadsheetId: string }>,
+    csvContent: string,
+  ) {
+    const loader = new GSheetLoader({ sheets });
+    loader.fetchPublicCsv = mock(async () => csvContent);
+    return loader;
+  }
+
+  test("loads rows from public CSV export when no auth is provided", async () => {
+    const loader = makeLoaderWithCsv(
+      { parent: { spreadsheetId: "abc123" } },
+      "name,child\nalice,bob\ncarol,dave\n",
+    );
+    const decl = getExtDecl("extensional parent(name: text, child: text).");
+    const { backend, insertedQueries } = makeMockBackend();
+    const result = await loader.load(decl, backend);
+
+    expect(result.rowsLoaded).toBe(2);
+    expect(insertedQueries).toHaveLength(2);
+    expect(insertedQueries[0]?.params).toEqual(["alice", "bob"]);
+    expect(insertedQueries[1]?.params).toEqual(["carol", "dave"]);
+  });
+
+  test("coerces types from public CSV export", async () => {
+    const loader = makeLoaderWithCsv(
+      { t: { spreadsheetId: "abc123" } },
+      "a,b,c,d\nhello,42,3.14,true\n",
+    );
+    const decl = getExtDecl("extensional t(a: text, b: integer, c: real, d: boolean).");
+    const { backend, insertedQueries } = makeMockBackend();
+    const result = await loader.load(decl, backend);
+
+    expect(result.rowsLoaded).toBe(1);
+    expect(insertedQueries[0]?.params).toEqual(["hello", 42, 3.14, true]);
+  });
+
+  test("throws on missing column in public CSV export", async () => {
+    const loader = makeLoaderWithCsv(
+      { parent: { spreadsheetId: "abc123" } },
+      "name\nalice\n",
+    );
+    const decl = getExtDecl("extensional parent(name: text, child: text).");
+    const { backend } = makeMockBackend();
+    expect(loader.load(decl, backend)).rejects.toThrow(/missing column 'child'/);
+  });
+
+  test("returns zero rows for empty CSV", async () => {
+    const loader = makeLoaderWithCsv(
+      { parent: { spreadsheetId: "abc123" } },
+      "",
+    );
+    const decl = getExtDecl("extensional parent(name: text, child: text).");
+    const { backend } = makeMockBackend();
+    const result = await loader.load(decl, backend);
+    expect(result.rowsLoaded).toBe(0);
+  });
+
+  test("handles quoted fields in public CSV export", async () => {
+    const loader = makeLoaderWithCsv(
+      { parent: { spreadsheetId: "abc123" } },
+      'name,child\n"alice, sr",bob\n"carol ""C""",dave\n',
+    );
+    const decl = getExtDecl("extensional parent(name: text, child: text).");
+    const { backend, insertedQueries } = makeMockBackend();
+    const result = await loader.load(decl, backend);
+
+    expect(result.rowsLoaded).toBe(2);
+    expect(insertedQueries[0]?.params).toEqual(["alice, sr", "bob"]);
+    expect(insertedQueries[1]?.params).toEqual(['carol "C"', "dave"]);
+  });
+});

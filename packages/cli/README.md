@@ -68,12 +68,18 @@ Place a file named `<predicate>.jsonl` in the data directory. Each line is a JSO
 Pass a Google Sheets share URL via `--extensional`:
 
 ```bash
+# Public spreadsheets work without any auth configuration
+bun run datamog \
+  --extensional scores=https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit \
+  program.dl
+
+# For private sheets, set GOOGLE_API_KEY or service account credentials
 GOOGLE_API_KEY=... bun run datamog \
   --extensional scores=https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit \
   program.dl
 ```
 
-The sheet must have a header row with column names matching the `extensional` declaration. Requires the `GOOGLE_API_KEY` environment variable.
+The sheet must have a header row with column names matching the `extensional` declaration. Public spreadsheets are fetched via CSV export and require no credentials. For private sheets, set `GOOGLE_API_KEY` or `GOOGLE_SERVICE_ACCOUNT_EMAIL` + `GOOGLE_PRIVATE_KEY`.
 
 ## Options
 
