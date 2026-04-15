@@ -55,7 +55,17 @@ ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
 | `datamog-gsheet` | Loader plugin for Google Sheets |
 | `datamog-mermaid` | Loader plugin for Mermaid graph/flowchart files (`.mmd`) |
 | `datamog-cli` | Command-line interface |
+| `datamog-playground` | Browser-based playground (Preact, CodeMirror, sql.js — no server needed) |
 | `datamog-vscode` | VS Code extension with syntax highlighting and diagnostics |
+
+## Playground
+
+The playground lets you write and run Datamog programs entirely in the browser — no installation required. It uses sql.js (SQLite compiled to WASM) to execute queries client-side.
+
+```bash
+bun run playground:dev    # start dev server
+bun run playground:build  # production build (static files in packages/playground/dist/)
+```
 
 ## Usage
 
