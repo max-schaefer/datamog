@@ -14,6 +14,8 @@ bun run datamog --dry-run <file.dl>  # preview generated SQL
 bun run datamog --backend postgres <file.dl>  # use Postgres backend
 bun run datamog --backend duckdb <file.dl>   # use DuckDB backend
 bun run datamog --backend sqljs <file.dl>    # use sql.js backend (WASM SQLite)
+bun run playground:dev              # start playground dev server
+bun run playground:build            # production build (static files)
 ```
 
 ## Architecture
@@ -32,9 +34,11 @@ engine (SQL translator, executor, Backend interface, loader interface)
   |    backend/duckdb (@duckdb/node-api)
   |    backend/sqljs (sql.js WASM — reuses sqlite dialect)
   ↑
-loader/csv, loader/jsonl, loader/gsheet
+loader/csv, loader/jsonl, loader/gsheet, loader/mermaid
   ↑
 cli (imports all packages, selects backend via --backend flag)
+
+playground (Preact + Vite SPA, uses parser/core/engine/backend-sqlite via sql.js in a Web Worker)
 ```
 
 ### Key modules
@@ -85,6 +89,14 @@ Each backend implements `SqlDialect` (in `engine/src/dialect.ts`). Key differenc
 - **Range sources**: Postgres/DuckDB use `generate_series`; SQLite/sql.js use recursive CTE subqueries
 - **`group_concat`**: `GROUP_CONCAT(expr, ',')` (SQLite/sql.js) / `STRING_AGG(expr::TEXT, ',')` (Postgres/DuckDB)
 - `translateRule()` receives a `dialect` parameter (passed through from `translateViews`)
+
+## Playground
+
+Purely client-side Preact + Vite SPA — no backend server. Runs the full datamog pipeline (parse → analyze → translate → execute) in a Web Worker using sql.js (WASM SQLite). CSV data is loaded in-memory via papaparse.
+
+- Deployed to GitHub Pages automatically on push to `main` (`.github/workflows/deploy-playground.yml`)
+- Vite `base` is set to `/datamog/` in CI (via `process.env.GITHUB_ACTIONS`) so asset paths resolve correctly under the repo subpath
+- sql.js WASM is loaded at runtime from `https://sql.js.org/dist` (not bundled)
 
 ## Conventions
 
