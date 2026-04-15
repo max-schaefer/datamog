@@ -28,11 +28,23 @@ let sqlModule: any = null;
 
 async function ensureSqlJs() {
   if (!sqlModule) {
+    console.log("[worker] importing sql.js...");
     const mod = await import("sql.js/dist/sql-wasm-browser.js");
+    console.log("[worker] mod:", mod);
+    console.log("[worker] typeof mod:", typeof mod);
+    console.log("[worker] mod keys:", Object.keys(mod));
+    console.log("[worker] typeof mod.default:", typeof mod.default);
+    if (mod.default) {
+      console.log("[worker] typeof mod.default.default:", typeof (mod.default as any).default);
+      console.log("[worker] mod.default keys:", Object.keys(mod.default));
+    }
     const initSqlJs = typeof mod.default === "function" ? mod.default : mod;
+    console.log("[worker] initSqlJs:", initSqlJs);
+    console.log("[worker] typeof initSqlJs:", typeof initSqlJs);
     sqlModule = await initSqlJs({
       locateFile: (file: string) => `https://sql.js.org/dist/${file}`,
     });
+    console.log("[worker] sqlModule ready");
   }
   return sqlModule;
 }
