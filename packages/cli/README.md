@@ -1,11 +1,11 @@
 # datamog-cli
 
-Command-line interface for running Datamog programs. Uses in-memory SQLite by default, or Postgres when `DATABASE_URL` is set.
+Command-line interface for running Datamog programs. Uses in-memory DuckDB by default, or Postgres when `DATABASE_URL` is set.
 
 ## Usage
 
 ```bash
-# Run with in-memory SQLite (no database setup needed)
+# Run with in-memory DuckDB (no database setup needed)
 bun run datamog program.dl
 
 # Run against Postgres

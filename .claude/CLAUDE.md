@@ -9,7 +9,7 @@ bun test                    # run all tests
 bun run typecheck           # tsc -b (project references, emits .d.ts only)
 bun run check               # biome lint + format check
 bun run check:fix           # auto-fix lint + format
-bun run datamog <file.dl>   # run a Datamog program (in-memory SQLite)
+bun run datamog <file.dl>   # run a Datamog program (in-memory DuckDB)
 bun run datamog --dry-run <file.dl>  # preview generated SQL
 bun run datamog --backend postgres <file.dl>  # use Postgres backend
 bun run datamog --backend duckdb <file.dl>   # use DuckDB backend

@@ -55,7 +55,7 @@ ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
 
 ## Usage
 
-Run with the CLI (no database setup needed — uses in-memory SQLite by default):
+Run with the CLI (no database setup needed — uses in-memory DuckDB by default):
 
 ```bash
 bun run datamog packages/cli/examples/family/family.dl

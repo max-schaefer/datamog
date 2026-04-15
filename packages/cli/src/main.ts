@@ -40,7 +40,7 @@ function usage(): never {
   console.error();
   console.error("Environment:");
   console.error(
-    "  DATABASE_URL                    Postgres connection string (uses in-memory SQLite if not set)",
+    "  DATABASE_URL                    Postgres connection string (uses in-memory DuckDB if not set)",
   );
   console.error(
     "  GOOGLE_API_KEY                  API key for Google Sheets (public sheets, read-only)",
@@ -399,7 +399,7 @@ async function main() {
   dataDir = dataDir ? resolve(dataDir) : dirname(resolve(dlPath));
   const source = await dlFile.text();
   const backendName: BackendName =
-    backendOverride ?? (process.env.DATABASE_URL ? "postgres" : "sqlite");
+    backendOverride ?? (process.env.DATABASE_URL ? "postgres" : "duckdb");
 
   // Check query count for machine-readable formats
   if (outputFormat !== "table") {
