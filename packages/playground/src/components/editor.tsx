@@ -2,7 +2,7 @@ import { useEffect, useRef } from "preact/hooks";
 import { EditorView, keymap, lineNumbers, highlightActiveLine } from "@codemirror/view";
 import { EditorState } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { bracketMatching } from "@codemirror/language";
+import { bracketMatching, defaultHighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { datamogLanguage } from "../lib/highlight.ts";
 
 interface EditorProps {
@@ -28,6 +28,7 @@ export function Editor({ source, onChange }: EditorProps) {
           highlightActiveLine(),
           history(),
           bracketMatching(),
+          syntaxHighlighting(defaultHighlightStyle),
           datamogLanguage(),
           keymap.of([...defaultKeymap, ...historyKeymap]),
           EditorView.updateListener.of((update) => {
