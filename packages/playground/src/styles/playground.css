@@ -280,15 +280,9 @@ body {
 }
 
 .sql-block {
-  font-family: "JetBrains Mono", "Fira Code", monospace;
-  font-size: 13px;
-  padding: 12px;
-  background: #f9fafb;
   border: 1px solid #e5e7eb;
   border-radius: 6px;
-  white-space: pre-wrap;
-  word-break: break-word;
-  line-height: 1.5;
+  overflow: hidden;
   margin-bottom: 8px;
 }
 

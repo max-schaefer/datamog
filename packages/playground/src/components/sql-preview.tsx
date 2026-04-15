@@ -1,4 +1,5 @@
 import type { TranslationResult } from "datamog-engine";
+import { SqlBlock } from "./sql-block.tsx";
 
 interface SqlPreviewProps {
   result: TranslationResult;
@@ -21,9 +22,7 @@ export function SqlPreview({ result }: SqlPreviewProps) {
         <div key={section.title} class="sql-section">
           <div class="sql-section-title">{section.title}</div>
           {section.statements.map((stmt, i) => (
-            <pre key={i} class="sql-block">
-              {stmt}
-            </pre>
+            <SqlBlock key={i} value={stmt} />
           ))}
         </div>
       ))}
