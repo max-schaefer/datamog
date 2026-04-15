@@ -1,12 +1,24 @@
-import type { ExtDecl, HeadTerm, Program, Query, Rule } from "./ast.ts";
+import type { Atom, ExtDecl, HeadTerm, Program, Query, Rule } from "./ast.ts";
 
 const AGGREGATE_NAMES = new Set(["count", "sum", "avg", "min", "max", "group_concat"]);
 
 export class AnalyzerError extends Error {
-  constructor(message: string) {
+  /** Byte offset of the error in the source (undefined if position unavailable). */
+  offset?: number;
+  /** Byte end-offset of the error in the source. */
+  end?: number;
+
+  constructor(message: string, offset?: number, end?: number) {
     super(message);
     this.name = "AnalyzerError";
+    this.offset = offset;
+    this.end = end;
   }
+}
+
+/** Extract byte-offset range from a Langium AST node's CST node. */
+function nodePos(node: { $cstNode?: { offset: number; end: number } }): [number, number] | undefined {
+  return node.$cstNode ? [node.$cstNode.offset, node.$cstNode.end] : undefined;
 }
 
 export interface AnalyzedProgram {
@@ -67,8 +79,10 @@ export function analyze(program: Program): AnalyzedProgram {
     switch (stmt.$type) {
       case "ExtDecl":
         if (extDecls.has(stmt.predicate)) {
+          const pos = nodePos(stmt);
           throw new AnalyzerError(
             `Predicate '${stmt.predicate}' is declared as extensional multiple times`,
+            ...pos ?? [],
           );
         }
         extDecls.set(stmt.predicate, stmt);
@@ -79,8 +93,10 @@ export function analyze(program: Program): AnalyzedProgram {
         if (existing) {
           const expectedArity = arities.get(stmt.head.predicate)!;
           if (stmt.head.args.length !== expectedArity) {
+            const pos = nodePos(stmt.head);
             throw new AnalyzerError(
               `Predicate '${stmt.head.predicate}' is defined with arity ${expectedArity} and ${stmt.head.args.length}`,
+              ...pos ?? [],
             );
           }
           existing.push(stmt);
@@ -99,8 +115,10 @@ export function analyze(program: Program): AnalyzedProgram {
   // Check no predicate is both EDB and IDB
   for (const predicate of rules.keys()) {
     if (extDecls.has(predicate)) {
+      const pos = nodePos(rules.get(predicate)![0]!.head);
       throw new AnalyzerError(
         `Predicate '${predicate}' is declared as both extensional and intensional`,
+        ...pos ?? [],
       );
     }
   }
@@ -108,21 +126,26 @@ export function analyze(program: Program): AnalyzedProgram {
   // Check no predicate uses an aggregate function name
   for (const predicate of [...extDecls.keys(), ...rules.keys()]) {
     if (AGGREGATE_NAMES.has(predicate)) {
+      const decl = extDecls.get(predicate) ?? rules.get(predicate)?.[0];
+      const pos = decl ? nodePos(decl) : undefined;
       throw new AnalyzerError(
         `Predicate name '${predicate}' conflicts with aggregate function '${predicate}'`,
+        ...pos ?? [],
       );
     }
   }
 
   // Check arity of atoms in rule bodies and queries
-  function checkAtomArity(predicate: string, actual: number) {
-    const expected = arities.get(predicate);
+  function checkAtom(atom: Atom) {
+    const expected = arities.get(atom.predicate);
+    const pos = nodePos(atom);
     if (expected === undefined) {
-      throw new AnalyzerError(`Predicate '${predicate}' is not defined`);
+      throw new AnalyzerError(`Predicate '${atom.predicate}' is not defined`, ...pos ?? []);
     }
-    if (actual !== expected) {
+    if (atom.args.length !== expected) {
       throw new AnalyzerError(
-        `Predicate '${predicate}' has arity ${expected} but is used with ${actual} arguments`,
+        `Predicate '${atom.predicate}' has arity ${expected} but is used with ${atom.args.length} arguments`,
+        ...pos ?? [],
       );
     }
   }
@@ -131,14 +154,14 @@ export function analyze(program: Program): AnalyzedProgram {
     for (const rule of predicateRules) {
       for (const elem of rule.body) {
         if (elem.$type === "Atom") {
-          checkAtomArity(elem.predicate, elem.args.length);
+          checkAtom(elem);
         }
       }
     }
   }
 
   for (const query of queries) {
-    checkAtomArity(query.atom.predicate, query.atom.args.length);
+    checkAtom(query.atom);
   }
 
   // Safety check
@@ -157,20 +180,28 @@ export function analyze(program: Program): AnalyzedProgram {
       // All rules must be aggregate rules
       const ruleHasAgg = rule.head.args.some((a) => containsAggregate(a));
       if (!ruleHasAgg) {
+        const pos = nodePos(rule.head);
         throw new AnalyzerError(
           `Predicate '${predicate}' has both aggregate and non-aggregate rules`,
+          ...pos ?? [],
         );
       }
       for (const arg of rule.head.args) {
         if (arg.$type === "AggregateCall") {
           // No nested aggregates
           if (containsAggregate(arg.arg)) {
-            throw new AnalyzerError(`Nested aggregate in head of rule for '${predicate}'`);
+            const pos = nodePos(arg);
+            throw new AnalyzerError(
+              `Nested aggregate in head of rule for '${predicate}'`,
+              ...pos ?? [],
+            );
           }
         } else if (containsAggregate(arg)) {
           // Aggregate must be top-level, not embedded in an expression
+          const pos = nodePos(arg);
           throw new AnalyzerError(
             `Aggregate must be a top-level head argument in rule for '${predicate}'`,
+            ...pos ?? [],
           );
         }
       }
@@ -183,8 +214,10 @@ export function analyze(program: Program): AnalyzedProgram {
       const rule = predicateRules[r]!;
       for (let i = 0; i < rule.head.args.length; i++) {
         if ((rule.head.args[i]!.$type === "AggregateCall") !== aggPositions[i]) {
+          const pos = nodePos(rule.head);
           throw new AnalyzerError(
             `Rules for '${predicate}' disagree on which head positions are aggregates`,
+            ...pos ?? [],
           );
         }
       }
@@ -265,8 +298,13 @@ export function analyze(program: Program): AnalyzedProgram {
   // Aggregate predicates cannot be recursive
   for (const pred of recursivePredicates) {
     const predRules = rules.get(pred);
-    if (predRules?.some((r) => r.head.args.some((a) => a.$type === "AggregateCall"))) {
-      throw new AnalyzerError(`Aggregate predicate '${pred}' cannot be recursive`);
+    const aggRule = predRules?.find((r) => r.head.args.some((a) => a.$type === "AggregateCall"));
+    if (aggRule) {
+      const pos = nodePos(aggRule.head);
+      throw new AnalyzerError(
+        `Aggregate predicate '${pred}' cannot be recursive`,
+        ...pos ?? [],
+      );
     }
   }
 
@@ -283,8 +321,20 @@ export function analyze(program: Program): AnalyzedProgram {
     const myScc = sccOf.get(predicate);
     for (const dep of negDeps) {
       if (myScc?.has(dep)) {
+        // Find the negated atom for a precise error location
+        let errPos: [number, number] | undefined;
+        for (const rule of rules.get(predicate) ?? []) {
+          for (const elem of rule.body) {
+            if (elem.$type === "Atom" && elem.negated && elem.predicate === dep) {
+              errPos = nodePos(elem);
+              break;
+            }
+          }
+          if (errPos) break;
+        }
         throw new AnalyzerError(
           `Negation of '${dep}' in rules for '${predicate}' is not stratifiable (they are mutually recursive)`,
+          ...errPos ?? [],
         );
       }
     }
@@ -385,17 +435,14 @@ function checkSafety(rule: Rule) {
     }
   }
 
-  function checkVarSafe(varName: string, context: string) {
-    if (!safeVars.has(varName)) {
-      throw new AnalyzerError(`Unsafe variable '${varName}' in ${context}`);
-    }
-  }
-
   function checkTermSafe(term: HeadTerm, context: string) {
     const vars = new Set<string>();
     collectVars(term, vars);
     for (const v of vars) {
-      checkVarSafe(v, context);
+      if (!safeVars.has(v)) {
+        const pos = nodePos(term);
+        throw new AnalyzerError(`Unsafe variable '${v}' in ${context}`, ...pos ?? []);
+      }
     }
   }
 

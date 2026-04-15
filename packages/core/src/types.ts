@@ -192,13 +192,16 @@ function checkRangeExprTypes(
   const exprType = inferTermType(range.expr, varTypes, types);
 
   if (lowType && !isNumericType(lowType)) {
-    throw new AnalyzerError(`Range lower bound has non-numeric type '${lowType}'`);
+    const cst = range.low.$cstNode;
+    throw new AnalyzerError(`Range lower bound has non-numeric type '${lowType}'`, cst?.offset, cst?.end);
   }
   if (highType && !isNumericType(highType)) {
-    throw new AnalyzerError(`Range upper bound has non-numeric type '${highType}'`);
+    const cst = range.high.$cstNode;
+    throw new AnalyzerError(`Range upper bound has non-numeric type '${highType}'`, cst?.offset, cst?.end);
   }
   if (exprType && !isNumericType(exprType)) {
-    throw new AnalyzerError(`Range expression has non-numeric type '${exprType}'`);
+    const cst = range.expr.$cstNode;
+    throw new AnalyzerError(`Range expression has non-numeric type '${exprType}'`, cst?.offset, cst?.end);
   }
 }
 

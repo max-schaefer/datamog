@@ -81,3 +81,21 @@ export async function dryRun(source: string): Promise<TranslationResult> {
     getWorker().postMessage({ type: "dry-run", id, source });
   });
 }
+
+export interface LintDiagnostic {
+  message: string;
+  from?: number;
+  to?: number;
+}
+
+export async function lint(source: string): Promise<LintDiagnostic[]> {
+  await init();
+  const id = nextId++;
+  return new Promise((resolve, reject) => {
+    pending.set(id, {
+      resolve: resolve as (value: unknown) => void,
+      reject,
+    });
+    getWorker().postMessage({ type: "lint", id, source });
+  });
+}

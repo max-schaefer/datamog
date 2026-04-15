@@ -21,7 +21,13 @@ interface DryRunMessage {
   source: string;
 }
 
-type WorkerMessage = InitMessage | ExecuteMessage | DryRunMessage;
+interface LintMessage {
+  type: "lint";
+  id: number;
+  source: string;
+}
+
+type WorkerMessage = InitMessage | ExecuteMessage | DryRunMessage | LintMessage;
 
 const SQL_JS_CDN = "https://sql.js.org/dist";
 
@@ -136,5 +142,39 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         error: err instanceof Error ? err.message : String(err),
       });
     }
+    return;
+  }
+
+  if (msg.type === "lint") {
+    try {
+      const program = parse(msg.source);
+      const analyzed = analyze(program);
+      inferTypes(analyzed);
+      self.postMessage({ type: "lint-result", id: msg.id, result: [] });
+    } catch (err: unknown) {
+      const diag: { message: string; from?: number; to?: number } = {
+        message: err instanceof Error ? err.message : String(err),
+      };
+      if (err instanceof Error && err.name === "ParseError") {
+        const { line, column } = err as Error & { line: number; column: number };
+        diag.from = lineColumnToOffset(msg.source, line, column);
+        diag.to = diag.from + 1;
+      } else if (err instanceof Error && err.name === "AnalyzerError") {
+        const { offset, end } = err as Error & { offset?: number; end?: number };
+        diag.from = offset;
+        diag.to = end;
+      }
+      self.postMessage({ type: "lint-result", id: msg.id, result: [diag] });
+    }
   }
 };
+
+function lineColumnToOffset(source: string, line: number, column: number): number {
+  let offset = 0;
+  for (let i = 1; i < line; i++) {
+    const nl = source.indexOf("\n", offset);
+    if (nl === -1) break;
+    offset = nl + 1;
+  }
+  return offset + column - 1;
+}

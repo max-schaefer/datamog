@@ -4,6 +4,7 @@ import { EditorState } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { bracketMatching, defaultHighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { datamogLanguage } from "../lib/highlight.ts";
+import { datamogLinter } from "../lib/linter.ts";
 
 interface EditorProps {
   source: string;
@@ -30,6 +31,7 @@ export function Editor({ source, onChange }: EditorProps) {
           bracketMatching(),
           syntaxHighlighting(defaultHighlightStyle),
           datamogLanguage(),
+          datamogLinter,
           keymap.of([...defaultKeymap, ...historyKeymap]),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) {
