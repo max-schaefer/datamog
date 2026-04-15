@@ -21,8 +21,7 @@
     "datamog-engine": "workspace:*",
     "datamog-parser": "workspace:*",
     "papaparse": "^5.5.3",
-    "preact": "^10",
-    "sql.js": "^1"
+    "preact": "^10"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2",

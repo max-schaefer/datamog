@@ -23,28 +23,24 @@ interface DryRunMessage {
 
 type WorkerMessage = InitMessage | ExecuteMessage | DryRunMessage;
 
+const SQL_JS_CDN = "https://sql.js.org/dist";
+
 // biome-ignore lint/suspicious/noExplicitAny: sql.js types vary by bundler
 let sqlModule: any = null;
 
 async function ensureSqlJs() {
   if (!sqlModule) {
-    console.log("[worker] importing sql.js...");
-    const mod = await import("sql.js/dist/sql-wasm-browser.js");
-    console.log("[worker] mod:", mod);
-    console.log("[worker] typeof mod:", typeof mod);
-    console.log("[worker] mod keys:", Object.keys(mod));
-    console.log("[worker] typeof mod.default:", typeof mod.default);
-    if (mod.default) {
-      console.log("[worker] typeof mod.default.default:", typeof (mod.default as any).default);
-      console.log("[worker] mod.default keys:", Object.keys(mod.default));
-    }
-    const initSqlJs = typeof mod.default === "function" ? mod.default : mod;
-    console.log("[worker] initSqlJs:", initSqlJs);
-    console.log("[worker] typeof initSqlJs:", typeof initSqlJs);
+    // sql.js is a UMD bundle that Vite can't import as ESM in a module worker.
+    // Load it via fetch + globalThis eval, which is how it's designed to work in browsers.
+    const response = await fetch(`${SQL_JS_CDN}/sql-wasm.js`);
+    const scriptText = await response.text();
+    // biome-ignore lint/security/noGlobalEval: sql.js UMD needs global eval to register initSqlJs
+    (0, eval)(scriptText);
+    // biome-ignore lint/suspicious/noExplicitAny: set by sql.js UMD script
+    const initSqlJs = (globalThis as any).initSqlJs;
     sqlModule = await initSqlJs({
-      locateFile: (file: string) => `https://sql.js.org/dist/${file}`,
+      locateFile: (file: string) => `${SQL_JS_CDN}/${file}`,
     });
-    console.log("[worker] sqlModule ready");
   }
   return sqlModule;
 }
