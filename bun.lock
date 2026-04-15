@@ -153,7 +153,6 @@
         "@codemirror/state": "^6",
         "@codemirror/view": "^6",
         "codemirror": "^6",
-        "csv-parse": "^6.2.1",
         "datamog-backend-sqlite": "workspace:*",
         "datamog-core": "workspace:*",
         "datamog-engine": "workspace:*",

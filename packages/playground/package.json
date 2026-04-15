@@ -14,7 +14,6 @@
     "datamog-parser": "workspace:*",
     "datamog-engine": "workspace:*",
     "datamog-backend-sqlite": "workspace:*",
-    "csv-parse": "^6.2.1",
     "sql.js": "^1",
     "preact": "^10",
     "@codemirror/autocomplete": "^6",
