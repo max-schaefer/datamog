@@ -157,6 +157,7 @@ describe("analyzer", () => {
   test("rejects unsafe negation", () => {
     const program = parse(`
       extensional base(x: text).
+      extensional bar(x: text, y: text).
       foo(X) :- base(X), not bar(X, Y).
     `);
     expect(() => analyze(program)).toThrow(/Unsafe variable 'Y'/);
@@ -360,6 +361,23 @@ describe("analyzer", () => {
       extensional sum(x: integer).
     `);
     expect(() => analyze(program)).toThrow(/conflicts with aggregate function/);
+  });
+
+  test("rejects undefined predicate in rule body", () => {
+    const program = parse(`
+      extensional parnt(name: text, child: text).
+      ancestor(X, Y) :- parent(X, Y).
+      ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
+    `);
+    expect(() => analyze(program)).toThrow(/Predicate 'parent' is not defined/);
+  });
+
+  test("rejects undefined predicate in query", () => {
+    const program = parse(`
+      extensional parent(name: text, child: text).
+      ?- ancestor("alice", X).
+    `);
+    expect(() => analyze(program)).toThrow(/Predicate 'ancestor' is not defined/);
   });
 
   test("detects non-linear self-recursion", () => {

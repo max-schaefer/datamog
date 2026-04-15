@@ -117,7 +117,10 @@ export function analyze(program: Program): AnalyzedProgram {
   // Check arity of atoms in rule bodies and queries
   function checkAtomArity(predicate: string, actual: number) {
     const expected = arities.get(predicate);
-    if (expected !== undefined && actual !== expected) {
+    if (expected === undefined) {
+      throw new AnalyzerError(`Predicate '${predicate}' is not defined`);
+    }
+    if (actual !== expected) {
       throw new AnalyzerError(
         `Predicate '${predicate}' has arity ${expected} but is used with ${actual} arguments`,
       );
