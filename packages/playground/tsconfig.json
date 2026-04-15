@@ -1,0 +1,22 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "emitDeclarationOnly": false
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../parser" },
+    { "path": "../core" },
+    { "path": "../engine" },
+    { "path": "../backend/sqlite" }
+  ]
+}

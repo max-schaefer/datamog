@@ -1,0 +1,31 @@
+{
+  "name": "datamog-playground",
+  "version": "0.1.0",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "datamog-core": "workspace:*",
+    "datamog-parser": "workspace:*",
+    "datamog-engine": "workspace:*",
+    "datamog-backend-sqlite": "workspace:*",
+    "csv-parse": "^6.2.1",
+    "sql.js": "^1",
+    "preact": "^10",
+    "@codemirror/autocomplete": "^6",
+    "@codemirror/commands": "^6",
+    "@codemirror/language": "^6",
+    "@codemirror/state": "^6",
+    "@codemirror/view": "^6",
+    "codemirror": "^6"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2",
+    "vite": "^6"
+  }
+}

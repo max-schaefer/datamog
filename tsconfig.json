@@ -12,7 +12,8 @@
     { "path": "packages/loader/gsheet" },
     { "path": "packages/loader/mermaid" },
     { "path": "packages/cli" },
-    { "path": "packages/vscode-extension" }
+    { "path": "packages/vscode-extension" },
+    { "path": "packages/playground" }
   ],
   "files": []
 }
