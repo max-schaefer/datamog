@@ -1,5 +1,9 @@
 # Datamog
 
+<p align="center">
+  <img src="datamog.jpg" alt="Datamog" width="300" />
+</p>
+
 Datamog is an educational Datalog dialect that translates into SQL. It supports Horn clauses with extensional predicate declarations, stratified negation, and aggregates, and compiles rules into views (including recursive views for recursive predicates). It ships with Postgres, SQLite, DuckDB, and sql.js backends, and a VS Code extension for editor support.
 
 ## Syntax
