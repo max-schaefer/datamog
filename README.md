@@ -62,6 +62,10 @@ ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
 
 The playground lets you write and run Datamog programs entirely in the browser — no installation required. It uses sql.js (SQLite compiled to WASM) to execute queries client-side.
 
+**Try it online: [max-schaefer.github.io/datamog](https://max-schaefer.github.io/datamog/)**
+
+The playground is automatically deployed to GitHub Pages on every push to `main`.
+
 ```bash
 bun run playground:dev    # start dev server
 bun run playground:build  # production build (static files in packages/playground/dist/)
