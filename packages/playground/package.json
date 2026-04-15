@@ -10,21 +10,23 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "datamog-core": "workspace:*",
-    "datamog-parser": "workspace:*",
-    "datamog-engine": "workspace:*",
-    "datamog-backend-sqlite": "workspace:*",
-    "sql.js": "^1",
-    "preact": "^10",
     "@codemirror/autocomplete": "^6",
     "@codemirror/commands": "^6",
     "@codemirror/language": "^6",
     "@codemirror/state": "^6",
     "@codemirror/view": "^6",
-    "codemirror": "^6"
+    "codemirror": "^6",
+    "datamog-backend-sqlite": "workspace:*",
+    "datamog-core": "workspace:*",
+    "datamog-engine": "workspace:*",
+    "datamog-parser": "workspace:*",
+    "papaparse": "^5.5.3",
+    "preact": "^10",
+    "sql.js": "^1"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2",
+    "@types/papaparse": "^5.5.2",
     "vite": "^6"
   }
 }

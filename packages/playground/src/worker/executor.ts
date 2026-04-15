@@ -23,11 +23,13 @@ interface DryRunMessage {
 
 type WorkerMessage = InitMessage | ExecuteMessage | DryRunMessage;
 
-let sqlModule: typeof import("sql.js") | null = null;
+// biome-ignore lint/suspicious/noExplicitAny: sql.js types vary by bundler
+let sqlModule: any = null;
 
 async function ensureSqlJs() {
   if (!sqlModule) {
-    const initSqlJs = (await import("sql.js")).default;
+    const mod = await import("sql.js/dist/sql-wasm-browser.js");
+    const initSqlJs = typeof mod.default === "function" ? mod.default : mod;
     sqlModule = await initSqlJs({
       locateFile: (file: string) => `https://sql.js.org/dist/${file}`,
     });
@@ -35,7 +37,8 @@ async function ensureSqlJs() {
   return sqlModule;
 }
 
-function createBackend(SQL: typeof import("sql.js")): Backend {
+// biome-ignore lint/suspicious/noExplicitAny: sql.js module shape
+function createBackend(SQL: any): Backend {
   const db = new SQL.Database();
   return {
     sqlDialect: new SqliteSqlDialect(),

@@ -1,5 +1,6 @@
 import type { ExtDecl } from "datamog-core";
 import { type Backend, type ExtensionalLoader, type LoadResult, coerceValue } from "datamog-engine";
+import Papa from "papaparse";
 
 export class InMemoryCsvLoader implements ExtensionalLoader {
   readonly name = "in-memory-csv";
@@ -15,17 +16,19 @@ export class InMemoryCsvLoader implements ExtensionalLoader {
 
   async load(decl: ExtDecl, backend: Backend): Promise<LoadResult> {
     const content = this.csvData.get(decl.predicate)!;
-    const lines = content.split("\n").filter((line) => line.trim() !== "");
-    if (lines.length === 0) return { rowsLoaded: 0 };
+    const parsed = Papa.parse<Record<string, string>>(content, {
+      header: true,
+      skipEmptyLines: true,
+    });
 
-    const headers = parseFields(lines[0]!);
-    const dataLines = lines.slice(1);
+    if (parsed.errors.length > 0) {
+      const first = parsed.errors[0]!;
+      throw new Error(`CSV parse error for '${decl.predicate}': ${first.message} (row ${first.row})`);
+    }
 
-    for (const [i, line] of dataLines.entries()) {
-      const fields = parseFields(line);
+    for (const [i, record] of parsed.data.entries()) {
       const values = decl.columns.map((col) => {
-        const idx = headers.indexOf(col.name);
-        const raw = idx >= 0 ? (fields[idx] ?? "") : "";
+        const raw = record[col.name] ?? "";
         return coerceValue(raw, col.type, `${decl.predicate} row ${i + 1}, column '${col.name}'`);
       });
       const columns = decl.columns.map((c) => `"${c.name}"`).join(", ");
@@ -36,43 +39,6 @@ export class InMemoryCsvLoader implements ExtensionalLoader {
       );
     }
 
-    return { rowsLoaded: dataLines.length };
+    return { rowsLoaded: parsed.data.length };
   }
-}
-
-function parseFields(line: string): string[] {
-  const fields: string[] = [];
-  let i = 0;
-  while (i <= line.length) {
-    if (i === line.length) break;
-    if (line[i] === '"') {
-      i++;
-      let value = "";
-      while (i < line.length) {
-        if (line[i] === '"') {
-          if (line[i + 1] === '"') {
-            value += '"';
-            i += 2;
-          } else {
-            i++;
-            break;
-          }
-        } else {
-          value += line[i];
-          i++;
-        }
-      }
-      fields.push(value);
-      if (i < line.length && line[i] === ",") i++;
-    } else {
-      const nextComma = line.indexOf(",", i);
-      if (nextComma === -1) {
-        fields.push(line.slice(i));
-        break;
-      }
-      fields.push(line.slice(i, nextComma));
-      i = nextComma + 1;
-    }
-  }
-  return fields;
 }
