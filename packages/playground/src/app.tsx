@@ -48,9 +48,9 @@ export function App() {
   const run = useCallback(async () => {
     if (isRunning) return;
     setIsRunning(true);
+    setShowSql(false);
     setError(null);
     setResults(null);
-    setSqlResult(null);
     try {
       const queryResults = await bridge.execute(sourceRef.current, csvDataRef.current);
       setResults(queryResults);
@@ -61,26 +61,23 @@ export function App() {
     }
   }, [isRunning]);
 
-  const runDryRun = useCallback(async () => {
-    if (isRunning) return;
-    setIsRunning(true);
-    setError(null);
-    setSqlResult(null);
-    try {
-      const result = await bridge.dryRun(sourceRef.current);
-      setSqlResult(result);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setIsRunning(false);
-    }
-  }, [isRunning]);
-
-  const toggleSql = useCallback(() => {
+  const toggleSql = useCallback(async () => {
     const next = !showSql;
     setShowSql(next);
-    if (next) runDryRun();
-  }, [showSql, runDryRun]);
+    if (next) {
+      setIsRunning(true);
+      setError(null);
+      setSqlResult(null);
+      try {
+        const result = await bridge.dryRun(sourceRef.current);
+        setSqlResult(result);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setIsRunning(false);
+      }
+    }
+  }, [showSql, isRunning]);
 
   const loadExample = useCallback((index: number) => {
     const ex = examples[index]!;
@@ -129,13 +126,15 @@ export function App() {
         </div>
         <div class="output-side">
           {error && <div class="error-box">{error}</div>}
-          {showSql && sqlResult && <SqlPreview result={sqlResult} />}
-          {!showSql && results && <ResultsPanel results={results} />}
-          {!error && !results && !sqlResult && (
+          {showSql && sqlResult ? (
+            <SqlPreview result={sqlResult} />
+          ) : !showSql && results ? (
+            <ResultsPanel results={results} />
+          ) : !error ? (
             <div class="placeholder">
               {ready ? "Press Run or Ctrl+Enter to execute" : "Initializing..."}
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>
