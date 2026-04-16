@@ -6,6 +6,8 @@ import { translate } from "./translator.ts";
 
 export interface QueryResult {
   sql: string;
+  /** The original Datalog query source text, if available. */
+  source?: string;
   rows: Record<string, unknown>[];
 }
 
@@ -50,10 +52,12 @@ export class DatamogExecutor {
 
     // 4. Execute queries
     const results: QueryResult[] = [];
+    const queries = analyzed.queries;
     const settledResults = await Promise.allSettled(
-      translation.queries.map(async (querySql) => {
+      translation.queries.map(async (querySql, i) => {
         const rows = await this.backend.execute(querySql);
-        return { sql: querySql, rows };
+        const source = queries[i]?.$cstNode?.text;
+        return { sql: querySql, source, rows };
       }),
     );
 

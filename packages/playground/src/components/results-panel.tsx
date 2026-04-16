@@ -13,7 +13,7 @@ export function ResultsPanel({ results }: ResultsPanelProps) {
     <div class="results-panel">
       {results.map((result, i) => (
         <div key={i} class="result-block">
-          <div class="result-query">{result.sql}</div>
+          <div class="result-query">{result.source ?? result.sql}</div>
           {result.rows.length === 0 ? (
             <div class="result-empty">(no rows)</div>
           ) : (
