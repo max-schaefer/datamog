@@ -22,6 +22,7 @@ export function Toolbar({
   return (
     <div class="toolbar">
       <div class="toolbar-left">
+        <img src={`${import.meta.env.BASE_URL}datamog.jpg`} alt="Datamog" class="toolbar-logo" />
         <span class="toolbar-title">Datamog Playground</span>
         <select
           class="example-select"

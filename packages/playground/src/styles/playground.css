@@ -72,6 +72,13 @@ body {
   gap: 8px;
 }
 
+.toolbar-logo {
+  height: 28px;
+  width: 28px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
 .toolbar-title {
   font-weight: 600;
   font-size: 15px;
