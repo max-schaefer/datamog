@@ -42,7 +42,8 @@ export function App() {
   csvDataRef.current = csvData;
 
   useEffect(() => {
-    bridge.init().then(() => setReady(true));
+    const minDisplay = new Promise<void>((r) => setTimeout(r, 2000));
+    Promise.allSettled([bridge.init(), minDisplay]).then(() => setReady(true));
   }, []);
 
   const run = useCallback(async () => {
@@ -132,7 +133,17 @@ export function App() {
             <ResultsPanel results={results} />
           ) : !error ? (
             <div class="placeholder">
-              {ready ? "Press Run or Ctrl+Enter to execute" : "Initializing..."}
+              {ready ? (
+                "Press Run or Ctrl+Enter to execute"
+              ) : (
+                <div class="mascot-drive">
+                  <img
+                    src={`${import.meta.env.BASE_URL}datamog.jpg`}
+                    alt="Datamog loading"
+                    class="mascot-img"
+                  />
+                </div>
+              )}
             </div>
           ) : null}
         </div>
