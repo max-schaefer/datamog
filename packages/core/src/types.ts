@@ -1,6 +1,7 @@
 import { AnalyzerError } from "./analyzer.ts";
 import type { AnalyzedProgram } from "./analyzer.ts";
 import type { HeadTerm, RangeAtom, SqlType } from "./ast.ts";
+import { isRealLiteral } from "./ast.ts";
 
 export interface TypedProgram extends AnalyzedProgram {
   /** Column types for every predicate (EDB and IDB). */
@@ -39,7 +40,7 @@ export function inferTypes(analyzed: AnalyzedProgram): TypedProgram {
           else if (arg.$type === "NumberLiteral")
             seedTypes[i] = joinTypes(
               seedTypes[i],
-              Number.isInteger(arg.value) ? "integer" : "real",
+              isRealLiteral(arg) || !Number.isInteger(arg.value) ? "real" : "integer",
             );
         }
       }
@@ -215,7 +216,7 @@ function inferTermType(
     case "StringLiteral":
       return "text";
     case "NumberLiteral":
-      return Number.isInteger(term.value) ? "integer" : "real";
+      return isRealLiteral(term) || !Number.isInteger(term.value) ? "real" : "integer";
     case "Variable":
       return varTypes.get(term.name);
     case "BinaryExpr": {
