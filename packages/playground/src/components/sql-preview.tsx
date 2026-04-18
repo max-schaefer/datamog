@@ -1,34 +1,39 @@
-import type { TranslationResult } from "datamog-engine";
+import type { SqlSpan, TranslationResult } from "datamog-engine";
+import type { SourceSpan } from "../worker/bridge.ts";
 import { SqlBlock } from "./sql-block.tsx";
 
 interface SqlPreviewProps {
   result: TranslationResult;
-  hoveredPredicate: string | null;
-  onHoverPredicate: (predicate: string | null) => void;
+  hoveredRange: SourceSpan | null;
+  onHoverRange: (range: SourceSpan | null) => void;
 }
 
 interface Section {
   title: string;
   statements: string[];
   predicates: (string | null)[];
+  spanMaps: (SqlSpan[] | null)[];
 }
 
-export function SqlPreview({ result, hoveredPredicate, onHoverPredicate }: SqlPreviewProps) {
+export function SqlPreview({ result, hoveredRange, onHoverRange }: SqlPreviewProps) {
   const sections: Section[] = [
     {
       title: "Tables",
       statements: result.createTables,
       predicates: result.createTables.map(() => null),
+      spanMaps: result.createTables.map(() => null),
     },
     {
       title: "Views",
       statements: result.createViews,
       predicates: result.viewPredicates ?? result.createViews.map(() => null),
+      spanMaps: result.viewSpans ?? result.createViews.map(() => null),
     },
     {
       title: "Queries",
       statements: result.queries,
       predicates: result.queryPredicates ?? result.queries.map(() => null),
+      spanMaps: result.querySpans ?? result.queries.map(() => null),
     },
   ].filter((s) => s.statements.length > 0);
 
@@ -43,23 +48,23 @@ export function SqlPreview({ result, hoveredPredicate, onHoverPredicate }: SqlPr
           <div class="sql-section-title">{section.title}</div>
           {section.statements.map((stmt, i) => {
             const predicate = section.predicates[i] ?? null;
-            const highlighted = predicate !== null && predicate === hoveredPredicate;
+            const spans = section.spanMaps[i] ?? null;
             return (
-              <div
-                key={i}
-                class={`sql-block-wrapper${highlighted ? " highlighted" : ""}`}
-                onMouseEnter={() => predicate && onHoverPredicate(predicate)}
-                onMouseLeave={() => onHoverPredicate(null)}
-              >
+              <div key={i} class="sql-block-wrapper">
                 {predicate && (
                   <div
                     class="sql-block-label"
-                    title="Hover to highlight the matching Datalog rules"
+                    title="Hover the SQL to highlight the matching Datalog"
                   >
                     <code>{predicate}</code>
                   </div>
                 )}
-                <SqlBlock value={stmt} />
+                <SqlBlock
+                  value={stmt}
+                  spans={spans}
+                  hoveredRange={hoveredRange}
+                  onHoverRange={onHoverRange}
+                />
               </div>
             );
           })}

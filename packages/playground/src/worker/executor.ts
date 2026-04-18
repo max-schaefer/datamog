@@ -1,6 +1,6 @@
-import { SqliteSqlDialect } from "datamog-backend-sqlite/dialect";
-import { PostgresSqlDialect } from "datamog-backend-postgres/dialect";
 import { DuckDbSqlDialect } from "datamog-backend-duckdb/dialect";
+import { PostgresSqlDialect } from "datamog-backend-postgres/dialect";
+import { SqliteSqlDialect } from "datamog-backend-sqlite/dialect";
 import { analyze, inferTypes } from "datamog-core";
 import type { AnalyzedProgram } from "datamog-core";
 import {
@@ -31,31 +31,62 @@ export interface SourceSpan {
   end: number;
 }
 
-export interface DryRunResult {
-  result: TranslationResult;
-  /** For each predicate mentioned in a rule head or query, source spans
-   *  covering the full statement. Used for hover highlighting. */
-  spans: Record<string, SourceSpan[]>;
+/**
+ * Element of the Datalog source that the hover UI should treat as a unit:
+ * a whole rule, its head, a body atom/equality/comparison/range, or a query.
+ * The editor looks up the *innermost* element at the cursor position when
+ * emitting a hover range.
+ */
+export interface AstElement extends SourceSpan {
+  kind: "rule" | "head" | "atom" | "equality" | "comparison" | "range" | "query";
 }
 
-function extractPredicateSpans(analyzed: AnalyzedProgram): Record<string, SourceSpan[]> {
-  const spans: Record<string, SourceSpan[]> = {};
-  function push(predicate: string, span: SourceSpan) {
-    const existing = spans[predicate];
-    if (existing) existing.push(span);
-    else spans[predicate] = [span];
-  }
-  for (const [predicate, rules] of analyzed.rules) {
+export interface DryRunResult {
+  result: TranslationResult;
+  /** Hoverable source elements, sorted ascending by (size, start). */
+  elements: AstElement[];
+}
+
+function cst(node: unknown): { offset: number; end: number } | undefined {
+  return (node as { $cstNode?: { offset: number; end: number } }).$cstNode;
+}
+
+function extractAstElements(analyzed: AnalyzedProgram): AstElement[] {
+  const elements: AstElement[] = [];
+  const push = (kind: AstElement["kind"], node: unknown) => {
+    const c = cst(node);
+    if (c) elements.push({ kind, start: c.offset, end: c.end });
+  };
+  for (const rules of analyzed.rules.values()) {
     for (const rule of rules) {
-      const cst = (rule as { $cstNode?: { offset: number; end: number } }).$cstNode;
-      if (cst) push(predicate, { start: cst.offset, end: cst.end });
+      push("rule", rule);
+      push("head", rule.head);
+      for (const elem of rule.body) {
+        switch (elem.$type) {
+          case "Atom":
+            push("atom", elem);
+            break;
+          case "Equality":
+            push("equality", elem);
+            break;
+          case "Comparison":
+            push("comparison", elem);
+            break;
+          case "RangeAtom":
+            push("range", elem);
+            break;
+        }
+      }
     }
   }
   for (const query of analyzed.queries) {
-    const cst = (query as { $cstNode?: { offset: number; end: number } }).$cstNode;
-    if (cst) push(query.atom.predicate, { start: cst.offset, end: cst.end });
+    push("query", query);
+    push("atom", query.atom);
   }
-  return spans;
+  // Sort by size ascending (smallest first), so "innermost element" lookup
+  // can short-circuit on the first match.
+  elements.sort((a, b) => a.end - a.start - (b.end - b.start));
+  return elements;
 }
 
 interface InitMessage {
@@ -189,8 +220,8 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       const program = parse(msg.source);
       const analyzed = inferTypes(analyze(program));
       const result = translate(analyzed, dialectFor(msg.backend));
-      const spans = extractPredicateSpans(analyzed);
-      const payload: DryRunResult = { result, spans };
+      const elements = extractAstElements(analyzed);
+      const payload: DryRunResult = { result, elements };
       self.postMessage({ type: "dry-run-result", id: msg.id, result: payload });
     } catch (err) {
       self.postMessage({

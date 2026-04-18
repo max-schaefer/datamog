@@ -647,4 +647,77 @@ describe("translator (duckdb dialect)", () => {
     expect(sql).toContain("STRING_AGG(");
     expect(sql).toContain("::TEXT");
   });
+
+  describe("source maps", () => {
+    test("emits a span per positive body atom", () => {
+      const source = `extensional edge(src: text, dst: text).
+reach(X) :- edge("a", X), edge(X, "b").`;
+      const result = translate(inferTypes(analyze(parse(source))), sqlite);
+      const [sql] = result.createViews;
+      const [spans] = result.viewSpans;
+      expect(sql).toBeDefined();
+      expect(spans).toBeDefined();
+
+      // Atom spans should point at the exact `edge(...)` substrings in the source.
+      const atomStart1 = source.indexOf('edge("a", X)');
+      const atomEnd1 = atomStart1 + 'edge("a", X)'.length;
+      const atomStart2 = source.indexOf("edge(X, ", atomEnd1);
+      const atomEnd2 = atomStart2 + 'edge(X, "b")'.length;
+
+      const atomSpans = spans!.filter(
+        (s) =>
+          (s.astStart === atomStart1 && s.astEnd === atomEnd1) ||
+          (s.astStart === atomStart2 && s.astEnd === atomEnd2),
+      );
+      // Two atoms, each contributing at least the FROM alias.
+      expect(atomSpans.length).toBeGreaterThanOrEqual(2);
+
+      // Each atom span covers a real substring of the emitted SQL.
+      for (const s of atomSpans) {
+        expect(s.sqlStart).toBeLessThan(s.sqlEnd);
+        expect(s.sqlEnd).toBeLessThanOrEqual(sql!.length);
+        expect(sql!.slice(s.sqlStart, s.sqlEnd)).toContain("__b");
+      }
+    });
+
+    test("emits a span for the head atom and for the whole rule", () => {
+      const source = `extensional edge(src: text, dst: text).
+reach(X) :- edge("a", X).`;
+      const result = translate(inferTypes(analyze(parse(source))), sqlite);
+      const [spans] = result.viewSpans;
+
+      const headStart = source.indexOf("reach(X)");
+      const headEnd = headStart + "reach(X)".length;
+      expect(spans!.some((s) => s.astStart === headStart && s.astEnd === headEnd)).toBe(true);
+
+      const ruleStart = headStart;
+      const ruleEnd = source.indexOf(".", ruleStart) + 1;
+      expect(spans!.some((s) => s.astStart === ruleStart && s.astEnd === ruleEnd)).toBe(true);
+    });
+
+    test("strips span markers from the visible SQL", () => {
+      const result = translate(
+        inferTypes(
+          analyze(
+            parse(`extensional edge(src: text, dst: text).
+reach(X) :- edge("a", X).`),
+          ),
+        ),
+        sqlite,
+      );
+      expect(result.createViews[0]!).not.toContain("\u0001");
+      expect(result.createViews[0]!).not.toContain("\u0002");
+    });
+
+    test("marks query atoms", () => {
+      const source = `extensional edge(src: text, dst: text).
+reach(X) :- edge("a", X).
+?- reach(X).`;
+      const result = translate(inferTypes(analyze(parse(source))), sqlite);
+      const [spans] = result.querySpans;
+      const queryStart = source.indexOf("?- reach(X).");
+      const queryEnd = queryStart + "?- reach(X).".length;
+      expect(spans!.some((s) => s.astStart === queryStart && s.astEnd === queryEnd)).toBe(true);
+    });
+  });
 });

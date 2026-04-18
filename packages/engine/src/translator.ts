@@ -2,6 +2,7 @@ import type {
   AggregateCall,
   AnalyzedProgram,
   Atom,
+  BodyElement,
   Comparison,
   Expression,
   Rule,
@@ -9,6 +10,15 @@ import type {
 } from "datamog-core";
 import { AnalyzerError, isRealLiteral } from "datamog-core";
 import { type SqlDialect, colList, ident } from "./dialect.ts";
+
+export interface SqlSpan {
+  /** Offset of the SQL fragment within the containing statement. */
+  sqlStart: number;
+  sqlEnd: number;
+  /** Offset of the source AST node this fragment was generated from. */
+  astStart: number;
+  astEnd: number;
+}
 
 export interface TranslationResult {
   createTables: string[];
@@ -18,13 +28,83 @@ export interface TranslationResult {
   viewPredicates: string[];
   /** Predicate queried by each entry in `queries` (same length / indexing). */
   queryPredicates: string[];
+  /** For each `createViews[i]`, AST-to-SQL span mappings used for hover linking. */
+  viewSpans: SqlSpan[][];
+  /** For each `queries[i]`, AST-to-SQL span mappings used for hover linking. */
+  querySpans: SqlSpan[][];
 }
 
 export function translate(analyzed: AnalyzedProgram, dialect: SqlDialect): TranslationResult {
   const createTables = translateTables(analyzed);
-  const { sql: createViews, predicates: viewPredicates } = translateViews(analyzed, dialect);
-  const { sql: queries, predicates: queryPredicates } = translateQueries(analyzed);
-  return { createTables, createViews, queries, viewPredicates, queryPredicates };
+  const viewResult = translateViews(analyzed, dialect);
+  const queryResult = translateQueries(analyzed);
+  const viewStripped = viewResult.sql.map(stripSpanMarks);
+  const queryStripped = queryResult.sql.map(stripSpanMarks);
+  return {
+    createTables,
+    createViews: viewStripped.map((v) => v.sql),
+    queries: queryStripped.map((q) => q.sql),
+    viewPredicates: viewResult.predicates,
+    queryPredicates: queryResult.predicates,
+    viewSpans: viewStripped.map((v) => v.spans),
+    querySpans: queryStripped.map((q) => q.spans),
+  };
+}
+
+// --- Span markers ---
+//
+// To link a generated SQL fragment to the Datalog AST node that produced it,
+// we wrap the fragment with control-character markers: `\u0001<start>,<end>\u0001`
+// opens a span covering the given AST offset range, `\u0002` closes the
+// innermost open span. Markers survive string concatenation unchanged, so
+// dialect wrappers (createView, createRecursiveView, ...) don't need to know
+// about them. After translation we strip markers from each statement and
+// emit the resulting `SqlSpan[]` alongside the clean SQL.
+
+const MARK_START = "\u0001";
+const MARK_END = "\u0002";
+
+function markSpan(
+  node: { $cstNode?: { offset: number; end: number } } | undefined,
+  sql: string,
+): string {
+  const cst = node?.$cstNode;
+  if (!cst) return sql;
+  return `${MARK_START}${cst.offset},${cst.end}${MARK_START}${sql}${MARK_END}`;
+}
+
+function stripSpanMarks(marked: string): { sql: string; spans: SqlSpan[] } {
+  const spans: SqlSpan[] = [];
+  const stack: { astStart: number; astEnd: number; sqlStart: number }[] = [];
+  let out = "";
+  let i = 0;
+  while (i < marked.length) {
+    const c = marked[i]!;
+    if (c === MARK_START) {
+      const close = marked.indexOf(MARK_START, i + 1);
+      if (close === -1) break;
+      const [aStr, bStr] = marked.slice(i + 1, close).split(",");
+      const a = Number(aStr);
+      const b = Number(bStr);
+      stack.push({ astStart: a, astEnd: b, sqlStart: out.length });
+      i = close + 1;
+    } else if (c === MARK_END) {
+      const frame = stack.pop();
+      if (frame) {
+        spans.push({
+          sqlStart: frame.sqlStart,
+          sqlEnd: out.length,
+          astStart: frame.astStart,
+          astEnd: frame.astEnd,
+        });
+      }
+      i++;
+    } else {
+      out += c;
+      i++;
+    }
+  }
+  return { sql: out, spans };
 }
 
 // --- Tables ---
@@ -135,8 +215,18 @@ function translateRule(
   const positiveAtoms: { atom: Atom; index: number }[] = [];
   const negatedAtoms: { atom: Atom }[] = [];
   const comparisons: Comparison[] = [];
-  const bindingRanges: { alias: string; lowSql: string; highSql: string }[] = [];
-  const filterRanges: { exprSql: string; lowSql: string; highSql: string }[] = [];
+  const bindingRanges: {
+    alias: string;
+    lowSql: string;
+    highSql: string;
+    node: BodyElement;
+  }[] = [];
+  const filterRanges: {
+    exprSql: string;
+    lowSql: string;
+    highSql: string;
+    node: BodyElement;
+  }[] = [];
 
   const aliases = rule.body.map((_, i) => `__b${i}`);
   const bindings = new Map<string, Binding[]>();
@@ -181,12 +271,13 @@ function translateRule(
           const list = bindings.get(elem.expr.name) ?? [];
           list.push({ kind: "col", alias: rangeAlias, col: "value" });
           bindings.set(elem.expr.name, list);
-          bindingRanges.push({ alias: rangeAlias, lowSql, highSql });
+          bindingRanges.push({ alias: rangeAlias, lowSql, highSql, node: elem });
         } else {
           filterRanges.push({
             exprSql: termToSql(elem.expr, bindings, varTypes),
             lowSql,
             highSql,
+            node: elem,
           });
         }
         break;
@@ -238,12 +329,15 @@ function translateRule(
   }
 
   // FROM clause: positive atoms + binding ranges
-  const fromParts = positiveAtoms.map(
-    ({ atom, index }) =>
+  const fromParts = positiveAtoms.map(({ atom, index }) =>
+    markSpan(
+      atom,
       `${ident(renameMap?.get(atom.predicate) ?? atom.predicate)} AS ${aliases[index]}`,
+    ),
   );
-  for (const { alias, lowSql, highSql } of bindingRanges) {
-    fromParts.push(dialect.rangeSource(alias, lowSql, highSql));
+  for (let r = 0; r < bindingRanges.length; r++) {
+    const { alias, lowSql, highSql, node } = bindingRanges[r]!;
+    fromParts.push(markSpan(node, dialect.rangeSource(alias, lowSql, highSql)));
   }
 
   // WHERE conditions
@@ -259,8 +353,10 @@ function translateRule(
   }
 
   // Range bound conditions (dialect-specific: empty for Postgres, present for SQLite)
-  for (const { alias, lowSql, highSql } of bindingRanges) {
-    conditions.push(...dialect.rangeConditions(alias, lowSql, highSql));
+  for (const { alias, lowSql, highSql, node } of bindingRanges) {
+    for (const cond of dialect.rangeConditions(alias, lowSql, highSql)) {
+      conditions.push(markSpan(node, cond));
+    }
   }
 
   // Tag filter conditions for combined mutual-recursion CTE
@@ -280,7 +376,9 @@ function translateRule(
       const term = atom.args[j]!;
       if (term.$type !== "Variable") {
         const col = resolveColumnRef(atom.predicate, j, analyzed);
-        conditions.push(`${alias}.${ident(col)} = ${termToSql(term, bindings, varTypes)}`);
+        conditions.push(
+          markSpan(atom, `${alias}.${ident(col)} = ${termToSql(term, bindings, varTypes)}`),
+        );
       }
     }
   }
@@ -308,30 +406,36 @@ function translateRule(
     if (subConditions.length > 0) {
       subquery += ` WHERE ${subConditions.join(" AND ")}`;
     }
-    conditions.push(`NOT EXISTS (${subquery})`);
+    conditions.push(markSpan(atom, `NOT EXISTS (${subquery})`));
   }
 
   // Comparison conditions
   for (const cmp of comparisons) {
     const sqlOp = cmp.op === "!=" ? "<>" : cmp.op;
     conditions.push(
-      `${termToSql(cmp.left, bindings, varTypes)} ${sqlOp} ${termToSql(cmp.right, bindings, varTypes)}`,
+      markSpan(
+        cmp,
+        `${termToSql(cmp.left, bindings, varTypes)} ${sqlOp} ${termToSql(cmp.right, bindings, varTypes)}`,
+      ),
     );
   }
 
   // Filter range conditions (non-binding ranges)
-  for (const { exprSql, lowSql, highSql } of filterRanges) {
-    conditions.push(`${exprSql} BETWEEN ${lowSql} AND ${highSql}`);
+  for (const { exprSql, lowSql, highSql, node } of filterRanges) {
+    conditions.push(markSpan(node, `${exprSql} BETWEEN ${lowSql} AND ${highSql}`));
   }
 
-  let sql = `SELECT ${selectParts.join(", ")} FROM ${fromParts.join(", ")}`;
+  const selectClause = markSpan(rule.head, `SELECT ${selectParts.join(", ")}`);
+  let sql = `${selectClause} FROM ${fromParts.join(", ")}`;
   if (conditions.length > 0) {
     sql += ` WHERE ${conditions.join(" AND ")}`;
   }
   if (groupByExprs.length > 0) {
     sql += ` GROUP BY ${groupByExprs.join(", ")}`;
   }
-  return sql;
+  // Wrap the whole rule so hovering anywhere in the rule source still has a
+  // matching SQL span at the coarsest level.
+  return markSpan(rule, sql);
 }
 
 function translateFact(rule: Rule): string {
@@ -339,7 +443,8 @@ function translateFact(rule: Rule): string {
   const selectParts = rule.head.args.map(
     (term, i) => `${termToSql(term as Expression, emptyBindings)} AS col${i + 1}`,
   );
-  return `SELECT ${selectParts.join(", ")}`;
+  const selectClause = markSpan(rule.head, `SELECT ${selectParts.join(", ")}`);
+  return markSpan(rule, selectClause);
 }
 
 // --- Queries ---
@@ -370,12 +475,13 @@ function translateQueries(analyzed: AnalyzedProgram): { sql: string[]; predicate
       selectParts.push("*");
     }
 
-    let text = `SELECT ${selectParts.join(", ")} FROM ${ident(atom.predicate)}`;
+    const from = markSpan(atom, `FROM ${ident(atom.predicate)}`);
+    let text = `SELECT ${selectParts.join(", ")} ${from}`;
     if (conditions.length > 0) {
       text += ` WHERE ${conditions.join(" AND ")}`;
     }
     text += ";";
-    sql.push(text);
+    sql.push(markSpan(query, text));
     predicates.push(atom.predicate);
   }
   return { sql, predicates };

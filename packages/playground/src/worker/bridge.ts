@@ -1,7 +1,7 @@
 import type { QueryResult } from "datamog-engine";
-import type { BackendName, DryRunResult, SourceSpan } from "./executor.ts";
+import type { AstElement, BackendName, DryRunResult, SourceSpan } from "./executor.ts";
 
-export type { BackendName, DryRunResult, SourceSpan };
+export type { AstElement, BackendName, DryRunResult, SourceSpan };
 
 type PendingRequest = {
   resolve: (value: unknown) => void;

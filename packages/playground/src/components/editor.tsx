@@ -14,21 +14,19 @@ import {
 import { useEffect, useRef } from "preact/hooks";
 import { datamogLanguage } from "../lib/highlight.ts";
 import { datamogLinter } from "../lib/linter.ts";
-import type { SourceSpan } from "../worker/bridge.ts";
+import type { AstElement, SourceSpan } from "../worker/bridge.ts";
 
 interface EditorProps {
   source: string;
   onChange: (source: string) => void;
-  spans: Record<string, SourceSpan[]> | null;
-  hoveredPredicate: string | null;
-  onHoverPredicate: (predicate: string | null) => void;
+  elements: AstElement[] | null;
+  hoveredRange: SourceSpan | null;
+  onHoverRange: (range: SourceSpan | null) => void;
 }
 
-// Highlight decoration applied to rule/query ranges whose predicate matches
-// the currently hovered SQL view.
 const highlightMark = Decoration.mark({ class: "cm-predicate-highlight" });
 
-const setHighlightSpans = StateEffect.define<SourceSpan[]>();
+const setHighlightSpan = StateEffect.define<SourceSpan | null>();
 
 const highlightField = StateField.define<DecorationSet>({
   create() {
@@ -37,12 +35,14 @@ const highlightField = StateField.define<DecorationSet>({
   update(value, tr) {
     let next = value.map(tr.changes);
     for (const effect of tr.effects) {
-      if (effect.is(setHighlightSpans)) {
+      if (effect.is(setHighlightSpan)) {
+        const span = effect.value;
         const docLen = tr.state.doc.length;
-        const ranges = effect.value
-          .filter((s) => s.start < s.end && s.end <= docLen)
-          .map((s) => highlightMark.range(s.start, s.end));
-        next = Decoration.set(ranges, true);
+        if (span && span.start < span.end && span.end <= docLen) {
+          next = Decoration.set([highlightMark.range(span.start, span.end)]);
+        } else {
+          next = Decoration.none;
+        }
       }
     }
     return next;
@@ -50,21 +50,21 @@ const highlightField = StateField.define<DecorationSet>({
   provide: (field) => EditorView.decorations.from(field),
 });
 
-export function Editor({
-  source,
-  onChange,
-  spans,
-  hoveredPredicate,
-  onHoverPredicate,
-}: EditorProps) {
+function rangesEqual(a: SourceSpan | null, b: SourceSpan | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.start === b.start && a.end === b.end;
+}
+
+export function Editor({ source, onChange, elements, hoveredRange, onHoverRange }: EditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
-  const spansRef = useRef(spans);
-  const onHoverRef = useRef(onHoverPredicate);
+  const elementsRef = useRef(elements);
+  const onHoverRef = useRef(onHoverRange);
   onChangeRef.current = onChange;
-  spansRef.current = spans;
-  onHoverRef.current = onHoverPredicate;
+  elementsRef.current = elements;
+  onHoverRef.current = onHoverRange;
 
   // Create editor once: the EditorView is created with the initial `source`
   // and thereafter synced via the separate effect below. Listing `source` in
@@ -75,7 +75,7 @@ export function Editor({
 
     const hoverPlugin = ViewPlugin.fromClass(
       class {
-        private lastPredicate: string | null = null;
+        private lastRange: SourceSpan | null = null;
         private readonly view: EditorView;
         private readonly onMove: (e: MouseEvent) => void;
         private readonly onLeave: () => void;
@@ -97,29 +97,30 @@ export function Editor({
 
         private handleMove(e: MouseEvent) {
           const pos = this.view.posAtCoords({ x: e.clientX, y: e.clientY });
-          const spans = spansRef.current;
-          if (pos === null || !spans) {
-            this.setPredicate(null);
+          const els = elementsRef.current;
+          if (pos === null || !els) {
+            this.setRange(null);
             return;
           }
-          let found: string | null = null;
-          for (const [predicate, ranges] of Object.entries(spans)) {
-            if (ranges.some((r) => pos >= r.start && pos < r.end)) {
-              found = predicate;
+          // Elements are pre-sorted smallest-first; take the innermost containing pos.
+          let found: SourceSpan | null = null;
+          for (const el of els) {
+            if (pos >= el.start && pos < el.end) {
+              found = { start: el.start, end: el.end };
               break;
             }
           }
-          this.setPredicate(found);
+          this.setRange(found);
         }
 
         private handleLeave() {
-          this.setPredicate(null);
+          this.setRange(null);
         }
 
-        private setPredicate(p: string | null) {
-          if (p === this.lastPredicate) return;
-          this.lastPredicate = p;
-          onHoverRef.current(p);
+        private setRange(r: SourceSpan | null) {
+          if (rangesEqual(r, this.lastRange)) return;
+          this.lastRange = r;
+          onHoverRef.current(r);
         }
       },
     );
@@ -158,7 +159,6 @@ export function Editor({
 
     viewRef.current = view;
     return () => view.destroy();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only run once
   }, []);
 
   // Update editor content when source changes externally (e.g. loading an example)
@@ -173,13 +173,12 @@ export function Editor({
     }
   }, [source]);
 
-  // Update highlight decorations when the hovered predicate changes.
+  // Update highlight decorations when the hovered range changes.
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
-    const ranges: SourceSpan[] = hoveredPredicate && spans ? (spans[hoveredPredicate] ?? []) : [];
-    view.dispatch({ effects: setHighlightSpans.of(ranges) });
-  }, [hoveredPredicate, spans]);
+    view.dispatch({ effects: setHighlightSpan.of(hoveredRange) });
+  }, [hoveredRange]);
 
   return <div ref={containerRef} class="editor-container" />;
 }
