@@ -1,8 +1,24 @@
 import { analyze, inferTypes } from "datamog-core";
 import { type Backend, DatamogExecutor, type QueryResult, translate } from "datamog-engine";
+import type { SqlDialect } from "datamog-engine";
 import { SqliteSqlDialect } from "datamog-backend-sqlite/dialect";
+import { PostgresSqlDialect } from "datamog-backend-postgres/dialect";
+import { DuckDbSqlDialect } from "datamog-backend-duckdb/dialect";
 import { parse } from "datamog-parser";
 import { InMemoryCsvLoader } from "../lib/csv-loader.ts";
+
+export type BackendName = "sqlite" | "postgres" | "duckdb";
+
+function dialectFor(name: BackendName): SqlDialect {
+  switch (name) {
+    case "sqlite":
+      return new SqliteSqlDialect();
+    case "postgres":
+      return new PostgresSqlDialect();
+    case "duckdb":
+      return new DuckDbSqlDialect();
+  }
+}
 
 interface InitMessage {
   type: "init";
@@ -19,6 +35,7 @@ interface DryRunMessage {
   type: "dry-run";
   id: number;
   source: string;
+  backend: BackendName;
 }
 
 interface LintMessage {
@@ -133,7 +150,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     try {
       const program = parse(msg.source);
       const analyzed = inferTypes(analyze(program));
-      const result = translate(analyzed, new SqliteSqlDialect());
+      const result = translate(analyzed, dialectFor(msg.backend));
       self.postMessage({ type: "dry-run-result", id: msg.id, result });
     } catch (err) {
       self.postMessage({

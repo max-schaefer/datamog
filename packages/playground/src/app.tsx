@@ -7,7 +7,12 @@ import { SqlPreview } from "./components/sql-preview.tsx";
 import { Toolbar } from "./components/toolbar.tsx";
 import { examples } from "./examples/index.ts";
 import * as bridge from "./worker/bridge.ts";
+import type { BackendName } from "./worker/bridge.ts";
 import "./styles/playground.css";
+
+// Only the sqlite dialect actually executes in the browser (via sql.js).
+// Other backends are available for viewing the generated SQL.
+const RUNNABLE_BACKENDS: ReadonlySet<BackendName> = new Set(["sqlite"]);
 
 interface ExtDecl {
   predicate: string;
@@ -35,11 +40,16 @@ export function App() {
   const [isRunning, setIsRunning] = useState(false);
   const [showSql, setShowSql] = useState(false);
   const [ready, setReady] = useState(false);
+  const [backend, setBackend] = useState<BackendName>("sqlite");
   const sourceRef = useRef(source);
   const csvDataRef = useRef(csvData);
+  const backendRef = useRef(backend);
 
   sourceRef.current = source;
   csvDataRef.current = csvData;
+  backendRef.current = backend;
+
+  const canRun = RUNNABLE_BACKENDS.has(backend);
 
   useEffect(() => {
     const minDisplay = new Promise<void>((r) => setTimeout(r, 2000));
@@ -48,6 +58,7 @@ export function App() {
 
   const run = useCallback(async () => {
     if (isRunning) return;
+    if (!RUNNABLE_BACKENDS.has(backendRef.current)) return;
     setIsRunning(true);
     setShowSql(false);
     setError(null);
@@ -62,23 +73,45 @@ export function App() {
     }
   }, [isRunning]);
 
-  const toggleSql = useCallback(async () => {
-    const next = !showSql;
-    setShowSql(next);
-    if (next) {
-      setIsRunning(true);
-      setError(null);
-      setSqlResult(null);
-      try {
-        const result = await bridge.dryRun(sourceRef.current);
-        setSqlResult(result);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
-      } finally {
-        setIsRunning(false);
-      }
+  const showSqlFor = useCallback(async () => {
+    setShowSql(true);
+    setIsRunning(true);
+    setError(null);
+    setSqlResult(null);
+    try {
+      const result = await bridge.dryRun(sourceRef.current, backendRef.current);
+      setSqlResult(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsRunning(false);
     }
-  }, [showSql, isRunning]);
+  }, []);
+
+  const toggleSql = useCallback(async () => {
+    if (showSql) {
+      setShowSql(false);
+      return;
+    }
+    await showSqlFor();
+  }, [showSql, showSqlFor]);
+
+  const handleBackendChange = useCallback(
+    (next: BackendName) => {
+      setBackend(next);
+      backendRef.current = next;
+      if (showSql) {
+        // Re-translate with the new dialect.
+        showSqlFor();
+      }
+      if (!RUNNABLE_BACKENDS.has(next)) {
+        // Results from the previous run were produced by sql.js and are not
+        // meaningful for another backend; clear them.
+        setResults(null);
+      }
+    },
+    [showSql, showSqlFor],
+  );
 
   const loadExample = useCallback((index: number) => {
     const ex = examples[index]!;
@@ -115,6 +148,9 @@ export function App() {
         showSql={showSql}
         isRunning={isRunning}
         ready={ready}
+        canRun={canRun}
+        backend={backend}
+        onBackendChange={handleBackendChange}
         examples={examples}
         onLoadExample={loadExample}
       />
