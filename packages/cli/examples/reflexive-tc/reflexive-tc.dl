@@ -1,0 +1,26 @@
+% Reflexive transitive closure
+%
+% Given a set of directed edges, compute the reflexive-transitive closure:
+% rtc(X, X) holds for every node, and rtc(X, Y) holds whenever Y is
+% reachable from X by following zero or more edges.
+%
+% This is a linear-recursion formulation — only one occurrence of rtc in
+% the body of the recursive rule — so it runs on every backend (SQLite,
+% Postgres, DuckDB, sql.js).
+
+edge("a", "b").
+edge("b", "c").
+edge("c", "d").
+edge("d", "b").
+
+% All nodes — endpoints on either side of an edge.
+node(X) :- edge(X, _).
+node(X) :- edge(_, X).
+
+% Base case: every node reaches itself (this is what makes it reflexive).
+rtc(X, X) :- node(X).
+
+% Recursive step: follow one edge, then reach zero or more further steps.
+rtc(X, Z) :- edge(X, Y), rtc(Y, Z).
+
+?- rtc(X, Y).

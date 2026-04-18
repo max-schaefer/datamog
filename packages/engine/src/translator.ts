@@ -7,7 +7,7 @@ import type {
   Rule,
   SqlType,
 } from "datamog-core";
-import { AnalyzerError } from "datamog-core";
+import { AnalyzerError, isRealLiteral } from "datamog-core";
 import { type SqlDialect, colList, ident } from "./dialect.ts";
 
 export interface TranslationResult {
@@ -383,8 +383,13 @@ function termToSql(
   switch (term.$type) {
     case "StringLiteral":
       return `'${term.value.replace(/'/g, "''")}'`;
-    case "NumberLiteral":
-      return String(term.value);
+    case "NumberLiteral": {
+      // Preserve the original text so a real literal like `1.0` stays `1.0`
+      // in SQL (emitting `1` would silently turn real division into integer
+      // division).
+      const raw = (term as typeof term & { rawText?: string }).rawText;
+      return raw ?? String(term.value);
+    }
     case "Variable": {
       const refs = bindings.get(term.name);
       if (!refs || refs.length === 0) {
@@ -434,7 +439,7 @@ function termToSql(
 
 /** Check whether a term has integer type. */
 function isIntegerTerm(term: Expression, varTypes?: Map<string, SqlType>): boolean {
-  if (term.$type === "NumberLiteral") return Number.isInteger(term.value);
+  if (term.$type === "NumberLiteral") return !isRealLiteral(term) && Number.isInteger(term.value);
   if (term.$type === "Variable") return varTypes?.get(term.name) === "integer";
   if (term.$type === "FunctionCall" && term.name === "len") return true;
   if (term.$type === "BinaryExpr") {
