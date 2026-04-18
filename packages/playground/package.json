@@ -18,6 +18,8 @@
     "@codemirror/state": "^6",
     "@codemirror/view": "^6",
     "codemirror": "^6",
+    "datamog-backend-duckdb": "workspace:*",
+    "datamog-backend-postgres": "workspace:*",
     "datamog-backend-sqlite": "workspace:*",
     "datamog-core": "workspace:*",
     "datamog-engine": "workspace:*",

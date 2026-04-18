@@ -85,13 +85,17 @@ body {
   color: #333;
 }
 
-.example-select {
+.example-select,
+.backend-select {
   font-size: 13px;
   padding: 4px 8px;
   border: 1px solid #ccc;
   border-radius: 4px;
   background: #fff;
   color: #333;
+}
+
+.example-select {
   max-width: 360px;
 }
 
