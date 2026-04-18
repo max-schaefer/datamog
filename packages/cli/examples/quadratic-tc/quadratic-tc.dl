@@ -1,0 +1,55 @@
+% Transitive closure — quadratic (non-linear) vs linear formulation
+%
+% The textbook "quadratic" transitive closure joins the relation with
+% itself on each step:
+%
+%   tc(X, Y) :- edge(X, Y).
+%   tc(X, Z) :- tc(X, Y), tc(Y, Z).         % <-- two occurrences of tc
+%
+% It is called "quadratic" because each iteration joins tc with tc and
+% doubles path length, so the full closure is reached in O(log n) rounds
+% — but every round does O(|tc|²) work. In pure Datalog semantics this
+% is equivalent to the linear formulation further below; both converge
+% to the same fixed point.
+%
+% We cannot translate the quadratic rule to SQL because SQL's
+% WITH RECURSIVE uses **semi-naive evaluation**: on each iteration the
+% recursive reference only sees the *working table* (the rows added in
+% the previous iteration), not the full accumulated result. For linear
+% recursion that is enough — each new path extends an old path by one
+% edge, and one of the two sides of the join is always the delta. For
+% non-linear recursion it is not: a derivation that needs two "old"
+% rows never fires.
+%
+% On the chain  a -> b -> c -> d  the quadratic rule converges (under
+% semi-naive evaluation) to:
+%
+%   {(a,b), (b,c), (c,d), (a,c), (b,d)}
+%
+% — missing (a,d), which would require joining two pairs that were both
+% derived in earlier iterations. Empirically this is what DuckDB 1.5,
+% PostgreSQL and SQLite all return; there is no SQL dialect we know of
+% that performs full fixed-point (naive) evaluation for a recursive
+% CTE. DuckDB's `supportsNonLinearRecursion = true` reflects that it
+% *accepts* the SQL syntactically, not that it computes the right
+% answer.
+%
+% So the non-linear rule is shown here commented out for reference:
+%
+%   tc(X, Z) :- tc(X, Y), tc(Y, Z).
+%
+% and the example below uses the linear formulation, which does work
+% on every backend.
+
+edge("a", "b").
+edge("b", "c").
+edge("c", "d").
+
+% Base case.
+tc(X, Y) :- edge(X, Y).
+
+% Linear recursive step: one occurrence of tc in the body, so SQL's
+% semi-naive evaluation converges correctly.
+tc(X, Z) :- edge(X, Y), tc(Y, Z).
+
+?- tc(X, Y).
