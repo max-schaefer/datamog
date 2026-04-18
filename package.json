@@ -11,8 +11,8 @@
     "check:fix": "bunx biome check --fix .",
     "datamog": "bun packages/cli/src/main.ts",
     "build:vscode": "node packages/vscode-extension/esbuild.mjs && cd packages/vscode-extension && npx @vscode/vsce package -o datamog.vsix --no-dependencies",
-    "playground:dev": "bun --filter datamog-playground dev",
-    "playground:build": "bun --filter datamog-playground build"
+    "playground:dev": "node scripts/ensure-rollup-native.mjs && bun --filter datamog-playground dev",
+    "playground:build": "node scripts/ensure-rollup-native.mjs && bun --filter datamog-playground build"
   },
   "engines": {
     "bun": ">=1.3.0"
