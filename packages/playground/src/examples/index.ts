@@ -173,6 +173,104 @@ shortest(X, Y, min(C)) :- path(X, Y, C).
 ?- shortest(X, Y, C).`,
   },
   {
+    name: "Reflexive TC",
+    description: "Reflexive transitive closure of a directed graph",
+    source: `% Reflexive transitive closure
+%
+% Starting from a set of directed edges, compute rtc(X, Y) for every
+% pair where Y is reachable from X in zero or more steps. The base
+% case rtc(X, X) gives the reflexive part.
+
+edge("a", "b").
+edge("b", "c").
+edge("c", "d").
+edge("d", "b").
+
+node(X) :- edge(X, _).
+node(X) :- edge(_, X).
+
+rtc(X, X) :- node(X).
+rtc(X, Z) :- edge(X, Y), rtc(Y, Z).
+
+?- rtc(X, Y).`,
+  },
+  {
+    name: "Transitive Closure",
+    description: "Linear vs quadratic formulation — why SQL only handles one",
+    source: `% Transitive closure — quadratic (non-linear) vs linear formulation
+%
+% The textbook "quadratic" formulation joins tc with itself:
+%
+%   tc(X, Z) :- tc(X, Y), tc(Y, Z).           <-- two occurrences of tc
+%
+% A proper semi-naive Datalog engine converges on this fine: for each
+% recursive atom it unions a variant with that atom bound to the delta
+% (Δtc_n) and the others bound to the accumulated tc_n, so every new
+% old/new pairing is seen.
+%
+% SQL's WITH RECURSIVE does *not* do this. Per SQL:1999 every reference
+% to the recursive name inside the recursive term resolves to the same
+% "working table" — only the rows produced in the previous iteration.
+% For linear recursion that is fine. For two recursive references both
+% resolve to the same Δtc, so only Δtc ⋈ Δtc firings are produced and
+% derivations needing one old tc fact and one new one are dropped.
+%
+% On the chain  a -> b -> c -> d  the quadratic version returns only
+% {(a,b), (b,c), (c,d), (a,c), (b,d)} — missing (a,d), which would
+% have required pairing an old fact with a new one. DuckDB, Postgres
+% and SQLite all behave this way; none performs full fixed-point
+% evaluation for a recursive CTE.
+%
+% The non-linear rule is shown here commented out for reference:
+%
+%   tc(X, Z) :- tc(X, Y), tc(Y, Z).
+%
+% and the example below uses the linear formulation, which fits the
+% working-table model: the single recursive reference is paired with
+% an EDB atom, so each iteration extends yesterday's new paths by one
+% edge and the fixed point is reached.
+
+edge("a", "b").
+edge("b", "c").
+edge("c", "d").
+
+tc(X, Y) :- edge(X, Y).
+tc(X, Z) :- edge(X, Y), tc(Y, Z).
+
+?- tc(X, Y).`,
+  },
+  {
+    name: "Shannon Entropy",
+    description: "Character-frequency entropy of a string, using ranges and aggregates",
+    source: `% Shannon entropy of a string
+%
+% Computes the frequency and probability of each character in a string
+% and the Shannon entropy H = -sum_c p_c * log2(p_c), in bits. Uses
+% log(x) / log(2) for log2 to stay portable across SQL dialects.
+
+text_input("abracadabra").
+
+% Position each character in the string.
+char_at(I, C) :- text_input(S), I in [0 .. len(S) - 1], C = S[I].
+
+% Total number of characters, and count of each distinct character.
+total(count(_)) :- char_at(_, _).
+freq(C, count(_)) :- char_at(_, C).
+
+% Probability of each character. Multiply by 1.0 to force real division.
+prob(C, P) :- freq(C, N), total(T), P = (N * 1.0) / T.
+
+% Per-character contribution to entropy: -p * log2(p).
+contribution(C, X) :- prob(C, P), X = -1.0 * P * log(P) / log(2).
+
+% Total entropy in bits.
+entropy(sum(X)) :- contribution(_, X).
+
+?- freq(C, N).
+?- prob(C, P).
+?- entropy(H).`,
+  },
+  {
     name: "Find the Thief",
     description: "Logic puzzle: use clues to identify a suspect from 20 villagers",
     source: `% Find the Thief
