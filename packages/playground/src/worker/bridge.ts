@@ -1,7 +1,7 @@
-import type { QueryResult, TranslationResult } from "datamog-engine";
-import type { BackendName } from "./executor.ts";
+import type { QueryResult } from "datamog-engine";
+import type { BackendName, DryRunResult, SourceSpan } from "./executor.ts";
 
-export type { BackendName };
+export type { BackendName, DryRunResult, SourceSpan };
 
 type PendingRequest = {
   resolve: (value: unknown) => void;
@@ -73,7 +73,7 @@ export async function execute(
   });
 }
 
-export async function dryRun(source: string, backend: BackendName): Promise<TranslationResult> {
+export async function dryRun(source: string, backend: BackendName): Promise<DryRunResult> {
   await init();
   const id = nextId++;
   return new Promise((resolve, reject) => {

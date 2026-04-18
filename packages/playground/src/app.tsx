@@ -1,13 +1,13 @@
+import type { QueryResult } from "datamog-engine";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
-import type { QueryResult, TranslationResult } from "datamog-engine";
-import { Editor } from "./components/editor.tsx";
 import { DataPanel } from "./components/data-panel.tsx";
+import { Editor } from "./components/editor.tsx";
 import { ResultsPanel } from "./components/results-panel.tsx";
 import { SqlPreview } from "./components/sql-preview.tsx";
 import { Toolbar } from "./components/toolbar.tsx";
 import { examples } from "./examples/index.ts";
 import * as bridge from "./worker/bridge.ts";
-import type { BackendName } from "./worker/bridge.ts";
+import type { BackendName, DryRunResult } from "./worker/bridge.ts";
 import "./styles/playground.css";
 
 // Only the sqlite dialect actually executes in the browser (via sql.js).
@@ -35,7 +35,8 @@ export function App() {
   const [source, setSource] = useState(examples[0]!.source);
   const [csvData, setCsvData] = useState<Record<string, string>>(examples[0]!.csvData ?? {});
   const [results, setResults] = useState<QueryResult[] | null>(null);
-  const [sqlResult, setSqlResult] = useState<TranslationResult | null>(null);
+  const [sqlResult, setSqlResult] = useState<DryRunResult | null>(null);
+  const [hoveredPredicate, setHoveredPredicate] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [showSql, setShowSql] = useState(false);
@@ -89,6 +90,7 @@ export function App() {
   }, []);
 
   const toggleSql = useCallback(async () => {
+    setHoveredPredicate(null);
     if (showSql) {
       setShowSql(false);
       return;
@@ -100,6 +102,7 @@ export function App() {
     (next: BackendName) => {
       setBackend(next);
       backendRef.current = next;
+      setHoveredPredicate(null);
       if (showSql) {
         // Re-translate with the new dialect.
         showSqlFor();
@@ -121,6 +124,7 @@ export function App() {
     setSqlResult(null);
     setError(null);
     setShowSql(false);
+    setHoveredPredicate(null);
   }, []);
 
   const extensionals = extractExtensionals(source);
@@ -156,7 +160,13 @@ export function App() {
       />
       <div class="playground-body">
         <div class="editor-side">
-          <Editor source={source} onChange={setSource} />
+          <Editor
+            source={source}
+            onChange={setSource}
+            spans={sqlResult?.spans ?? null}
+            hoveredPredicate={hoveredPredicate}
+            onHoverPredicate={setHoveredPredicate}
+          />
           {extensionals.length > 0 && (
             <DataPanel extensionals={extensionals} csvData={csvData} onChange={setCsvData} />
           )}
@@ -164,7 +174,11 @@ export function App() {
         <div class="output-side">
           {error && <div class="error-box">{error}</div>}
           {showSql && sqlResult ? (
-            <SqlPreview result={sqlResult} />
+            <SqlPreview
+              result={sqlResult.result}
+              hoveredPredicate={hoveredPredicate}
+              onHoverPredicate={setHoveredPredicate}
+            />
           ) : !showSql && results ? (
             <ResultsPanel results={results} />
           ) : !error ? (

@@ -14,13 +14,17 @@ export interface TranslationResult {
   createTables: string[];
   createViews: string[];
   queries: string[];
+  /** Predicate defined by each entry in `createViews` (same length / indexing). */
+  viewPredicates: string[];
+  /** Predicate queried by each entry in `queries` (same length / indexing). */
+  queryPredicates: string[];
 }
 
 export function translate(analyzed: AnalyzedProgram, dialect: SqlDialect): TranslationResult {
   const createTables = translateTables(analyzed);
-  const createViews = translateViews(analyzed, dialect);
-  const queries = translateQueries(analyzed);
-  return { createTables, createViews, queries };
+  const { sql: createViews, predicates: viewPredicates } = translateViews(analyzed, dialect);
+  const { sql: queries, predicates: queryPredicates } = translateQueries(analyzed);
+  return { createTables, createViews, queries, viewPredicates, queryPredicates };
 }
 
 // --- Tables ---
@@ -43,12 +47,20 @@ function translateTables(analyzed: AnalyzedProgram): string[] {
 
 // --- Views ---
 
-function translateViews(analyzed: AnalyzedProgram, dialect: SqlDialect): string[] {
-  const views: string[] = [];
+function translateViews(
+  analyzed: AnalyzedProgram,
+  dialect: SqlDialect,
+): { sql: string[]; predicates: string[] } {
+  const sql: string[] = [];
+  const predicates: string[] = [];
   for (const stratum of analyzed.sortedStrata) {
     const isRecursive = analyzed.recursivePredicates.has(stratum[0]!);
 
-    if (isRecursive && !dialect.supportsNonLinearRecursion && analyzed.nonLinearPredicates.has(stratum[0]!)) {
+    if (
+      isRecursive &&
+      !dialect.supportsNonLinearRecursion &&
+      analyzed.nonLinearPredicates.has(stratum[0]!)
+    ) {
       const preds = stratum.filter((p) => analyzed.nonLinearPredicates.has(p));
       const predList = preds.map((p) => `'${p}'`).join(", ");
       throw new AnalyzerError(
@@ -63,7 +75,8 @@ function translateViews(analyzed: AnalyzedProgram, dialect: SqlDialect): string[
         translateRule(rule, analyzed, undefined, undefined, dialect),
       );
       const unionBody = ruleQueries.join("\n  UNION\n");
-      views.push(dialect.createView(predicate, unionBody));
+      sql.push(dialect.createView(predicate, unionBody));
+      predicates.push(predicate);
     } else if (stratum.length === 1) {
       const predicate = stratum[0]!;
       const rules = analyzed.rules.get(predicate)!;
@@ -73,7 +86,8 @@ function translateViews(analyzed: AnalyzedProgram, dialect: SqlDialect): string[
       );
       const unionBody = ruleQueries.join("\n  UNION\n");
       const colNames = colList(arity);
-      views.push(dialect.createRecursiveView(predicate, colNames, unionBody));
+      sql.push(dialect.createRecursiveView(predicate, colNames, unionBody));
+      predicates.push(predicate);
     } else {
       const ruleTranslator = (
         rule: Rule,
@@ -81,18 +95,20 @@ function translateViews(analyzed: AnalyzedProgram, dialect: SqlDialect): string[
         tagMap?: Map<string, string>,
       ) => translateRule(rule, analyzed, renameMap, tagMap, dialect);
 
-      views.push(
-        ...dialect.createMutuallyRecursiveViews(
-          stratum,
-          analyzed.arities,
-          analyzed.rules,
-          analyzed,
-          ruleTranslator,
-        ),
+      const mutualViews = dialect.createMutuallyRecursiveViews(
+        stratum,
+        analyzed.arities,
+        analyzed.rules,
+        analyzed,
+        ruleTranslator,
       );
+      // createMutuallyRecursiveViews returns one view per stratum predicate,
+      // in stratum order.
+      sql.push(...mutualViews);
+      predicates.push(...stratum);
     }
   }
-  return views;
+  return { sql, predicates };
 }
 
 /** Variable binding: either a column reference or an SQL expression (from equality). */
@@ -328,9 +344,11 @@ function translateFact(rule: Rule): string {
 
 // --- Queries ---
 
-function translateQueries(analyzed: AnalyzedProgram): string[] {
+function translateQueries(analyzed: AnalyzedProgram): { sql: string[]; predicates: string[] } {
   const emptyBindings = new Map<string, Binding[]>();
-  return analyzed.queries.map((query) => {
+  const sql: string[] = [];
+  const predicates: string[] = [];
+  for (const query of analyzed.queries) {
     const atom = query.atom;
     const isIDB = analyzed.rules.has(atom.predicate);
 
@@ -352,13 +370,15 @@ function translateQueries(analyzed: AnalyzedProgram): string[] {
       selectParts.push("*");
     }
 
-    let sql = `SELECT ${selectParts.join(", ")} FROM ${ident(atom.predicate)}`;
+    let text = `SELECT ${selectParts.join(", ")} FROM ${ident(atom.predicate)}`;
     if (conditions.length > 0) {
-      sql += ` WHERE ${conditions.join(" AND ")}`;
+      text += ` WHERE ${conditions.join(" AND ")}`;
     }
-    sql += ";";
-    return sql;
-  });
+    text += ";";
+    sql.push(text);
+    predicates.push(atom.predicate);
+  }
+  return { sql, predicates };
 }
 
 // --- Helpers ---

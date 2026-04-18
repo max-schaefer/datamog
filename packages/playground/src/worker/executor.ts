@@ -1,9 +1,15 @@
-import { analyze, inferTypes } from "datamog-core";
-import { type Backend, DatamogExecutor, type QueryResult, translate } from "datamog-engine";
-import type { SqlDialect } from "datamog-engine";
 import { SqliteSqlDialect } from "datamog-backend-sqlite/dialect";
 import { PostgresSqlDialect } from "datamog-backend-postgres/dialect";
 import { DuckDbSqlDialect } from "datamog-backend-duckdb/dialect";
+import { analyze, inferTypes } from "datamog-core";
+import type { AnalyzedProgram } from "datamog-core";
+import {
+  type Backend,
+  DatamogExecutor,
+  type SqlDialect,
+  type TranslationResult,
+  translate,
+} from "datamog-engine";
 import { parse } from "datamog-parser";
 import { InMemoryCsvLoader } from "../lib/csv-loader.ts";
 
@@ -18,6 +24,38 @@ function dialectFor(name: BackendName): SqlDialect {
     case "duckdb":
       return new DuckDbSqlDialect();
   }
+}
+
+export interface SourceSpan {
+  start: number;
+  end: number;
+}
+
+export interface DryRunResult {
+  result: TranslationResult;
+  /** For each predicate mentioned in a rule head or query, source spans
+   *  covering the full statement. Used for hover highlighting. */
+  spans: Record<string, SourceSpan[]>;
+}
+
+function extractPredicateSpans(analyzed: AnalyzedProgram): Record<string, SourceSpan[]> {
+  const spans: Record<string, SourceSpan[]> = {};
+  function push(predicate: string, span: SourceSpan) {
+    const existing = spans[predicate];
+    if (existing) existing.push(span);
+    else spans[predicate] = [span];
+  }
+  for (const [predicate, rules] of analyzed.rules) {
+    for (const rule of rules) {
+      const cst = (rule as { $cstNode?: { offset: number; end: number } }).$cstNode;
+      if (cst) push(predicate, { start: cst.offset, end: cst.end });
+    }
+  }
+  for (const query of analyzed.queries) {
+    const cst = (query as { $cstNode?: { offset: number; end: number } }).$cstNode;
+    if (cst) push(query.atom.predicate, { start: cst.offset, end: cst.end });
+  }
+  return spans;
 }
 
 interface InitMessage {
@@ -151,7 +189,9 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       const program = parse(msg.source);
       const analyzed = inferTypes(analyze(program));
       const result = translate(analyzed, dialectFor(msg.backend));
-      self.postMessage({ type: "dry-run-result", id: msg.id, result });
+      const spans = extractPredicateSpans(analyzed);
+      const payload: DryRunResult = { result, spans };
+      self.postMessage({ type: "dry-run-result", id: msg.id, result: payload });
     } catch (err) {
       self.postMessage({
         type: "dry-run-error",
