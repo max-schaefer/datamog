@@ -220,15 +220,82 @@ body {
   overflow: hidden;
 }
 
+.result-header {
+  display: flex;
+  align-items: stretch;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  gap: 8px;
+}
+
 .result-query {
   font-family: "JetBrains Mono", "Fira Code", monospace;
   font-size: 12px;
   padding: 8px 12px;
-  background: #f9fafb;
-  border-bottom: 1px solid #e5e7eb;
   color: #666;
   white-space: pre-wrap;
   word-break: break-word;
+  flex: 1;
+  min-width: 0;
+}
+
+.format-toggle {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  gap: 2px;
+}
+
+.format-toggle-btn {
+  font-size: 11px;
+  padding: 3px 8px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #555;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.format-toggle-btn.active {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
+
+.format-toggle-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.format-toggle-btn:hover:not(:disabled):not(.active) {
+  background: #f3f4f6;
+}
+
+.mermaid-view {
+  padding: 12px;
+  background: #fff;
+  overflow: auto;
+}
+
+.mermaid-container {
+  display: flex;
+  justify-content: center;
+}
+
+.mermaid-container svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.result-json {
+  margin: 0;
+  padding: 12px;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 12px;
+  background: #fff;
+  color: #333;
+  overflow: auto;
+  max-height: 400px;
 }
 
 .result-empty {
