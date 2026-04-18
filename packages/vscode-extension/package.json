@@ -43,7 +43,7 @@
     "@types/vscode": "^1.67.0",
     "datamog-core": "workspace:*",
     "datamog-parser": "workspace:*",
-    "esbuild": "^0.28.0"
+    "esbuild": "^0.25.0"
   },
   "scripts": {
     "build": "node esbuild.mjs",
