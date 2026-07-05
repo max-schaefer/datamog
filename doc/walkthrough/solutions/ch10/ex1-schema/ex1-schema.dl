@@ -1,0 +1,20 @@
+# Exercise 10.1 solution.
+
+extensional book(id: integer, title: string, author_id: integer).
+extensional author(id: integer, name: string, country: string).
+extensional checkout(book_id: integer, borrower_id: integer, date: string).
+
+# A book is currently out if it appears anywhere in checkout.
+# (A real system would filter by active-loan status; this simple
+# variant treats any checkout row as "out".)
+currently_out(B) :- checkout(B, _, _).
+
+available(B) :- book(B, _, _), not currently_out(B).
+
+local_author(Name) :- author(_, Name, "uk").
+
+most_borrowed(B, count(Ev)) :- checkout(B, Ev, _).
+
+?- available(B).
+?- local_author(A).
+?- most_borrowed(B, N).

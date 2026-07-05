@@ -1,0 +1,16 @@
+# Exercise 2.2 — Project down.
+#
+# Define `person(P)` for every name that appears as a parent OR as
+# a child. You'll need two rules — one for each role. Two rules
+# with the same head predicate are combined as a union.
+
+extensional parent(parent_name: string, child_name: string).
+
+# Placeholder so the starter parses; delete once you've added your
+# own two rules below.
+person(P) :- parent(P, "__placeholder_never_matches__").
+
+# TODO: rule 1 — P appears as a parent.
+# TODO: rule 2 — P appears as a child.
+
+?- person(P).

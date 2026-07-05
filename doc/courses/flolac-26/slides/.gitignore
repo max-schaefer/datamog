@@ -1,0 +1,12 @@
+# build output
+dist/
+# exported slide deck (bun run slides:pdf)
+flolac-slides.pdf
+# generated embed bundle (built from packages/playground/src/embed)
+public/embed/
+# generated Astro types / content cache
+.astro/
+# dependencies
+node_modules/
+# logs
+*.log

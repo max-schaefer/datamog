@@ -1,0 +1,31 @@
+# Find the Shortest Path — tutorial solution
+#
+# Given a weighted road network with cycles, find the shortest distance
+# between every pair of connected towns.
+#
+# Adapted from the Datalog Educational System (DES) by Fernando Saenz-Perez.
+
+road("castle", "village", 2).
+road("castle", "forest", 5).
+road("village", "bridge", 4).
+road("village", "castle", 3).
+road("forest", "river", 3).
+road("river", "village", 1).
+road("river", "bridge", 2).
+
+# Upper bound on useful path length: sum of all edge weights.
+# Any shortest path must be shorter than this (it would never need
+# to traverse every edge).
+max_cost(sum(W)) :- road(_, _, W).
+
+# All paths with their total cost, bounded to ensure termination.
+path(X, Y, C) :- road(X, Y, C).
+path(X, Y, C) :-
+  path(X, Z, C0), road(Z, Y, C1),
+  max_cost(Max), C0 < Max,
+  C = C0 + C1.
+
+# Shortest path cost for each pair of towns.
+shortest(X, Y, min(C)) :- path(X, Y, C).
+
+?- shortest(X, Y, C).

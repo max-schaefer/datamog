@@ -1,0 +1,14 @@
+# Exercise 8.2 — Courses with no prerequisites.
+#
+# `prereq(course, requires)` means "course needs `requires` as a
+# prerequisite". Find the courses that appear as a prerequisite
+# for something but themselves have no prerequisites.
+
+extensional prereq(course: string, requires: string).
+
+# Placeholder.
+starter_course(C) :- prereq(C, _), C = "__never_matches__".
+
+# TODO: float rules.
+
+?- starter_course(C).

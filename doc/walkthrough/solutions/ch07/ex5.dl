@@ -1,0 +1,15 @@
+# Exercise 7.5 solution.
+#
+# A is bound by the seed; each subsequent equality binds one new
+# variable from an already-safe expression. The analyser passes
+# because each fix-point iteration marks one more variable safe.
+
+extensional seed(x: integer).
+
+quad(A, B, C, D) :-
+    seed(A),
+    B = A * 2,
+    C = B + 3,
+    D = A + B + C.
+
+?- quad(A, B, C, D).

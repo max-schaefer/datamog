@@ -1,0 +1,15 @@
+# Exercise 4.2 — Reflexive transitive closure.
+#
+# Extend reach so that every node is also reachable from itself.
+# You'll need a third rule that derives reach_or_self(X, X) for
+# every X that appears in `edge` (either column).
+
+extensional edge(src: string, dst: string).
+
+reach_or_self(X, Y) :- edge(X, Y).
+reach_or_self(X, Y) :- edge(X, Z), reach_or_self(Z, Y).
+
+# TODO: a rule (or two) for reflexivity.
+
+?- reach_or_self("a", Y).
+?- reach_or_self(X, X).   # what nodes are reachable from themselves?

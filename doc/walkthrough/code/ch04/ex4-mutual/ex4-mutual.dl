@@ -1,0 +1,21 @@
+# Exercise 4.4 — Mutual recursion.
+#
+# Two predicates that alternate colours on each hop. `rr(X, Y)` is
+# "there's a red-ending path from X to Y"; `bb(X, Y)` is the same
+# for blue-ending.
+#
+# Run with any SQL backend; SQLite/sql.js compile to a single
+# combined CTE with a `__tag` discriminator (the workaround
+# SQLite needs because it doesn't accept multiple recursive CTEs
+# in one block); Postgres compiles to two sibling CTEs.
+
+extensional edge(src: string, dst: string, colour: string).
+
+rr(X, Y) :- edge(X, Y, "red").
+rr(X, Y) :- bb(X, Z), edge(Z, Y, "red").
+
+bb(X, Y) :- edge(X, Y, "blue").
+bb(X, Y) :- rr(X, Z), edge(Z, Y, "blue").
+
+?- rr("a", Y).
+?- bb("a", Y).

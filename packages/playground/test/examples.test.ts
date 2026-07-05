@@ -1,0 +1,34 @@
+import { describe, expect, test } from "bun:test";
+import { existsSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+
+// Examples opt into the playground by carrying a `playground.json` file in
+// their CLI example directory; `src/examples/index.ts` discovers them at build
+// time via `import.meta.glob`. Validate every such file here so a malformed
+// entry or a renamed `.dl` fails in `bun test` rather than silently dropping
+// the example from the dropdown (or only surfacing as a Vite build error).
+const CLI_EXAMPLES = join(import.meta.dir, "..", "..", "cli", "examples");
+
+const registered = readdirSync(CLI_EXAMPLES).filter((dir) =>
+  existsSync(join(CLI_EXAMPLES, dir, "playground.json")),
+);
+
+describe("playground examples", () => {
+  test("at least one example is registered", () => {
+    expect(registered.length).toBeGreaterThan(0);
+  });
+
+  for (const dir of registered) {
+    test(`${dir}: playground.json is valid and points to a .dl`, async () => {
+      const meta = (await Bun.file(join(CLI_EXAMPLES, dir, "playground.json")).json()) as Record<
+        string,
+        unknown
+      >;
+      expect(typeof meta.name).toBe("string");
+      expect(typeof meta.description).toBe("string");
+      expect(typeof meta.order).toBe("number");
+      // index.ts loads `<dir>/<dir>.dl`, so the basename must match the dir.
+      expect(existsSync(join(CLI_EXAMPLES, dir, `${dir}.dl`))).toBe(true);
+    });
+  }
+});

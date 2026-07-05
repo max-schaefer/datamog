@@ -1,0 +1,223 @@
+/* Self-contained styles for the embeddable mini-playground. Scoped under
+   .datamog-embed so a host page's own CSS is unaffected. The popover is
+   appended to <body>, so its rules are not nested. */
+.datamog-embed {
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 14px;
+  color: #1f2328;
+}
+
+.datamog-embed-editor {
+  max-height: 28rem;
+  overflow: auto;
+}
+
+/* Syntax highlighting. `classHighlighter` only assigns `.tok-*` classes; the
+   colours live here so the embed is self-contained (the playground colours
+   the same classes via its own CSS variables). Light-theme literals. */
+.datamog-embed .cm-editor .tok-keyword {
+  color: #7c3aed;
+  font-weight: 600;
+}
+.datamog-embed .cm-editor .tok-typeName {
+  color: #0891b2;
+}
+.datamog-embed .cm-editor .tok-variableName {
+  color: #0f172a;
+}
+.datamog-embed .cm-editor .tok-string,
+.datamog-embed .cm-editor .tok-string2 {
+  color: #b91c1c;
+}
+.datamog-embed .cm-editor .tok-number {
+  color: #047857;
+}
+.datamog-embed .cm-editor .tok-comment,
+.datamog-embed .cm-editor .tok-lineComment,
+.datamog-embed .cm-editor .tok-blockComment {
+  color: #94a3b8;
+  font-style: italic;
+}
+.datamog-embed .cm-editor .tok-operator {
+  color: #64748b;
+}
+.datamog-embed .cm-editor .tok-punctuation,
+.datamog-embed .cm-editor .tok-bracket,
+.datamog-embed .cm-editor .tok-paren,
+.datamog-embed .cm-editor .tok-brace,
+.datamog-embed .cm-editor .tok-squareBracket,
+.datamog-embed .cm-editor .tok-angleBracket,
+.datamog-embed .cm-editor .tok-separator {
+  color: #475569;
+}
+.datamog-embed .cm-editor .tok-propertyName {
+  color: #b45309;
+}
+.datamog-embed .cm-editor .tok-atom,
+.datamog-embed .cm-editor .tok-bool,
+.datamog-embed .cm-editor .tok-null,
+.datamog-embed .cm-editor .tok-function,
+.datamog-embed .cm-editor .tok-labelName {
+  color: #2563eb;
+}
+
+/* Inline "run" marker rendered after each query. */
+.datamog-embed-runquery {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.8em;
+  font-weight: 600;
+  color: #0969da;
+  background: #ddf4ff;
+  border: 1px solid #b6e3ff;
+  border-radius: 4px;
+  padding: 0 0.35em;
+  margin-left: 0.5em;
+  cursor: pointer;
+  user-select: none;
+}
+.datamog-embed-runquery:hover {
+  background: #b6e3ff;
+}
+
+/* Inline data chip rendered after each `extensional` declaration. */
+.datamog-embed-chip {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.8em;
+  color: #57606a;
+  background: #f6f8fa;
+  border: 1px solid #d0d7de;
+  border-radius: 4px;
+  padding: 0 0.35em;
+  margin-left: 0.5em;
+  cursor: pointer;
+  user-select: none;
+}
+.datamog-embed-chip:hover {
+  background: #eaeef2;
+}
+
+/* Result popover: sized to its content (a table or a yes/no answer) rather
+   than the fixed data-popover width. */
+.datamog-embed-result-popover {
+  width: auto;
+  min-width: 7rem;
+}
+.datamog-embed-result-body {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.85em;
+  max-height: 18rem;
+  overflow: auto;
+}
+
+/* Result popover header: title on the left, a close "×" in the top-right. */
+.datamog-embed-popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.datamog-embed-popover-x {
+  flex: none;
+  border: none;
+  background: transparent;
+  color: #57606a;
+  font-size: 1.15em;
+  line-height: 1;
+  padding: 0 0.15rem;
+  margin-right: -0.15rem;
+  cursor: pointer;
+}
+.datamog-embed-popover-x:hover {
+  color: #1f2328;
+}
+
+.datamog-embed-answer {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-weight: 600;
+}
+.datamog-embed-answer-yes {
+  color: #1a7f37;
+}
+.datamog-embed-answer-no {
+  color: #cf222e;
+}
+
+/* The result table lives in a body-appended popover, outside any host content
+   container, so host table rules can't reach it: scope it to the popover and
+   size it relative to the popover's (host-matched) font. */
+.datamog-embed-popover .datamog-embed-table {
+  border-collapse: collapse;
+  font-size: 0.95em;
+}
+.datamog-embed-popover .datamog-embed-table th,
+.datamog-embed-popover .datamog-embed-table td {
+  border: 1px solid #d0d7de;
+  padding: 0.2rem 0.5rem;
+  text-align: left;
+}
+.datamog-embed-popover .datamog-embed-table th {
+  background: #fff;
+  font-weight: 600;
+}
+
+.datamog-embed-error {
+  color: #cf222e;
+  white-space: pre-wrap;
+}
+
+/* Data-source popover (appended to <body>, positioned at the chip). */
+.datamog-embed-popover {
+  position: fixed;
+  z-index: 1000;
+  width: 22rem;
+  max-width: calc(100vw - 1rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.6rem;
+  background: #fff;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(31, 35, 40, 0.18);
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 13px;
+  color: #1f2328;
+}
+.datamog-embed-popover-title {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.85em;
+  color: #57606a;
+}
+.datamog-embed-popover-text {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.85em;
+  resize: vertical;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  padding: 0.4rem;
+}
+.datamog-embed-popover-footer {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+.datamog-embed-popover-footer button {
+  font: inherit;
+  border-radius: 6px;
+  padding: 0.25rem 0.7rem;
+  cursor: pointer;
+}
+.datamog-embed-popover-apply {
+  color: #fff;
+  background: #0969da;
+  border: 1px solid #0860c4;
+}
+.datamog-embed-popover-reset,
+.datamog-embed-popover-close {
+  background: #f6f8fa;
+  border: 1px solid #d0d7de;
+}
+.datamog-embed-popover-footer button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

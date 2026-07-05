@@ -1,0 +1,12 @@
+# Exercise 2.2 solution.
+#
+# Two rules with the same head are combined as a union. Every
+# parent is a person; every child is a person. Together we cover
+# everyone in our data.
+
+extensional parent(parent_name: string, child_name: string).
+
+person(P) :- parent(P, _).
+person(P) :- parent(_, P).
+
+?- person(P).

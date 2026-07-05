@@ -1,0 +1,63 @@
+name: Playground E2E
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/playground-e2e.yml
+      - bun.lock
+      - package.json
+      - playwright.config.ts
+      - packages/backend/**
+      - packages/core/**
+      - packages/engine/**
+      - packages/loader/**
+      - packages/parser/**
+      - packages/playground/**
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: playground-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BUN_VERSION: 1.3.11
+
+jobs:
+  e2e:
+    name: Playground E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - run: bun install --frozen-lockfile
+
+      - run: bunx playwright install --with-deps chromium
+
+      - run: bunx playwright test
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-test-results
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7

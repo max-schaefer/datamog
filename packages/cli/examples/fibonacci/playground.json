@@ -1,0 +1,5 @@
+{
+  "name": "Fibonacci",
+  "description": "First 10 Fibonacci numbers using linear recursion and arithmetic",
+  "order": 20
+}

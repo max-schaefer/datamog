@@ -1,0 +1,126 @@
+# Theorem proving by falsifiability -- step 2 of 3: deriving the CNF
+#
+# Step 1 (../cnf-falsifiability) took a CNF as an *extensional* input and
+# decided whether it was falsifiable. Here we keep that engine byte-for-byte
+# but stop handing it a CNF: instead we hand it a formula's abstract syntax
+# tree and *derive* clause_lit / nvars with rules. The extensional clause_lit
+# and nvars from step 1 become intensional -- the boundary of "given" data
+# moves one layer back, from the CNF to the AST.
+#
+# IMPORTANT: this step uses NON-LINEAR recursion. Converting a binary
+# connective to CNF needs the clause sets of *both* children, so a rule
+# references the recursive predicate twice. The SQL backends reject that;
+# run this on the in-memory interpreters:
+#
+#     bun run datamog --backend seminaive cnf-from-ast.dl
+#
+# --- The AST (the extensional input that step 3 will replace with a parser) ---
+#
+# A formula is a tree of nodes. Each node has a kind; binary nodes have two
+# children, `not` has one, and a `var` leaf carries a variable name.
+#
+#     node(Id, Kind)             Kind in {var, not, and, or, imp}
+#     node_var(Id, Name)         the variable name, for a var leaf
+#     node_child(Id, Pos, Kid)   child at position Pos (0, or 0/1 for binary)
+#     root(Id)                   the top of the tree
+#
+# The AST in the sibling CSV files encodes De Morgan's law
+#
+#     ~(p & q) -> (~p | ~q)
+#
+# which is a tautology, so we expect a "yes" verdict and no counterexamples.
+
+extensional node(id: integer, kind: string).
+extensional node_var(id: integer, name: string).
+extensional node_child(id: integer, pos: integer, child: integer).
+extensional root(id: integer).
+
+# --- Deriving the CNF (the polarity trick) ---
+#
+# For each node N we compute two clause sets at once:
+#   pos(N, C) -- C is a clause of CNF(N)
+#   neg(N, C) -- C is a clause of CNF(~N)
+# Computing both means negation is just a swap, with no separate
+# negation-normal-form pass and no rewriting of -> and <->.
+#
+# A clause is identified by a structural *value* id, since Datalog cannot
+# invent fresh names: a variable's unit clause is ["lit", N, Pol]; a clause
+# built by distributing two clauses C and D is ["m", C, D]. Identical
+# structures collapse to the same id automatically (values compare by their
+# canonical form). clause_lit_named(C, Name, Pol) lists the literals of C,
+# keyed by variable *name* (the AST has names, not indices yet).
+
+# A variable leaf: CNF is the unit clause {+name}; CNF of its negation is {-name}.
+pos(N, ["lit", N, 1]) :- node(N, "var").
+neg(N, ["lit", N, 0]) :- node(N, "var").
+clause_lit_named(["lit", N, 1], Name, 1) :- node(N, "var"), node_var(N, Name).
+clause_lit_named(["lit", N, 0], Name, 0) :- node(N, "var"), node_var(N, Name).
+
+# Negation swaps the two clause sets of the child (no new clauses).
+pos(N, C) :- node(N, "not"), node_child(N, 0, K), neg(K, C).
+neg(N, C) :- node(N, "not"), node_child(N, 0, K), pos(K, C).
+
+# Conjunction: CNF(L & R) is the union of the children's clauses;
+# CNF(~(L & R)) = CNF(~L | ~R) distributes neg(L) over neg(R).
+pos(N, C) :- node(N, "and"), node_child(N, 0, L), pos(L, C).
+pos(N, C) :- node(N, "and"), node_child(N, 1, R), pos(R, C).
+neg(N, ["m", C, D]) :- node(N, "and"), node_child(N, 0, L), node_child(N, 1, R), neg(L, C), neg(R, D).
+merge(C, D)         :- node(N, "and"), node_child(N, 0, L), node_child(N, 1, R), neg(L, C), neg(R, D).
+
+# Disjunction is the dual: pos distributes, neg unions.
+pos(N, ["m", C, D]) :- node(N, "or"), node_child(N, 0, L), node_child(N, 1, R), pos(L, C), pos(R, D).
+merge(C, D)         :- node(N, "or"), node_child(N, 0, L), node_child(N, 1, R), pos(L, C), pos(R, D).
+neg(N, C) :- node(N, "or"), node_child(N, 0, L), neg(L, C).
+neg(N, C) :- node(N, "or"), node_child(N, 1, R), neg(R, C).
+
+# Implication L -> R is ~L | R: pos distributes neg(L) over pos(R);
+# its negation unions pos(L) with neg(R).
+pos(N, ["m", C, D]) :- node(N, "imp"), node_child(N, 0, L), node_child(N, 1, R), neg(L, C), pos(R, D).
+merge(C, D)         :- node(N, "imp"), node_child(N, 0, L), node_child(N, 1, R), neg(L, C), pos(R, D).
+neg(N, C) :- node(N, "imp"), node_child(N, 0, L), pos(L, C).
+neg(N, C) :- node(N, "imp"), node_child(N, 1, R), neg(R, C).
+
+# A distributed clause ["m", C, D] holds the literals of both parents.
+# We recorded the parent pair as merge(C, D) when we built the id, so we
+# never have to take the id apart again (Datalog cannot destructure a value).
+clause_lit_named(["m", C, D], V, P) :- merge(C, D), clause_lit_named(C, V, P).
+clause_lit_named(["m", C, D], V, P) :- merge(C, D), clause_lit_named(D, V, P).
+
+# --- From variable names to dense indices ---
+#
+# The engine enumerates assignments as bit patterns, so it needs variables
+# numbered 0 .. nvars-1. Rank each name by how many names are <= it (every
+# name counts itself, so the smallest gets rank 1); the 0-based index is
+# that rank minus one.
+
+varname(Name) :- node(_, "var"), node_var(_, Name).
+rank(Name, count(Other)) :- varname(Name), varname(Other), Other <= Name.
+var_index(Name, J) :- rank(Name, K), J = K - 1.
+nvars(count(Name)) :- varname(Name).
+
+# --- Bridge to the step-1 engine interface: clause_lit(C, Index, Pol) ---
+#
+# Keep only the clauses of the whole formula (the root's CNF), and translate
+# each literal's variable name to its dense index.
+
+root_clause(C) :- root(N), pos(N, C).
+clause_lit(C, Idx, Pol) :- root_clause(C), clause_lit_named(C, Name, Pol), var_index(Name, Idx).
+
+# --- The engine, copied verbatim from step 1 (../cnf-falsifiability) ---
+
+clause(C) :- clause_lit(C, _, _).
+var(V) :- nvars(N), V in [0 .. N - 1].
+
+assignment(A) :- nvars(N), A in [0 .. (1 << N) - 1].
+eval(A, V, (A >> V) & 1)  :- assignment(A), var(V).
+
+satisfies(A, C) :- clause_lit(C, V, Pol), eval(A, V, Pol).
+falsifies(A, C) :- assignment(A), clause(C), not satisfies(A, C).
+falsifiable() :- falsifies(_, _).
+
+theorem() :- nvars(_), not falsifiable().
+
+counterexample(A, V, B) :- falsifies(A, C), eval(A, V, B).
+
+?- theorem().
+?- counterexample(A, V, Value).

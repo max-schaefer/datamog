@@ -1,0 +1,56 @@
+# Recognising well-formed propositional formulas: a syntax checker built
+# straight from a BNF grammar, the recogniser from the Part 2 slides.
+#
+# A formula is text. char(I, C) gives the character at each position; a
+# nonterminal x(F, T) means "the characters at positions F..T-1 form an x".
+# Each BNF production becomes a rule. The precedence layering, loosest first,
+# is  impl < disj < conj < lit < atom:
+#
+#   impl ::= disj | disj "->" impl       (lowest precedence, right associative)
+#   disj ::= conj | disj "|" conj        (left associative)
+#   conj ::= lit  | conj "&" lit         (left associative)
+#   lit  ::= atom | "~" lit
+#   atom ::= var  | "(" impl ")"
+#
+# Implication uses a two-character arrow "->", matched as the character "-"
+# followed by ">". It is RIGHT associative: its rule recurses on its own right
+# operand, so p->q->r parses as p->(q->r). Contrast disj and conj, which
+# recurse on the left and so are left associative.
+#
+# This only RECOGNISES well-formed formulas: formula() is simply true or false,
+# and does not build a syntax tree. Building the tree needs structured values;
+# see parse-to-cnf, which parses to an AST and proves theorems.
+#
+# The parenthesis rule makes the nonterminals mutually recursive, and the
+# binary-operator rules each reference two members of that cycle (disj and
+# conj, conj and lit, and so on), so this is NON-LINEAR recursion. Run it on an
+# in-memory backend, which the SQL backends' WITH RECURSIVE cannot express:
+#
+#     bun run datamog --backend seminaive recognise-formula.dl
+#
+# prop_var is the variable alphabet; the input string lives in input.csv and is
+# the hypothetical syllogism (p->q)&(q->r)->(p->r), a well-formed formula.
+
+extensional input(s: string).
+extensional prop_var(name: string).
+
+# A formula is text, turned into relations: one row per character, plus its length.
+char(I, C) :- input(S), I in [0 .. length(S) - 1], C = S[I].
+len(N) :- input(S), N = length(S).
+
+# Each BNF production becomes a rule; a nonterminal x(F, T) spans positions F..T-1.
+impl(F, T) :- disj(F, T).
+impl(F, T) :- disj(F, M), char(M, "-"), char(M + 1, ">"), impl(M + 2, T).
+disj(F, T) :- conj(F, T).
+disj(F, T) :- disj(F, M), char(M, "|"), conj(M + 1, T).
+conj(F, T) :- lit(F, T).
+conj(F, T) :- conj(F, M), char(M, "&"), lit(M + 1, T).
+lit(F, T)  :- atom(F, T).
+lit(F, T)  :- char(F, "~"), lit(F + 1, T).
+atom(F, T) :- char(F, C), prop_var(C), T = F + 1.
+atom(F, T) :- char(F, "("), impl(F + 1, M), char(M, ")"), T = M + 1.
+
+# The whole input is a formula when the start symbol impl spans it.
+formula() :- impl(0, T), len(T).
+
+?- formula().

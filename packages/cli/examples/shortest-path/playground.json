@@ -1,0 +1,5 @@
+{
+  "name": "Shortest Path",
+  "description": "Shortest path in a weighted graph using min aggregate",
+  "order": 60
+}

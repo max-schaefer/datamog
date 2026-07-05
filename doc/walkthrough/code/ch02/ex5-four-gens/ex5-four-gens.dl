@@ -1,0 +1,17 @@
+# Exercise 2.5 — Add a fourth generation.
+#
+# Extend parent.csv in this folder (already a copy of the ch02
+# original) with at least one fact giving greg or helen a child,
+# then add a rule for great_great_grandparent.
+
+extensional parent(parent_name: string, child_name: string).
+
+grandparent(X, Z) :- parent(X, Y), parent(Y, Z).
+great_grandparent(X, W) :- parent(X, Y), parent(Y, Z), parent(Z, W).
+
+# TODO: add great_great_grandparent.
+
+?- grandparent(X, Y).
+?- great_grandparent(X, Y).
+
+# TODO: query great_great_grandparent.

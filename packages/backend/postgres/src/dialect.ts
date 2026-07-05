@@ -1,0 +1,466 @@
+import type { BitwiseOp, PrimitiveType, Rule, TypedProgram } from "datamog-core";
+import { SQL_TYPE_MAP, type SqlDialect, colList, emptyAnchor, ident } from "datamog-engine";
+
+/**
+ * Replace IEEE Infinity / NaN with SQL NULL. Used at jsonb-construction
+ * sites so a non-finite float doesn't produce a backend-specific jsonb
+ * leaf (or raise on cast) — see `jsonArray` / `jsonObject` below for
+ * the detailed rationale. Postgres treats NaN as larger than any
+ * non-NaN value in comparisons, so `ABS(x) > MAX_VALUE` catches both
+ * `±Infinity` and NaN — no separate NaN check needed.
+ */
+function finiteOrNull(floatSql: string): string {
+  return `(CASE WHEN ABS(${floatSql}) > 1.7976931348623157e308 THEN NULL ELSE ${floatSql} END)`;
+}
+
+function jsonNullToSqlNull(jsonSql: string): string {
+  return `NULLIF(${jsonSql}, 'null'::jsonb)`;
+}
+
+export class PostgresSqlDialect implements SqlDialect {
+  readonly name = "postgres";
+  readonly supportsNonLinearRecursion = false;
+
+  sqlType(type: PrimitiveType): string {
+    // `jsonb` (binary JSON) over `json` because it canonicalises numbers
+    // and key order on storage — that's what gives Postgres native
+    // structural equality under `=`, `DISTINCT`, and `UNION`. The text
+    // `json` type would compare textually and silently break joins.
+    if (type === "value") return "JSONB";
+    return SQL_TYPE_MAP[type];
+  }
+
+  valueInsertPlaceholder(placeholder: string): string {
+    // The loader binds the canonical JSON *text* for a value column. Bun's
+    // pg driver sends a bare string param as a JSON string scalar, so a
+    // plain `$n` (or even `$n::jsonb`) would store `'[...]'` as a jsonb
+    // string, not an array. Casting through `text` first forces the param to
+    // be read as JSON source text and parsed into structured `JSONB`.
+    return `${placeholder}::text::jsonb`;
+  }
+
+  jsonSubscript(receiverSql: string, indexSql: string, indexIsString: boolean): string {
+    // jsonb's `->` operator handles both forms: string → object key, integer
+    // → array element. Force the index expression's SQL type so that mixed
+    // JSON shapes (object indexed with integer, array indexed with string)
+    // return NULL rather than raising. Collapse JSON null leaves to SQL NULL
+    // at the expression boundary, matching the native runtime's single
+    // representation for both.
+    const cast = indexIsString ? "TEXT" : "INTEGER";
+    return jsonNullToSqlNull(`(${receiverSql} -> CAST(${indexSql} AS ${cast}))`);
+  }
+
+  jsonSlice(receiverSql: string, startSql: string | null, endSql: string | null): string {
+    // Postgres has no slice operator on jsonb. Build the sub-array via
+    // `jsonb_array_elements` filtered by ordinality, then reaggregate.
+    // Wrap the element subquery so the predicate-row column references
+    // ($) correlate correctly. `array_length` provides the implicit
+    // upper bound when `endSql` is omitted; `0` is the implicit lower
+    // bound when `startSql` is omitted.
+    const start = startSql ?? "0";
+    const end = endSql ?? `(SELECT jsonb_array_length(${receiverSql}))`;
+    return `(CASE WHEN jsonb_typeof(${receiverSql}) = 'array' THEN
+      (SELECT COALESCE(jsonb_agg(value ORDER BY ordinality), '[]'::jsonb)
+      FROM jsonb_array_elements(${receiverSql}) WITH ORDINALITY AS t(value, ordinality)
+      WHERE ordinality - 1 >= ${start} AND ordinality - 1 < ${end})
+      ELSE NULL END)`;
+  }
+
+  jsonIterate(
+    kind: "object" | "array",
+    sourceSql: string,
+    alias: string,
+  ): { fromSql: string; keySql: string; valueSql: string } {
+    // Postgres has separate functions for object iteration (jsonb_each)
+    // and array iteration (jsonb_array_elements_with_ordinality). Both
+    // need LATERAL so the source expression can reference an outer
+    // column. Wrap the source in a CASE so non-{object,array} payloads
+    // produce a NULL input — Postgres's set-returning JSON functions
+    // emit zero rows for NULL, mirroring the native evaluator's
+    // shape-mismatch → no rows behaviour.
+    if (kind === "object") {
+      const guarded = `CASE WHEN jsonb_typeof(${sourceSql}) = 'object' THEN ${sourceSql} ELSE NULL END`;
+      return {
+        fromSql: `LATERAL jsonb_each(${guarded}) AS ${alias}(_k, _v)`,
+        keySql: `${alias}._k`,
+        valueSql: jsonNullToSqlNull(`${alias}._v`),
+      };
+    }
+    const guarded = `CASE WHEN jsonb_typeof(${sourceSql}) = 'array' THEN ${sourceSql} ELSE NULL END`;
+    return {
+      fromSql: `LATERAL jsonb_array_elements(${guarded}) WITH ORDINALITY AS ${alias}(_v, _o)`,
+      keySql: `(${alias}._o - 1)::INTEGER`,
+      valueSql: jsonNullToSqlNull(`${alias}._v`),
+    };
+  }
+
+  jsonTypeOf(jsonSql: string): string {
+    // jsonb_typeof already returns the canonical spec strings
+    // ('object' | 'array' | 'string' | 'number' | 'boolean' | 'null').
+    // Datamog collapses JSON null leaves to SQL NULL at expression
+    // boundaries, so hide jsonb's separate 'null' tag here too.
+    return `NULLIF(jsonb_typeof(${jsonSql}), 'null')`;
+  }
+
+  jsonAsString(jsonSql: string): string {
+    // `x #>> '{}'` extracts the jsonb value as text. For string
+    // leaves this returns the unquoted content; for any other shape
+    // it would return the JSON form, so we gate by jsonb_typeof.
+    return `(CASE WHEN jsonb_typeof(${jsonSql}) = 'string'
+      THEN ${jsonSql} #>> '{}' ELSE NULL END)`;
+  }
+
+  jsonAsInteger(jsonSql: string): string {
+    // jsonb canonicalises numbers numerically — `1.0` and `1` become
+    // the same numeric, so a lexical type check (like SQLite/sql.js
+    // use) wouldn't distinguish int-form from float-form. Instead,
+    // check that the numeric is integer-valued and within JS safe-
+    // integer range (±2^53 - 1, matching native `as_integer.value`),
+    // then cast. The pre-fix bounds were the wider INT64 range
+    // (±2^63), so values in (2^53, 2^63] passed through as
+    // precision-lost JS numbers instead of NULL — divergence from
+    // native, which rejects anything outside JS safe range. The
+    // repeated `(jsonSql #>> '{}')::numeric` costs nothing meaningful
+    // — Postgres CSEs identical sub-expressions during planning.
+    const num = `(${jsonSql} #>> '{}')::numeric`;
+    return `(CASE WHEN jsonb_typeof(${jsonSql}) = 'number'
+      AND ${num} = trunc(${num})
+      AND ${num} BETWEEN -9007199254740991 AND 9007199254740991
+      THEN ${num}::bigint ELSE NULL END)`;
+  }
+
+  jsonAsFloat(jsonSql: string): string {
+    // Match native `as_float.value` (`Number.isFinite(args[0]) ? v : null`):
+    // a JSON number that's IEEE non-finite (Infinity / NaN — reachable
+    // by chained arithmetic captured into a value column, or via
+    // `parse_json` on a SQLite-side value that survived the round-trip)
+    // coerces to NULL, not Infinity. Without this guard the
+    // cross-backend `as_float` output diverges. Use ABS-vs-MAX_VALUE
+    // since Postgres treats NaN as larger than every non-NaN, so the
+    // single check catches both Infinity and NaN.
+    const cast = `(${jsonSql} #>> '{}')::double precision`;
+    return `(CASE WHEN jsonb_typeof(${jsonSql}) = 'number' AND ABS(${cast}) <= 1.7976931348623157e308
+      THEN ${cast} ELSE NULL END)`;
+  }
+
+  jsonAsBoolean(jsonSql: string): string {
+    return `(CASE WHEN jsonb_typeof(${jsonSql}) = 'boolean'
+      THEN (${jsonSql} #>> '{}')::boolean ELSE NULL END)`;
+  }
+
+  jsonLength(jsonSql: string): string {
+    return `(CASE jsonb_typeof(${jsonSql})
+      WHEN 'array' THEN jsonb_array_length(${jsonSql})
+      WHEN 'object' THEN (SELECT count(*)::integer FROM jsonb_object_keys(${jsonSql}))
+      WHEN 'string' THEN length(${jsonSql} #>> '{}')
+      ELSE NULL
+    END)`;
+  }
+
+  jsonHasKey(jsonSql: string, keySql: string): string {
+    return `(CASE
+      WHEN ${jsonSql} IS NULL OR ${keySql} IS NULL THEN NULL
+      WHEN jsonb_typeof(${jsonSql}) = 'null' THEN NULL
+      WHEN jsonb_typeof(${jsonSql}) = 'object' THEN (${jsonSql} ? ${keySql})
+      ELSE FALSE
+    END)`;
+  }
+
+  jsonKeys(jsonSql: string): string {
+    // `jsonb_object_keys` returns one row per key as TEXT, in storage
+    // (i.e. canonical sorted) order. Aggregate with explicit ORDER BY
+    // for determinism even on planner orderings that don't preserve
+    // source-order. `jsonb_agg(text_expr)` auto-lifts each text to a
+    // jsonb string, so the output is a jsonb array of strings.
+    // COALESCE handles the empty-object case — `jsonb_agg` over zero
+    // rows returns NULL, but jq-style `keys({})` is `[]`.
+    return `(CASE WHEN jsonb_typeof(${jsonSql}) = 'object'
+      THEN COALESCE(
+        (SELECT jsonb_agg(k ORDER BY ${this.stringOrder("k")}) FROM jsonb_object_keys(${jsonSql}) AS k),
+        '[]'::jsonb)
+      ELSE NULL END)`;
+  }
+
+  jsonValues(jsonSql: string): string {
+    // `jsonb_each` exposes both key and value; ORDER BY key in the
+    // backend's portable string order gives deterministic per-row output
+    // that matches `jsonKeys` element-for-element. Empty-object → `[]`.
+    return `(CASE WHEN jsonb_typeof(${jsonSql}) = 'object'
+      THEN COALESCE(
+        (SELECT jsonb_agg(value ORDER BY ${this.stringOrder("key")}) FROM jsonb_each(${jsonSql})),
+        '[]'::jsonb)
+      ELSE NULL END)`;
+  }
+
+  jsonStringify(jsonSql: string): string {
+    // Postgres jsonb's `::text` serializer inserts a space after `:`
+    // and `,` *outside* strings (e.g. `{"a": 1, "b": 2}`). The
+    // canonical form on every other backend has no whitespace, so we
+    // strip those spaces here. The regex consumes JSON strings whole
+    // (so a `, ` or `: ` inside a string is preserved), then matches
+    // the gap forms `, ` and `: ` separately. The replacement
+    // concatenates the three capture groups: exactly one is non-
+    // empty per match.
+    //
+    // Pattern breakdown:
+    //   ("(?:[^"\\]|\\.)*")  — JSON string: opening quote, then chars
+    //                          that are neither quote nor backslash, or
+    //                          backslash-escapes (\", \\, \n, \uXXXX
+    //                          all caught via `\\.` consuming the
+    //                          escape lead-in)
+    //   (,) [space]          — comma followed by a space
+    //   (:) [space]          — colon followed by a space
+    return `(CASE WHEN jsonb_typeof(${jsonSql}) = 'null' THEN NULL
+      ELSE regexp_replace((${jsonSql})::text, '("(?:[^"\\\\]|\\\\.)*")|(,) |(:) ', '\\1\\2\\3', 'g') END)`;
+  }
+
+  createView(name: string, body: string): string {
+    return `CREATE OR REPLACE VIEW ${ident(name)} AS\n  ${body}\n;`;
+  }
+
+  createRecursiveView(name: string, columns: string, body: string): string {
+    return `CREATE RECURSIVE VIEW ${ident(name)} (${columns}) AS (\n  ${body}\n);`;
+  }
+
+  createMutuallyRecursiveViews(
+    stratum: string[],
+    arities: ReadonlyMap<string, number>,
+    rules: ReadonlyMap<string, Rule[]>,
+    analyzed: TypedProgram,
+    translateRule: (
+      rule: Rule,
+      renameMap?: Map<string, string>,
+      tagMap?: Map<string, string>,
+    ) => string,
+  ): string[] {
+    const stratumSet = new Set(stratum);
+    const cteParts = stratum.map((predicate) => {
+      const predRules = rules.get(predicate)!;
+      const arity = arities.get(predicate)!;
+      const ruleQueries = predRules.map((rule) => translateRule(rule));
+      // Empty-anchor synthesis: a stratum predicate whose only rules
+      // are recursive (no base case of its own)
+      // produces a CTE with no anchor branch, which Postgres rejects.
+      // Prepend a typed empty SELECT so the CTE compiles and evaluates
+      // to zero rows.
+      const hasBase = predRules.some(
+        (r) =>
+          r.body.length === 0 ||
+          !r.body.some(
+            (elem) => elem.$type === "Literal" && !elem.negated && stratumSet.has(elem.predicate),
+          ),
+      );
+      if (!hasBase) {
+        ruleQueries.unshift(emptyAnchor(arity, analyzed.columnTypes.get(predicate)!, this));
+      }
+      const unionBody = ruleQueries.join("\n    UNION\n  ");
+      const colNames = colList(arity);
+      return `  ${ident(predicate)}(${colNames}) AS (\n  ${unionBody}\n  )`;
+    });
+    const withBlock = `WITH RECURSIVE\n${cteParts.join(",\n")}`;
+
+    return stratum.map(
+      (predicate) =>
+        `CREATE OR REPLACE VIEW ${ident(predicate)} AS\n  ${withBlock}\n  SELECT * FROM ${ident(predicate)}\n;`,
+    );
+  }
+
+  rangeSource(alias: string, lowSql: string, highSql: string): string {
+    return `generate_series(${lowSql}, ${highSql}) AS ${alias}("value")`;
+  }
+
+  rangeConditions(_alias: string, _lowSql: string, _highSql: string): string[] {
+    return [];
+  }
+
+  logicalEq(leftSql: string, rightSql: string): string {
+    return `(${leftSql} IS NOT DISTINCT FROM ${rightSql})`;
+  }
+
+  logicalNeq(leftSql: string, rightSql: string): string {
+    return `(${leftSql} IS DISTINCT FROM ${rightSql})`;
+  }
+
+  stringOrder(sql: string): string {
+    return `(${sql} COLLATE "C")`;
+  }
+
+  bitwise(op: BitwiseOp, leftSql: string, rightSql: string): string {
+    const l = `(${leftSql})`;
+    const r = `(${rightSql})`;
+    // Shift count mod 32 (Java/JS semantics), matching the native backend.
+    const count = `(${r} & 31)`;
+    switch (op) {
+      case "&":
+        return `(${l} & ${r})`;
+      case "|":
+        return `(${l} | ${r})`;
+      // Postgres spells bitwise XOR `#` (`^` is exponentiation).
+      case "^":
+        return `(${l} # ${r})`;
+      // int4 `<<` / `>>` are 32-bit and wrap; `>>` is arithmetic. Masking
+      // the count mod 32 matches Java/JS and avoids undefined wide shifts.
+      case "<<":
+        return `(${l} << ${count})`;
+      case ">>":
+        return `(${l} >> ${count})`;
+      // No `>>>` in Postgres: mask the operand to unsigned 32-bit in
+      // bigint, shift, then reinterpret the result as signed int32.
+      case ">>>":
+        return `(((((${l}::bigint & 4294967295) >> ${count}) + 2147483648) & 4294967295) - 2147483648)::int`;
+    }
+  }
+
+  roundToScale(valueSql: string, scaleSql: string, resultType: "integer" | "float"): string {
+    const rounded = `ROUND((${valueSql})::numeric, ${scaleSql})`;
+    return resultType === "integer"
+      ? `CAST(${rounded} AS INTEGER)`
+      : `CAST(${rounded} AS DOUBLE PRECISION)`;
+  }
+
+  parseStringAsInteger(textSql: string): string {
+    // Cap the digit run at 9 so the value always fits in `INTEGER`
+    // (Postgres int4: ±2,147,483,647). Bun's pg driver returns
+    // `BIGINT` columns as JS strings to preserve precision, which
+    // would surface as a string-typed result rather than a number;
+    // sticking to int4 avoids that gotcha and keeps the result type
+    // consistent with the SQLite path. Cross-backend integer parsing
+    // is limited to ±999,999,999 (inputs in 1B+ territory return NULL).
+    //
+    // Canonical form: `0`, or non-zero leading digit with optional
+    // minus. Rejects leading zeros (`'01'`), the surface form `'-0'`
+    // (which round-trips through `to_string` to `'0'`), and explicit
+    // `+` signs.
+    return `CAST((CASE WHEN ${textSql} ~ '^(0|-?[1-9][0-9]{0,8})$'
+      THEN ${textSql} ELSE NULL END) AS INTEGER)`;
+  }
+
+  toJson(valueSql: string, _valueType: PrimitiveType): string {
+    // `to_jsonb` accepts any primitive type and produces the matching
+    // jsonb leaf — the `_valueType` discriminator only matters on
+    // SQLite, where text storage forces per-type emission.
+    return `to_jsonb(${valueSql})`;
+  }
+
+  jsonArray(elements: ReadonlyArray<{ sql: string; type: PrimitiveType | undefined }>): string {
+    // `jsonb_build_array` auto-lifts primitive arguments and passes
+    // jsonb values through unchanged. SQL NULL becomes JSON null. A
+    // non-finite float (Infinity / NaN, from arithmetic overflow such
+    // as a chained `1e9 * 1e9 * ...`) would either raise on the cast
+    // or produce a backend-specific jsonb leaf — diverging from the
+    // native path that substitutes JSON null. Guard each float arg
+    // with `isfinite` so the cross-backend output agrees.
+    if (elements.length === 0) return "'[]'::jsonb";
+    const args = elements.map((e) => (e.type === "float" ? finiteOrNull(e.sql) : e.sql));
+    return `jsonb_build_array(${args.join(", ")})`;
+  }
+
+  jsonObject(
+    entries: ReadonlyArray<{
+      key: string;
+      valueSql: string;
+      valueType: PrimitiveType | undefined;
+    }>,
+  ): string {
+    if (entries.length === 0) return "'{}'::jsonb";
+    const args = entries
+      .map((e) => {
+        const value = e.valueType === "float" ? finiteOrNull(e.valueSql) : e.valueSql;
+        return `'${e.key.replace(/'/g, "''")}', ${value}`;
+      })
+      .join(", ");
+    return `jsonb_build_object(${args})`;
+  }
+
+  parseJson(textSql: string): string {
+    // `pg_input_is_valid(text, 'jsonb')` (PG16+) checks parseability
+    // without raising — the natural complement to `to_integer` / `to_float`'s
+    // regex pre-check. Gate the cast on it so malformed input becomes
+    // NULL rather than a query-aborting error.
+    //
+    // PostgreSQL jsonb can also represent two shapes Datamog deliberately
+    // cannot observe as runtime `value`s: a JSON null leaf (which the
+    // runtime collapses to SQL NULL) and numeric leaves that are valid
+    // jsonb numerics but outside JavaScript's finite double range (e.g.
+    // `9e999`, which native JSON.parse turns into Infinity and rejects).
+    // Walk the parsed jsonb tree and reject those numeric leaves before
+    // the value reaches result decoding or downstream value operators.
+    //
+    // JSONB canonicalises on storage, so accepted values behave like any
+    // other jsonb: keys sorted, numbers normalised, structural equality
+    // under `=`.
+    return `(WITH RECURSIVE __datamog_parse_json(j) AS (
+      SELECT CAST((CASE WHEN pg_input_is_valid(${textSql}, 'jsonb')
+        THEN ${textSql} ELSE NULL END) AS jsonb)
+    ),
+    __datamog_json_walk(v) AS (
+      SELECT j FROM __datamog_parse_json WHERE j IS NOT NULL
+      UNION ALL
+      SELECT child.value
+      FROM __datamog_json_walk AS walk
+      CROSS JOIN LATERAL (
+        SELECT value FROM jsonb_array_elements(
+          CASE WHEN jsonb_typeof(walk.v) = 'array' THEN walk.v ELSE '[]'::jsonb END
+        )
+        UNION ALL
+        SELECT value FROM jsonb_each(
+          CASE WHEN jsonb_typeof(walk.v) = 'object' THEN walk.v ELSE '{}'::jsonb END
+        )
+      ) AS child(value)
+    )
+    SELECT CASE WHEN j IS NOT NULL
+      AND jsonb_typeof(j) <> 'null'
+      AND NOT EXISTS (
+        SELECT 1 FROM __datamog_json_walk
+        WHERE jsonb_typeof(v) = 'number'
+          AND NOT pg_input_is_valid(v #>> '{}', 'double precision')
+      )
+      THEN j ELSE NULL END
+    FROM __datamog_parse_json)`;
+  }
+
+  parseStringAsFloat(textSql: string): string {
+    // Same shape as `parseStringAsInteger`: regex pre-check then cast.
+    // Canonical form mirrors `to_string(float)`'s output: no leading
+    // zeros on the integer part, no leading `+`. Trailing zeros in the
+    // fraction are tolerated (`'1.0'`, `'1.50'`) since they don't
+    // change the value. Negative zero is allowed only when paired with
+    // a fraction (`-0.5`) — `-0` alone is rejected as non-canonical.
+    //
+    // A syntactically-valid decimal can still be too large for
+    // `double precision`; `pg_input_is_valid` keeps that cast from
+    // aborting the query and maps it to NULL like the native evaluator's
+    // Number.isFinite gate.
+    return `CAST((CASE WHEN ${textSql} ~ '^((0|-?[1-9][0-9]*)(\\.[0-9]+)?|-0\\.[0-9]+)$'
+      AND pg_input_is_valid(${textSql}, 'double precision')
+      THEN ${textSql} ELSE NULL END) AS DOUBLE PRECISION)`;
+  }
+
+  concat(argSql: string): string {
+    // Explicit `ORDER BY` for deterministic per-group output across
+    // backends. Without it the planner is free to enumerate group rows
+    // in any order, which silently diverges from SQLite/sql.js and the
+    // native evaluator. We sort by the original argument expression
+    // before the `::TEXT` cast so numeric values keep their natural
+    // (numeric, not lexicographic) order.
+    return `STRING_AGG(${argSql}::TEXT, ',' ORDER BY ${argSql})`;
+  }
+
+  jsonAgg(valueSql: string, argSql: string, argIsJson: boolean): string {
+    // `JSONB_AGG` returns NULL on empty groups, matching the rest of
+    // the SQL aggregate family. Sort key choice differs by argument
+    // shape: jsonb arguments cast to text so structurally equal
+    // values sort adjacently (jsonb's natural ordering is
+    // type-tag-then-value, which would diverge from SQLite's
+    // canonical-TEXT-storage ordering and from the native
+    // `canonicalizeJson` sort). Force C collation on that text key so
+    // non-BMP leaves match Datamog's portable string order. Primitive
+    // arguments sort by the raw SQL value — numeric for numbers, lex
+    // for strings — matching SQLite's default ORDER BY semantics and
+    // the native comparator. The FILTER tests the *original* argument
+    // so we skip rows that were SQL-NULL on input rather than rows whose
+    // lifted form happens to be a JSON `null` string.
+    const orderKey = argIsJson ? this.stringOrder(`(${argSql})::TEXT`) : argSql;
+    return `JSONB_AGG(${valueSql} ORDER BY ${orderKey}) FILTER (WHERE ${argSql} IS NOT NULL)`;
+  }
+}

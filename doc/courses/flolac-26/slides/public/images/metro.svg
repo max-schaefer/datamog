@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="5 40 752 290" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif">
+  <defs>
+    <marker id="arr-blue" markerUnits="userSpaceOnUse" markerWidth="15" markerHeight="15" viewBox="0 0 10 10" refX="6" refY="5" orient="auto"><path d="M0,1 L9,5 L0,9 z" fill="#1565a8"/></marker>
+    <marker id="arr-green" markerUnits="userSpaceOnUse" markerWidth="15" markerHeight="15" viewBox="0 0 10 10" refX="6" refY="5" orient="auto"><path d="M0,1 L9,5 L0,9 z" fill="#1a8a4a"/></marker>
+  </defs>
+  <!-- main line (blue): Taipei Main Station -> Ximen -> Longshan Temple -->
+  <line x1="166" y1="100" x2="361" y2="100" stroke="#1565a8" stroke-width="8" marker-end="url(#arr-blue)"/>
+  <line x1="399" y1="100" x2="622" y2="100" stroke="#1565a8" stroke-width="8" marker-end="url(#arr-blue)"/>
+  <!-- branch (green): Ximen -> Beimen -> Zhongshan -->
+  <line x1="380" y1="118" x2="380" y2="189" stroke="#1a8a4a" stroke-width="8" marker-end="url(#arr-green)"/>
+  <line x1="380" y1="221" x2="380" y2="294" stroke="#1a8a4a" stroke-width="8" marker-end="url(#arr-green)"/>
+  <!-- stations -->
+  <g fill="#fff" stroke="#2f8576" stroke-width="4.5">
+    <circle cx="150" cy="100" r="12"/>
+    <circle cx="380" cy="100" r="12"/>
+    <circle cx="640" cy="100" r="12"/>
+    <circle cx="380" cy="205" r="12"/>
+    <circle cx="380" cy="310" r="12"/>
+  </g>
+  <!-- labels -->
+  <g fill="#16433c" font-size="28">
+    <text x="150" y="70" text-anchor="middle">Taipei Main Station</text>
+    <text x="380" y="70" text-anchor="middle">Ximen</text>
+    <text x="640" y="70" text-anchor="middle">Longshan Temple</text>
+    <text x="404" y="213" text-anchor="start">Beimen</text>
+    <text x="404" y="318" text-anchor="start">Zhongshan</text>
+  </g>
+</svg>

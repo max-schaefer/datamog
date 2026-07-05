@@ -1,0 +1,234 @@
+[
+  [
+    {
+      "Id": 1,
+      "M": "GET",
+      "P": "/v1/users",
+      "S": 200
+    },
+    {
+      "Id": 2,
+      "M": "POST",
+      "P": "/v1/users",
+      "S": 201
+    },
+    {
+      "Id": 3,
+      "M": "GET",
+      "P": "/v2/posts",
+      "S": 200
+    },
+    {
+      "Id": 4,
+      "M": "GET",
+      "P": "/v1/health",
+      "S": 200
+    },
+    {
+      "Id": 5,
+      "M": "DELETE",
+      "P": "/v1/users/42",
+      "S": 404
+    }
+  ],
+  [
+    {
+      "Id": 1,
+      "P": "/v1/users"
+    },
+    {
+      "Id": 2,
+      "P": "/v1/users"
+    },
+    {
+      "Id": 4,
+      "P": "/v1/health"
+    }
+  ],
+  [
+    {
+      "Id": 1,
+      "K": "x-trace",
+      "V": "abc"
+    },
+    {
+      "Id": 2,
+      "K": "x-trace",
+      "V": "def"
+    },
+    {
+      "Id": 2,
+      "K": "content-type",
+      "V": "application/json"
+    },
+    {
+      "Id": 4,
+      "K": "x-internal",
+      "V": "true"
+    }
+  ],
+  [
+    {
+      "Id": 1,
+      "N": 2
+    },
+    {
+      "Id": 2,
+      "N": 3
+    },
+    {
+      "Id": 3,
+      "N": 1
+    },
+    {
+      "Id": 4,
+      "N": 0
+    },
+    {
+      "Id": 5,
+      "N": null
+    }
+  ],
+  [
+    {
+      "Id": 1,
+      "F": "id",
+      "T": "number"
+    },
+    {
+      "Id": 1,
+      "F": "path",
+      "T": "string"
+    },
+    {
+      "Id": 1,
+      "F": "tags",
+      "T": "array"
+    },
+    {
+      "Id": 1,
+      "F": "method",
+      "T": "string"
+    },
+    {
+      "Id": 1,
+      "F": "status",
+      "T": "number"
+    },
+    {
+      "Id": 1,
+      "F": "headers",
+      "T": "object"
+    },
+    {
+      "Id": 2,
+      "F": "id",
+      "T": "number"
+    },
+    {
+      "Id": 2,
+      "F": "path",
+      "T": "string"
+    },
+    {
+      "Id": 2,
+      "F": "tags",
+      "T": "array"
+    },
+    {
+      "Id": 2,
+      "F": "method",
+      "T": "string"
+    },
+    {
+      "Id": 2,
+      "F": "status",
+      "T": "number"
+    },
+    {
+      "Id": 2,
+      "F": "headers",
+      "T": "object"
+    },
+    {
+      "Id": 3,
+      "F": "id",
+      "T": "number"
+    },
+    {
+      "Id": 3,
+      "F": "path",
+      "T": "string"
+    },
+    {
+      "Id": 3,
+      "F": "tags",
+      "T": "array"
+    },
+    {
+      "Id": 3,
+      "F": "method",
+      "T": "string"
+    },
+    {
+      "Id": 3,
+      "F": "status",
+      "T": "number"
+    },
+    {
+      "Id": 3,
+      "F": "headers",
+      "T": "object"
+    },
+    {
+      "Id": 4,
+      "F": "id",
+      "T": "number"
+    },
+    {
+      "Id": 4,
+      "F": "path",
+      "T": "string"
+    },
+    {
+      "Id": 4,
+      "F": "tags",
+      "T": "array"
+    },
+    {
+      "Id": 4,
+      "F": "method",
+      "T": "string"
+    },
+    {
+      "Id": 4,
+      "F": "status",
+      "T": "number"
+    },
+    {
+      "Id": 4,
+      "F": "headers",
+      "T": "object"
+    },
+    {
+      "Id": 5,
+      "F": "id",
+      "T": "number"
+    },
+    {
+      "Id": 5,
+      "F": "path",
+      "T": "string"
+    },
+    {
+      "Id": 5,
+      "F": "method",
+      "T": "string"
+    },
+    {
+      "Id": 5,
+      "F": "status",
+      "T": "number"
+    }
+  ]
+]

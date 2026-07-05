@@ -1,0 +1,5 @@
+{
+  "name": "Shannon Entropy",
+  "description": "Character-frequency entropy of a string, using ranges and aggregates",
+  "order": 90
+}

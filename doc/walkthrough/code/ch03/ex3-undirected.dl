@@ -1,0 +1,14 @@
+# Exercise 3.3 — Symmetric closure.
+#
+# Given a directed graph in `edge(src, dst)`, define `undirected`
+# as the symmetric closure: for every edge (X, Y), include both
+# (X, Y) and (Y, X).
+
+extensional edge(src: string, dst: string).
+
+# Placeholder so the file parses; delete once you've added rules.
+undirected(X, Y) :- edge(X, Y), X = "__never_matches__".
+
+# TODO: two rules.
+
+?- undirected(X, Y).

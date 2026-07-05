@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 35 720 285" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif">
+  <defs>
+    <marker id="g-teal" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" viewBox="0 0 10 10" refX="8" refY="5" orient="auto"><path d="M0,1 L9,5 L0,9 z" fill="#2f8576"/></marker>
+    <marker id="g-amber" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" viewBox="0 0 10 10" refX="8" refY="5" orient="auto"><path d="M0,1 L9,5 L0,9 z" fill="#c2872b"/></marker>
+  </defs>
+
+  <text x="170" y="58" text-anchor="middle" fill="#2f8576" font-size="20" font-style="italic">negated literals</text>
+  <text x="560" y="58" text-anchor="middle" fill="#2f8576" font-size="20" font-style="italic">count per clause</text>
+
+  <!-- fan-in arrows, coloured by clause -->
+  <g stroke-width="2.5" fill="none">
+    <line x1="256" y1="110" x2="466" y2="132" stroke="#2f8576" marker-end="url(#g-teal)"/>
+    <line x1="256" y1="190" x2="466" y2="236" stroke="#c2872b" marker-end="url(#g-amber)"/>
+    <line x1="256" y1="270" x2="466" y2="248" stroke="#c2872b" marker-end="url(#g-amber)"/>
+  </g>
+
+  <!-- negated-literal rows -->
+  <g font-size="22" text-anchor="middle">
+    <rect x="85" y="87"  width="170" height="46" rx="10" fill="#d9efe9" stroke="#2f8576" stroke-width="3"/>
+    <text x="170" y="117" fill="#16433c">clause 1: ¬q</text>
+    <rect x="85" y="167" width="170" height="46" rx="10" fill="#f6e7cc" stroke="#c2872b" stroke-width="3"/>
+    <text x="170" y="197" fill="#16433c">clause 2: ¬q</text>
+    <rect x="85" y="247" width="170" height="46" rx="10" fill="#f6e7cc" stroke="#c2872b" stroke-width="3"/>
+    <text x="170" y="277" fill="#16433c">clause 2: ¬r</text>
+  </g>
+
+  <!-- one result row per clause -->
+  <g font-size="22" text-anchor="middle">
+    <rect x="470" y="104" width="180" height="56" rx="10" fill="#d9efe9" stroke="#2f8576" stroke-width="3.5"/>
+    <text x="560" y="139" fill="#16433c">clause 1 → 1</text>
+    <rect x="470" y="214" width="180" height="56" rx="10" fill="#f6e7cc" stroke="#c2872b" stroke-width="3.5"/>
+    <text x="560" y="249" fill="#16433c">clause 2 → 2</text>
+  </g>
+</svg>

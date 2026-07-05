@@ -1,0 +1,53 @@
+# Boolean function minimisation: from a function's satisfying assignments, find
+# its prime implicants and the essential ones (the Quine-McCluskey algorithm).
+#
+# This runs the reverse direction of cnf-falsifiability: that takes a formula to
+# its models, this takes the models (the minterms) back towards a minimal sum of
+# products. A term is a string over {0, 1, -}; a "-" means the variable is
+# dropped from that product.
+#
+# Start from the minterms and merge any two terms that agree everywhere except
+# one 0/1 position, replacing that position with "-". Merging iterates to a
+# fixpoint. A term that is never merged into a larger one is a PRIME IMPLICANT.
+# A prime is ESSENTIAL when some minterm is covered by no other prime.
+#
+# Merging reads two terms, so the recursion is non-linear: run on an in-memory
+# backend.
+#
+#     bun run datamog --backend seminaive prime-implicants.dl
+#
+# The function is true on {001, 011, 110, 111}. Its primes are 0-1, -11 and 11-;
+# the essentials are 0-1 and 11-, since -11 is redundant (both minterms it
+# covers are covered by another prime).
+
+extensional minterm(bits: string).
+
+len(N) :- minterm(S), N = length(S).
+
+# Every minterm is a term; merging grows the set of terms.
+term(S) :- minterm(S).
+
+# Two terms merge if they agree on every position except one, where one has 0
+# and the other 1 (neither a dash).
+mergeable(S1, S2, P) :- term(S1), term(S2), len(N), P in [0 .. N - 1],
+    S1[0:P] = S2[0:P], S1[P + 1:N] = S2[P + 1:N],
+    S1[P] != S2[P], S1[P] != "-", S2[P] != "-".
+merged(MS) :- mergeable(S1, S2, P), len(N), MS = S1[0:P] + "-" + S1[P + 1:N].
+term(S) :- merged(S).
+
+# A term merged into a larger one is covered; the rest are prime.
+covered(S) :- mergeable(S, _, _).
+prime(S) :- term(S), not covered(S).
+
+# A prime covers a minterm when they agree on every non-dash position.
+mismatch(P, M, I) :- prime(P), minterm(M), len(N), I in [0 .. N - 1], P[I] != "-", P[I] != M[I].
+mismatch_any(P, M) :- mismatch(P, M, _).
+covers(P, M) :- prime(P), minterm(M), not mismatch_any(P, M).
+
+# A prime is essential when it is the only one covering some minterm.
+cover_count(M, count(P)) :- covers(P, M).
+essential(P) :- covers(P, M), cover_count(M, 1).
+
+?- prime(S).
+?- covers(P, M).
+?- essential(P).

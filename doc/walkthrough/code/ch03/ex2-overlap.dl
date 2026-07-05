@@ -1,0 +1,16 @@
+# Exercise 3.2 — Union with overlap.
+#
+# Define `involved_in_family(P)` with two rules. Most people in our
+# dataset qualify via BOTH rules — but the resulting relation has
+# no duplicates.
+
+extensional parent(parent_name: string, child_name: string).
+extensional marriage(p1: string, p2: string).
+
+# Placeholder so the file parses; delete once you've added your rules.
+involved_in_family(P) :- parent(P, "__nobody__").
+
+# TODO: rule 1 — P appears as a parent.
+# TODO: rule 2 — P appears in a marriage (either column).
+
+?- involved_in_family(P).

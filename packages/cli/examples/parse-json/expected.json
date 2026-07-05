@@ -1,0 +1,86 @@
+[
+  [
+    {
+      "K": "array",
+      "P": "[1,2,3]",
+      "J": [1, 2, 3]
+    },
+    {
+      "K": "array",
+      "P": "[10,20]",
+      "J": [10, 20]
+    },
+    {
+      "K": "object",
+      "P": "{\"a\":1,\"b\":2}",
+      "J": {
+        "a": 1,
+        "b": 2
+      }
+    },
+    {
+      "K": "malformed",
+      "P": "not json at all",
+      "J": null
+    },
+    {
+      "K": "empty_array",
+      "P": "[]",
+      "J": []
+    }
+  ],
+  [
+    {
+      "K": "array",
+      "N": 3
+    },
+    {
+      "K": "array",
+      "N": 2
+    },
+    {
+      "K": "object",
+      "N": 2
+    },
+    {
+      "K": "malformed",
+      "N": null
+    },
+    {
+      "K": "empty_array",
+      "N": 0
+    }
+  ],
+  [
+    {
+      "K": "array",
+      "V": 1
+    },
+    {
+      "K": "array",
+      "V": 10
+    },
+    {
+      "K": "empty_array",
+      "V": null
+    }
+  ],
+  [
+    {
+      "K": "array",
+      "T": "array"
+    },
+    {
+      "K": "object",
+      "T": "object"
+    },
+    {
+      "K": "malformed",
+      "T": null
+    },
+    {
+      "K": "empty_array",
+      "T": "array"
+    }
+  ]
+]

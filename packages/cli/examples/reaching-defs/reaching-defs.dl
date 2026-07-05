@@ -1,0 +1,36 @@
+# Reaching definitions — a classic data-flow analysis
+#
+# In compiler design, a "reaching definition" analysis determines which
+# variable definitions (assignments) can reach a given program point
+# without being overwritten along the way.
+#
+# This example models a simple control-flow graph (CFG) with four blocks
+# forming a loop. Each block may generate a new definition of a variable
+# or kill an existing one. A definition reaches a block if:
+#   1. It is generated at that block, OR
+#   2. It reaches a predecessor block and is not killed there.
+#
+# Adapted from the Soufflé tutorial (https://souffle-lang.github.io/tutorial).
+
+# Control-flow graph edges, loaded from cfg.csv (one edge per row).
+extensional cfg(src: string, dst: string).
+
+# Definitions generated at each block
+gen("b2", "d1").
+gen("b4", "d2").
+
+# Definitions killed at each block
+kill("b4", "d1").
+kill("b2", "d2").
+
+# A definition reaches a block if it is generated there,
+# or it reaches a predecessor and is not killed there.
+reaches(D, U) :- gen(U, D).
+reaches(D, V) :- cfg(U, V), reaches(D, U), not kill(U, D).
+
+# Query the control-flow graph on its own. Switch the playground's
+# results panel to the Mermaid view to see the CFG as a graph.
+?- cfg(From, To).
+
+# Query the reaching definitions: which definition reaches which block.
+?- reaches(Def, Block).

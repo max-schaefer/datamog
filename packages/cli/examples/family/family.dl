@@ -1,0 +1,6 @@
+extensional parent(name: string, child: string).
+
+ancestor(X, Y) :- parent(X, Y).
+ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
+
+?- ancestor("alice", X).

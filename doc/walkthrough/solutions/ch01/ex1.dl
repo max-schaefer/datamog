@@ -1,0 +1,8 @@
+# Exercise 1.1 solution.
+#
+# The constant "us" pins the second column; Name and Year are
+# free variables that will be bound by the query.
+
+extensional person(name: string, country: string, year_born: integer).
+
+?- person(Name, "us", Year).

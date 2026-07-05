@@ -1,0 +1,110 @@
+{
+  "name": "datamog-vscode",
+  "displayName": "Datamog",
+  "description": "VS Code language support for Datamog",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "publisher": "max-schaefer",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/max-schaefer/datamog",
+    "directory": "packages/vscode-extension"
+  },
+  "keywords": [
+    "datalog",
+    "vscode",
+    "language-server",
+    "syntax-highlighting",
+    "diagnostics",
+    "datamog"
+  ],
+  "author": "Max Schaefer",
+  "homepage": "https://github.com/max-schaefer/datamog/tree/main/packages/vscode-extension#readme",
+  "bugs": {
+    "url": "https://github.com/max-schaefer/datamog/issues"
+  },
+  "engines": {
+    "vscode": "^1.67.0"
+  },
+  "categories": ["Programming Languages"],
+  "activationEvents": ["onLanguage:datamog", "onCommand:datamog.run"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "datamog",
+        "aliases": ["Datamog", "datamog"],
+        "extensions": [".dl"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "datamog",
+        "scopeName": "source.datamog",
+        "path": "./syntaxes/datamog.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "datamog.run",
+        "title": "Datamog: Run File",
+        "category": "Datamog",
+        "icon": "$(play)"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "datamog.run",
+        "key": "ctrl+enter",
+        "mac": "cmd+enter",
+        "when": "editorTextFocus && editorLangId == datamog"
+      }
+    ],
+    "menus": {
+      "editor/title/run": [
+        {
+          "command": "datamog.run",
+          "when": "editorLangId == datamog",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "datamog.run",
+          "when": "editorLangId == datamog",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "datamog.run",
+          "when": "editorLangId == datamog"
+        }
+      ]
+    }
+  },
+  "dependencies": {
+    "langium": "^4.2.2",
+    "vscode-languageclient": "^9.0.1",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.12"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.67.0",
+    "csv-parse": "^6.2.1",
+    "datamog-backend-seminaive": "workspace:*",
+    "datamog-core": "workspace:*",
+    "datamog-csv": "workspace:*",
+    "datamog-engine": "workspace:*",
+    "datamog-json": "workspace:*",
+    "datamog-jsonl": "workspace:*",
+    "datamog-parser": "workspace:*",
+    "esbuild": "^0.25.0"
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch"
+  }
+}

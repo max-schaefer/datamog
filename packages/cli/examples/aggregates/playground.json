@@ -1,0 +1,5 @@
+{
+  "name": "Aggregates",
+  "description": "Aggregate functions (count, sum, avg, min, max, concat, list) on student scores",
+  "order": 50
+}

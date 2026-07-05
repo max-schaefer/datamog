@@ -1,0 +1,41 @@
+# parse_json — turn raw text into `value`s inside a rule body.
+#
+# Each row of raw.csv carries a kind tag and a payload string. The
+# rules below parse each payload via `parse_json`, then exercise the
+# resulting `value` against the existing destructuring / projection
+# builtins (length, subscript, type_of). Malformed payloads surface
+# as NULL and propagate cleanly through subsequent operations.
+#
+# Note on object payloads: SQLite's `json()` validates and minifies
+# but does not sort object keys, while Postgres `jsonb` and the
+# native evaluator both canonicalise key order. To keep the expected
+# output identical across every backend, the object payload here
+# uses keys that are already in sorted order. See spec §2.9.
+
+extensional raw(kind: string, payload: string).
+
+# Parse each payload into a `value`. Malformed input → NULL.
+parsed(K, P, J) :- raw(K, P), J = parse_json(P).
+
+# Length of each parsed value: array length / object key count, NULL
+# for the malformed row. The malformed payload still flows through —
+# `length(NULL)` is NULL, propagated through to the integer column.
+parsed_length(K, N) :- parsed(K, _, J), N = length(J).
+
+# Projection on parsed arrays: pull the first element as a `value`,
+# then coerce to integer. Non-arrays (the object row, the malformed
+# row) miss the array-shape gate and yield NULL, which the integer
+# column surfaces as a NULL row in the result.
+first_element(K, V) :-
+    parsed(K, _, J),
+    type_of(J) = "array",
+    V = as_integer(J[0]).
+
+# Type of each parsed value. The malformed row's J is NULL, so
+# type_of(J) is NULL too — flowing through unchanged.
+parsed_type(K, T) :- parsed(K, _, J), T = type_of(J).
+
+?- parsed(K, P, J).
+?- parsed_length(K, N).
+?- first_element(K, V).
+?- parsed_type(K, T).

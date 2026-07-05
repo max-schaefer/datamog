@@ -1,0 +1,16 @@
+# Tutorial, chapter 8 — negation.
+#
+# Find "orphans" in our family tree: people who appear somewhere
+# in the parent table but have no parent themselves — i.e., the
+# top generation.
+
+extensional parent(parent_name: string, child_name: string).
+
+person(P) :- parent(P, _).
+person(P) :- parent(_, P).
+
+has_parent(X) :- parent(_, X).
+
+orphan(X) :- person(X), not has_parent(X).
+
+?- orphan(X).

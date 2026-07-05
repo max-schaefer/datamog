@@ -1,0 +1,51 @@
+[
+  [
+    {
+      "N": "alice"
+    },
+    {
+      "N": "bob"
+    },
+    {
+      "N": "carol"
+    }
+  ],
+  [
+    {
+      "N": "alice"
+    }
+  ],
+  [
+    {
+      "N": "bob"
+    },
+    {
+      "N": "carol"
+    },
+    {
+      "N": "dave"
+    }
+  ],
+  [
+    {
+      "N": "alice",
+      "BothAdminActive": true,
+      "AnyPriv": true
+    },
+    {
+      "N": "bob",
+      "BothAdminActive": false,
+      "AnyPriv": true
+    },
+    {
+      "N": "carol",
+      "BothAdminActive": false,
+      "AnyPriv": true
+    },
+    {
+      "N": "dave",
+      "BothAdminActive": false,
+      "AnyPriv": false
+    }
+  ]
+]

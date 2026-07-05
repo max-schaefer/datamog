@@ -1,0 +1,26 @@
+# Tutorial, chapter 3 — multiple rules and disjunction.
+#
+# Same family as ch02, now with marriages:
+#
+#   alice - bob      cecil - diana
+#       \  /              \  /
+#       erin ----------- frank
+#              /      \
+#           greg     helen
+
+extensional parent(parent_name: string, child_name: string).
+extensional marriage(p1: string, p2: string).
+
+# Symmetric relation: two rules that flip the argument order.
+spouse(X, Y) :- marriage(X, Y).
+spouse(X, Y) :- marriage(Y, X).
+
+# Union of three sources: X and Y are close kin if either is the
+# other's parent, or if they are spouses.
+close_kin(X, Y) :- parent(X, Y).
+close_kin(X, Y) :- parent(Y, X).
+close_kin(X, Y) :- spouse(X, Y).
+
+?- spouse("alice", X).
+?- spouse(X, "frank").
+?- close_kin("erin", X).

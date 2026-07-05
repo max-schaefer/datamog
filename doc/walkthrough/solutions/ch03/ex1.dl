@@ -1,0 +1,23 @@
+# Exercise 3.1 solution.
+#
+# Three rules cover three ways of being an in-law. The third uses
+# an intermediate step — we find Y's parent, then that parent's
+# spouse — which naturally excludes Y's actual parent (you're not
+# your own spouse in our data).
+
+extensional parent(parent_name: string, child_name: string).
+extensional marriage(p1: string, p2: string).
+
+spouse(X, Y) :- marriage(X, Y).
+spouse(X, Y) :- marriage(Y, X).
+
+# X is a parent of Y's spouse.
+in_law(X, Y) :- spouse(Y, S), parent(X, S).
+
+# X is a child of Y's spouse.
+in_law(X, Y) :- spouse(Y, S), parent(S, X).
+
+# X is a spouse of Y's parent (step-parent, roughly).
+in_law(X, Y) :- parent(P, Y), spouse(P, X).
+
+?- in_law(X, "erin").

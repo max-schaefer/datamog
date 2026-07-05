@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Datamog Embed Demo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body { max-width: 48rem; margin: 2rem auto; padding: 0 1rem; font-family: 'Inter', system-ui, sans-serif; line-height: 1.6; }
+      h1 { font-size: 1.4rem; }
+      [data-datamog] { margin: 1.5rem 0; }
+    </style>
+  </head>
+  <body>
+    <h1>Datamog embed</h1>
+    <p>
+      Reachability over a small directed graph. Click <code>▸ run</code> next to a
+      query to evaluate it (the result appears below the line), or click the data
+      chip next to <code>extensional edge</code> to view, edit, or reset its rows.
+    </p>
+
+    <div data-datamog>
+      <script type="application/json">
+      {
+        "source": "extensional edge(src: string, dst: string).\n\nreachable(X) :- edge(\"a\", X).\nreachable(X) :- edge(Y, X), reachable(Y).\n\n?- reachable(X).",
+        "csv": { "edge": "src,dst\na,b\nb,c\nc,d\nx,y" }
+      }
+      </script>
+    </div>
+
+    <p>A ground query answers yes / no.</p>
+
+    <div data-datamog>
+      <script type="application/json">
+      {
+        "source": "extensional edge(src: string, dst: string).\n\nreachable(X) :- edge(\"a\", X).\nreachable(X) :- edge(Y, X), reachable(Y).\n\n?- reachable(\"d\").",
+        "csv": { "edge": "src,dst\na,b\nb,c\nc,d" }
+      }
+      </script>
+    </div>
+
+    <script type="module" src="/src/embed/index.ts"></script>
+  </body>
+</html>

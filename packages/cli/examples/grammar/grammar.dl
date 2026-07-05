@@ -1,0 +1,23 @@
+# Recognizing a left-recursive grammar using string operations and ranges
+#
+# The recognizer parses the following grammar rules:
+#   A -> "a"
+#   A -> A "b"
+#   A -> A "a"
+#
+# The input string is stored in a single-row extensional predicate.
+# Positions are derived using a range over the string length.
+#
+# at(I, C) means the character at position I in the input string is C.
+# a(F, T) means the nonterminal A matches input[F:T].
+# Query: does the grammar accept the full string?
+
+extensional input(s: string).
+
+at(S, I, C) :- input(S), I in [0 .. length(S) - 1], C = S[I].
+
+a(S, F, F + 1) :- at(S, F, "a").
+a(S, F, T + 1) :- a(S, F, T), at(S, T, "b").
+a(S, F, T + 1) :- a(S, F, T), at(S, T, "a").
+
+?- a(S, 0, N).

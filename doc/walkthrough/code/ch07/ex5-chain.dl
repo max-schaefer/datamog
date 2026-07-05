@@ -1,0 +1,18 @@
+# Exercise 7.5 — A chain of equalities that are each safe
+# only *together*.
+#
+# Write a rule where no single body atom binds every variable, but
+# the combination of atoms and equalities does. The analyser is
+# fixed-point: it keeps marking variables safe as long as progress
+# is being made.
+
+extensional seed(x: integer).
+
+# TODO: write a rule `quad(A, B, C, D) :- ...` where each of
+# A, B, C, D is bound in turn by an expression involving a
+# previously-bound variable.
+
+# Placeholder so the file parses.
+quad(A, B, C, D) :- seed(A), B = A, C = A, D = A.
+
+?- quad(A, B, C, D).

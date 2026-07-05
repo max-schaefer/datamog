@@ -1,0 +1,27 @@
+# Exercise 4.4 solution.
+#
+# Run with: bun run datamog <file>.dl
+#
+# Mutual recursion: rr and bb each reference the other. Datamog
+# groups the two predicates into a shared recursive block because
+# they sit in the same strongly connected component of the rule
+# dependency graph.
+#
+# On sqlite/sqljs, Datamog uses a combined CTE with a synthetic
+# `__tag` discriminator column (SQLite has no multi-CTE recursion).
+# On Postgres, Datamog emits structurally-clean sibling CTEs in a
+# single `WITH RECURSIVE` block.
+#
+# Swapping the rule order doesn't change the answer — as advertised
+# in Chapter 2, rule order is cosmetic.
+
+extensional edge(src: string, dst: string, colour: string).
+
+rr(X, Y) :- edge(X, Y, "red").
+rr(X, Y) :- bb(X, Z), edge(Z, Y, "red").
+
+bb(X, Y) :- edge(X, Y, "blue").
+bb(X, Y) :- rr(X, Z), edge(Z, Y, "blue").
+
+?- rr("a", Y).
+?- bb("a", Y).

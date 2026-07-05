@@ -1,0 +1,58 @@
+---
+import { getCollection, render } from "astro:content";
+import SlideLayout from "../layouts/SlideLayout.astro";
+import CourseOverview from "../components/CourseOverview.astro";
+import { DECKS, OVERVIEW_ID, baseName, deckSequence } from "../decks";
+
+export async function getStaticPaths() {
+  const all = await getCollection("slides");
+
+  return DECKS.flatMap((deck) => {
+    const seq = deckSequence(deck, all);
+    const url = (entry: (typeof seq)[number]) =>
+      `${deck.slug}/${baseName(entry.id)}`;
+
+    return seq.map((entry, i) => ({
+      params: { slide: url(entry) },
+      props: {
+        entry,
+        part: deck.part,
+        number: i + 1,
+        total: seq.length,
+        prevId: i > 0 ? url(seq[i - 1]) : undefined,
+        nextId: i < seq.length - 1 ? url(seq[i + 1]) : undefined,
+        firstId: url(seq[0]),
+        lastId: url(seq[seq.length - 1]),
+      },
+    }));
+  });
+}
+
+const { entry, part, number, total, prevId, nextId, firstId, lastId } =
+  Astro.props;
+const { Content } = await render(entry);
+const isOverview = entry.id === OVERVIEW_ID;
+const isRoadmap = entry.data.roadmap;
+
+const base = import.meta.env.BASE_URL;
+const href = (id?: string) => (id === undefined ? undefined : `${base}${id}/`);
+---
+
+<SlideLayout
+  title={entry.data.title}
+  kind={entry.data.kind}
+  section={entry.data.section}
+  image={entry.data.image}
+  imageAlt={entry.data.imageAlt}
+  tight={entry.data.tight}
+  number={number}
+  total={total}
+  prevUrl={href(prevId)}
+  nextUrl={href(nextId)}
+  firstUrl={href(firstId)!}
+  lastUrl={href(lastId)!}
+>
+  <Content />
+  {isOverview && <CourseOverview currentPart={part} />}
+  {isRoadmap && <CourseOverview completedThrough={part} />}
+</SlideLayout>

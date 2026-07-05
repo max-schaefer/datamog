@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 320" role="img"
+     font-family="Inter, 'Helvetica Neue', Arial, sans-serif" fill="#16433c">
+  <defs>
+    <marker id="arrowTeal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#34786c"/>
+    </marker>
+    <marker id="arrowAmber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#cf8a2e"/>
+    </marker>
+  </defs>
+
+  <!-- paths: EDB A -> IDB -> Result A (teal); EDB B -> IDB -> Result B (amber) -->
+  <g fill="none" stroke-width="2.5">
+    <path d="M200,82 L286,138" stroke="#34786c" marker-end="url(#arrowTeal)"/>
+    <path d="M200,246 L286,184" stroke="#cf8a2e" marker-end="url(#arrowAmber)"/>
+    <path d="M510,138 L590,86" stroke="#34786c" marker-end="url(#arrowTeal)"/>
+    <path d="M510,184 L590,244" stroke="#cf8a2e" marker-end="url(#arrowAmber)"/>
+  </g>
+
+  <!-- EDB 1 (teal) -->
+  <rect x="24" y="34" width="176" height="96" rx="10" fill="#e6f2ef" stroke="#5f9d92" stroke-width="1.5"/>
+  <text x="112" y="60" text-anchor="middle" font-size="22" font-weight="700" fill="#34786c">EDB &#9312;</text>
+  <text x="112" y="90" text-anchor="middle" font-size="18" font-family="'JetBrains Mono', ui-monospace, monospace">Snorlax  210</text>
+  <text x="112" y="114" text-anchor="middle" font-size="18" font-family="'JetBrains Mono', ui-monospace, monospace">Pikachu  111</text>
+
+  <!-- EDB 2 (amber) -->
+  <rect x="24" y="194" width="176" height="106" rx="10" fill="#f7edd8" stroke="#d9a441" stroke-width="1.5"/>
+  <text x="112" y="220" text-anchor="middle" font-size="22" font-weight="700" fill="#cf8a2e">EDB &#9313;</text>
+  <text x="112" y="250" text-anchor="middle" font-size="18" font-family="'JetBrains Mono', ui-monospace, monospace">Mewtwo   246</text>
+  <text x="112" y="272" text-anchor="middle" font-size="18" font-family="'JetBrains Mono', ui-monospace, monospace">Slaking  284</text>
+  <text x="112" y="294" text-anchor="middle" font-size="18" font-family="'JetBrains Mono', ui-monospace, monospace">Magikarp  20</text>
+
+  <!-- IDB (shared) -->
+  <rect x="290" y="96" width="220" height="128" rx="12" fill="#e6f2ef" stroke="#5f9d92" stroke-width="2"/>
+  <text x="400" y="122" text-anchor="middle" font-size="21" font-weight="700" fill="#34786c">IDB &#8212; same rules</text>
+  <text x="400" y="156" text-anchor="middle" font-size="16" font-family="'JetBrains Mono', ui-monospace, monospace">strong_pokemon(N) :-</text>
+  <text x="400" y="180" text-anchor="middle" font-size="16" font-family="'JetBrains Mono', ui-monospace, monospace">  pokemon(_, N, H),</text>
+  <text x="400" y="204" text-anchor="middle" font-size="16" font-family="'JetBrains Mono', ui-monospace, monospace">  H &gt; 150.</text>
+
+  <!-- Result 1 (teal) -->
+  <rect x="592" y="46" width="148" height="78" rx="10" fill="#e6f2ef" stroke="#5f9d92" stroke-width="1.5"/>
+  <text x="666" y="72" text-anchor="middle" font-size="22" font-weight="700" fill="#34786c">Result &#9312;</text>
+  <text x="666" y="104" text-anchor="middle" font-size="18" font-family="'JetBrains Mono', ui-monospace, monospace">Snorlax</text>
+
+  <!-- Result 2 (amber) -->
+  <rect x="592" y="200" width="148" height="92" rx="10" fill="#f7edd8" stroke="#d9a441" stroke-width="1.5"/>
+  <text x="666" y="226" text-anchor="middle" font-size="22" font-weight="700" fill="#cf8a2e">Result &#9313;</text>
+  <text x="666" y="256" text-anchor="middle" font-size="18" font-family="'JetBrains Mono', ui-monospace, monospace">Mewtwo</text>
+  <text x="666" y="280" text-anchor="middle" font-size="18" font-family="'JetBrains Mono', ui-monospace, monospace">Slaking</text>
+</svg>

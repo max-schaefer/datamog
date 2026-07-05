@@ -1,0 +1,215 @@
+# Development
+
+Datamog is a Bun/TypeScript monorepo with a small Python package for the
+Jupyter magic. Most TypeScript work should be done from the repository root so
+Bun can resolve workspace packages.
+
+The TypeScript packages are Bun-only when consumed directly: package entry
+points target Bun's TypeScript runtime and some packages use Bun APIs directly.
+Do not assume Node.js runtime compatibility unless a future package adds a
+compiled Node build. The VS Code extension is built from this Bun workspace, but
+the packaged extension runs as bundled JavaScript inside VS Code's extension
+host and should not require Bun from end users.
+
+## Prerequisites
+
+- Bun 1.3 or newer.
+- Node.js/npm for commands that invoke `node`, `npx`, or VS Code packaging.
+- Python 3.10 or newer, only for `python/datamog-magic`.
+- PostgreSQL, only when developing or testing the Postgres backend.
+
+Install TypeScript workspace dependencies with:
+
+```bash
+bun install
+```
+
+For reproducible CI-style installs, use:
+
+```bash
+bun install --frozen-lockfile
+```
+
+## Repository Layout
+
+- `packages/parser`: Langium grammar, generated parser, and AST types.
+- `packages/core`: analyzer, type inference, safety checks, completions, and
+  shared language logic.
+- `packages/engine`: SQL translation, execution orchestration, loaders, and
+  result coercion.
+- `packages/backend/*`: Postgres, SQLite, sql.js, native, and seminaive
+  backends.
+- `packages/loader/*`: CSV, JSON, JSONL, Google Sheets, and Mermaid loaders.
+- `packages/repl`: incremental REPL support used by the CLI and notebook magic.
+- `packages/cli`: command-line interface and examples.
+- `packages/playground`: browser playground built with Vite, Preact, CodeMirror,
+  and sql.js.
+- `packages/vscode-extension`: VS Code language extension.
+- `python/datamog-magic`: IPython/Jupyter integration.
+- `doc`: language spec, tutorial chapters, slides, and tutorial tooling.
+
+## Common Commands
+
+Run these from the repository root:
+
+```bash
+bun test                 # TypeScript tests across packages
+bun run test:coverage    # TypeScript tests with coverage
+bun run typecheck        # TypeScript project-reference build
+bun run check            # Biome lint/format check
+bun run check:fix        # Biome lint/format autofix
+```
+
+Run a single test file with:
+
+```bash
+bun test packages/core/test/analyzer.test.ts
+```
+
+Run a Datamog program through the CLI:
+
+```bash
+bun run datamog packages/cli/examples/family/family.dl
+bun run datamog --dry-run packages/cli/examples/family/family.dl
+```
+
+Select a backend explicitly:
+
+```bash
+bun run datamog --backend sqlite packages/cli/examples/family/family.dl
+bun run datamog --backend sqljs packages/cli/examples/family/family.dl
+bun run datamog --backend native packages/cli/examples/family/family.dl
+bun run datamog --backend seminaive packages/cli/examples/family/family.dl
+DATABASE_URL=postgres://localhost:5432/datamog_test bun run datamog --backend postgres program.dl
+```
+
+## Testing Notes
+
+`bun test` runs the TypeScript unit tests recursively. The Postgres backend tests
+are skipped unless `DATABASE_URL` is set. Point `DATABASE_URL` only at a
+dedicated development or test database because those tests create and drop their
+own tables.
+
+The playground end-to-end tests use Playwright:
+
+```bash
+bun run e2e
+bun run e2e:ui
+```
+
+The e2e script installs Chromium on first run and starts the playground dev
+server through Playwright's `webServer` configuration.
+
+For the Python package:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e 'python/datamog-magic[test]'
+python -m pytest python/datamog-magic
+```
+
+The notebook magic shells out to `bun run datamog`. If notebooks are launched
+outside the repository, set `DATAMOG_CMD`, for example:
+
+```bash
+export DATAMOG_CMD="bun run --cwd /path/to/datamog datamog"
+```
+
+## Playground
+
+Start the playground dev server:
+
+```bash
+bun run playground:dev
+```
+
+Build the static site:
+
+```bash
+bun run playground:build
+```
+
+The deployed GitHub Pages workflow installs dependencies with
+`bun install --frozen-lockfile` and publishes `packages/playground/dist`.
+
+## Parser And Grammar
+
+The grammar lives at `packages/parser/src/datamog.langium`. Generated parser
+files live under `packages/parser/src/generated` and are ignored by Biome.
+
+After changing the grammar, regenerate the parser from the parser package:
+
+```bash
+cd packages/parser
+bunx langium generate
+```
+
+When adding language syntax, also check the downstream consumers that mirror the
+language surface, especially `packages/core/src/keywords.ts`, playground
+highlighting/completion code, and the VS Code TextMate grammar.
+
+## VS Code Extension
+
+Build the extension bundle:
+
+```bash
+bun --filter datamog-vscode build
+```
+
+Build a `.vsix` from the repository root:
+
+```bash
+bun run build:vscode
+```
+
+For interactive extension development, open `packages/vscode-extension` in VS
+Code and start an Extension Development Host.
+
+## Tutorial Slides
+
+Marp slide sources live in `doc/walkthrough/slides`.
+
+```bash
+bun run slides:build
+bun run slides:watch
+```
+
+Generated slide PDFs are written under `doc/walkthrough/slides/pdf`.
+
+## Environment Variables
+
+- `DATABASE_URL`: selects and configures the Postgres backend for the CLI and
+  enables Postgres backend tests.
+- `GOOGLE_API_KEY`: lets the CLI load private Google Sheets through the Google
+  Sheets loader.
+- `GOOGLE_SERVICE_ACCOUNT_EMAIL` and `GOOGLE_PRIVATE_KEY`: alternative Google
+  Sheets credentials for service-account access.
+- `DATAMOG_CMD`: command used by `datamog-magic` to start the Datamog CLI.
+
+## Before Opening A Change
+
+At minimum, run the checks that match the area you changed:
+
+```bash
+bun test
+bun run typecheck
+bun run check
+```
+
+Also run `bun run e2e` for playground behavior changes, Postgres tests with
+`DATABASE_URL` for Postgres backend changes, and `python -m pytest
+python/datamog-magic` for notebook magic changes.
+
+## CI Workflows
+
+- `CI`: required fast gate for linting, typechecking, TypeScript tests, CLI
+  executable build, VS Code package build, and playground production build.
+- `Postgres Backend`: runs the Postgres backend tests against a GitHub Actions
+  Postgres service with `DATABASE_URL` set.
+- `Python Magic`: tests `python/datamog-magic` on supported Python versions with
+  Bun installed for subprocess-backed CLI tests.
+- `Playground E2E`: runs Playwright against the playground and uploads the
+  report/test-results artifacts on failure.
+- `Deploy Playground`: builds and deploys the playground to GitHub Pages from
+  `main` or manual dispatch.

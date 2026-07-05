@@ -1,0 +1,30 @@
+# Boolean operators: && (logical and), || (logical or), ! (logical not).
+# Operands and results are boolean; NULL propagates with three-valued
+# logic, identical to SQL semantics on every backend.
+#
+# A boolean expression in a body position is a *filter*: the rule
+# only fires when the expression is `true`. NULL (3VL "unknown") is
+# treated as "doesn't match" — same as SQL's WHERE.
+
+user("alice", true,  true ).
+user("bob",   false, true ).
+user("carol", true,  false).
+user("dave",  false, false).
+
+admin_or_active(N) :- user(N, A, I), A || I.
+both_admin_and_active(N) :- user(N, A, I), A && I.
+
+# Logical not. `!(A && I)` is "not both admin and active" — locked
+# out of admin actions even though they may be active users.
+locked(N) :- user(N, A, I), !(A && I).
+
+# Boolean columns also round-trip cleanly across backends — the
+# executor coerces SQLite's 0/1 boolean storage back into JS
+# true/false at the result boundary, so the row shape matches the
+# native evaluator's exactly.
+status(N, A && I, A || I) :- user(N, A, I).
+
+?- admin_or_active(N).
+?- both_admin_and_active(N).
+?- locked(N).
+?- status(N, BothAdminActive, AnyPriv).

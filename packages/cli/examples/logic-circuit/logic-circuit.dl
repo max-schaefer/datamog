@@ -1,0 +1,49 @@
+# Evaluating a boolean logic circuit: the larger sample from Advent of Code
+# 2024 day 24, part 1.
+#
+# Wires carry 0 or 1. Each gate combines two input wires with AND, OR, or XOR
+# to drive an output wire. The circuit is a DAG, so its wire values are a least
+# fixpoint: a wire's value follows once both its inputs are known. This is the
+# Part 2 formula evaluator again, on hardware instead of a syntax tree.
+#
+# The x.. and y.. wires are given in init.csv; the z.. wires (z00 the lowest
+# bit) spell the answer in binary. This circuit's z-wires read 0011111101000,
+# the decimal 2024.
+#
+# Each gate rule reads the recursive `signal` twice (once per input), so the
+# recursion is NON-LINEAR. The SQL backends reject that, so this is native-only;
+# run it on an in-memory backend:
+#
+#     bun run datamog --backend seminaive logic-circuit.dl
+#
+# (`value` is a reserved type keyword, so the wire-value relation is `signal`.)
+
+extensional init(wire: string, val: integer).
+extensional gate(wire: string, kind: string, a: string, b: string).
+
+# Evaluate the DAG: a wire either starts with a value or is driven by a gate.
+signal(W, V) :- init(W, V).
+signal(W, A & B) :- gate(W, "AND", I, J), signal(I, A), signal(J, B).
+signal(W, A | B) :- gate(W, "OR",  I, J), signal(I, A), signal(J, B).
+signal(W, A ^ B) :- gate(W, "XOR", I, J), signal(I, A), signal(J, B).
+
+# The z-wires (z00, z01, ...) form a binary number, z00 the lowest bit.
+# Recover each bit index from the name. The two-digit suffix has a leading zero
+# for 00..09, which `to_integer` rejects, so strip it in that case.
+zsuffix(W, W[1:3]) :- signal(W, _), W[0:1] = "z".
+zbit(W, Idx) :- zsuffix(W, S), S[0:1] != "0", Idx = to_integer(S).
+zbit(W, Idx) :- zsuffix(W, S), S[0:1] = "0", Idx = to_integer(S[1:2]).
+
+# Weight each bit by 2^Idx and sum. Build the powers of two with bounded
+# recursion rather than `1 << Idx`: shifts are 32-bit, but a real day-24
+# circuit has ~46 z-bits. The bound is the largest bit index present.
+topbit(max(Idx)) :- zbit(_, Idx).
+pow2(0, 1).
+pow2(N + 1, 2 * P) :- pow2(N, P), topbit(M), N < M.
+
+bit_value(Idx, V) :- zbit(W, Idx), signal(W, V).
+place(Idx, V * P) :- bit_value(Idx, V), pow2(Idx, P).
+answer(sum(WV)) :- place(_, WV).
+
+?- bit_value(Idx, V).
+?- answer(N).

@@ -1,0 +1,22 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../core" },
+    { "path": "../parser" },
+    { "path": "../engine" },
+    { "path": "../repl" },
+    { "path": "../loader/csv" },
+    { "path": "../loader/mermaid" },
+    { "path": "../backend/postgres" },
+    { "path": "../backend/sqlite" },
+    { "path": "../backend/sqljs" },
+    { "path": "../backend/native" },
+    { "path": "../backend/seminaive" }
+  ]
+}

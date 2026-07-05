@@ -1,0 +1,16 @@
+kind,raw
+int,42
+int,-7
+int,0
+int,01
+int,1.5
+int,bad
+float,3.14
+float,-0.5
+float,1.5
+float,01.5
+float,bad
+bool,true
+bool,false
+bool,True
+bool,maybe

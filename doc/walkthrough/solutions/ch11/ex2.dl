@@ -1,0 +1,9 @@
+# Exercise 11.2 solution.
+
+triple(A, B, C) :-
+    A in [1..10],
+    B in [1..10],
+    C in [1..10],
+    A * A * A + B * B * B + C * C * C = 99.
+
+?- triple(A, B, C).

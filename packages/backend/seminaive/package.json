@@ -1,0 +1,31 @@
+{
+  "name": "datamog-backend-seminaive",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Semi-naive in-memory Datalog evaluator backend for Datamog",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "bun": ">=1.3.0"
+  },
+  "files": ["src"],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/max-schaefer/datamog",
+    "directory": "packages/backend/seminaive"
+  },
+  "keywords": ["datalog", "backend", "interpreter", "evaluator", "semi-naive", "bun", "datamog"],
+  "author": "Max Schaefer",
+  "homepage": "https://github.com/max-schaefer/datamog/tree/main/packages/backend/seminaive#readme",
+  "bugs": {
+    "url": "https://github.com/max-schaefer/datamog/issues"
+  },
+  "dependencies": {
+    "datamog-backend-native": "workspace:*",
+    "datamog-core": "workspace:*",
+    "datamog-engine": "workspace:*"
+  }
+}

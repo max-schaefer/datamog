@@ -1,0 +1,6 @@
+kind,payload
+array,"[1,2,3]"
+array,"[10,20]"
+object,"{""a"":1,""b"":2}"
+malformed,"not json at all"
+empty_array,"[]"

@@ -1,0 +1,17 @@
+# Exercise 5.3 — Extending the chain.
+#
+# Starter: a length-5 chain. Grow it to 10, 20, 50, 100 and time
+# `native` vs. `seminaive`.
+
+parent("a", "b").
+parent("b", "c").
+parent("c", "d").
+parent("d", "e").
+parent("e", "f").
+
+# TODO: add more parent facts to lengthen the chain.
+
+ancestor(X, Y) :- parent(X, Y).
+ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
+
+?- ancestor(X, Y).

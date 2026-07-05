@@ -1,0 +1,9 @@
+# Course prerequisites
+# Find all direct and indirect prerequisites for a given course.
+
+extensional prereq(course: string, requires: string).
+
+all_prereqs(Course, Req) :- prereq(Course, Req).
+all_prereqs(Course, Req) :- prereq(Course, Mid), all_prereqs(Mid, Req).
+
+?- all_prereqs("cs301", X).

@@ -1,0 +1,8 @@
+# Social network: find mutual friends
+# Uses a Mermaid graph (`follows.mmd`) for extensional data.
+
+extensional follows(user: string, friend: string).
+
+mutual(X, Y) :- follows(X, Y), follows(Y, X).
+
+?- mutual("alice", X).

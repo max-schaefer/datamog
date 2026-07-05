@@ -1,0 +1,11 @@
+# Exercise 1.5 — Inline vs. CSV roundtrip.
+#
+# Starting from person.csv, replace the placeholder fact below with
+# inline `person(...)` facts for every row in the CSV. Then run both
+# programs (this one and people.dl) and confirm the query returns
+# the same SET of rows (order may differ).
+
+person("PLACEHOLDER", "PLACEHOLDER", 0).
+# TODO: replace the placeholder with one fact per CSV row.
+
+?- person(Name, Country, Year).

@@ -1,0 +1,13 @@
+# Flight connections with travel time
+#
+# Given direct flights between cities, find all possible travel routes
+# and their total travel times (including multi-hop connections).
+
+flight("london", "new_york", 9.0).
+flight("madrid", "paris", 1.5).
+flight("paris", "new_york", 10.0).
+
+travel(X, Y, T) :- flight(X, Y, T).
+travel(X, Y, T) :- flight(X, Z, T1), travel(Z, Y, T2), T = T1 + T2.
+
+?- travel(X, Y, T).

@@ -1,0 +1,5 @@
+{"id": 1, "method": "GET", "path": "/v1/users", "status": 200, "tags": ["api", "users"], "headers": {"x-trace": "abc"}}
+{"id": 2, "method": "POST", "path": "/v1/users", "status": 201, "tags": ["api", "users", "write"], "headers": {"x-trace": "def", "content-type": "application/json"}}
+{"id": 3, "method": "GET", "path": "/v2/posts", "status": 200, "tags": ["api"], "headers": {}}
+{"id": 4, "method": "GET", "path": "/v1/health", "status": 200, "tags": [], "headers": {"x-internal": "true"}}
+{"id": 5, "method": "DELETE", "path": "/v1/users/42", "status": 404}

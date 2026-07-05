@@ -1,0 +1,23 @@
+# Tutorial, chapter 11 — a small "who did it?" puzzle.
+#
+# The vase is broken. We know:
+#   1. The culprit was drinking tea at the time.
+#   2. The culprit is right-handed.
+# Who did it?
+
+extensional person(name: string).
+extensional drinks(name: string, beverage: string).
+extensional hand(name: string, handedness: string).
+
+# Encode each clue as a predicate that characterises who could
+# have done it based on that clue alone.
+drinks_tea(N) :- drinks(N, "tea").
+right_handed(N) :- hand(N, "right").
+
+# The suspect satisfies every clue.
+suspect(N) :-
+    person(N),
+    drinks_tea(N),
+    right_handed(N).
+
+?- suspect(X).

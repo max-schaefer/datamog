@@ -1,0 +1,15 @@
+# Exercise 6.5 — Deliberately divergent.
+#
+# Uncomment the divergent rule and run with --backend native. It
+# will spin until you interrupt it (Ctrl-C). Then add a bound.
+
+counter(0).
+# Divergent — no upper bound on N. Each iteration extends the
+# active domain by one new integer.
+# TODO: uncomment the next rule and run; it will not terminate.
+# counter(N + 1) :- counter(N).
+
+# TODO: then add a bound like `N < 1000` to the body to restore
+# termination.
+
+?- counter(N).

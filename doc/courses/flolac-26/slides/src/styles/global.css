@@ -1,0 +1,1158 @@
+:root {
+  --teal: #60c0bd; /* official FLOLAC banner teal */
+  --teal-deep: #2f8576;
+  --teal-soft: #e3f5f3;
+  --ink: #202124;
+  --muted: #5f6368;
+  --rule: #d7dde0;
+  --code-bg: #f5f8f7;
+  --highlight: #fff6c8;
+  --accent-orange: #f5a31e; /* emphasis highlight, echoing the GSlides marker */
+  --accent-red: #e23b2e;
+
+  --sans: "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+  --mono: "JetBrains Mono", "SF Mono", "Menlo", "Consolas", ui-monospace,
+    monospace;
+
+  /* A 16:9 stage that scales to the viewport while keeping slide proportions. */
+  --stage-w: min(100vw, calc(100vh * 16 / 9));
+  --stage-h: min(100vh, calc(100vw * 9 / 16));
+  /* Type scales with the stage so every slide reads the same at any size. */
+  --u: calc(var(--stage-h) / 100);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #0f1413;
+  color: var(--ink);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.slide {
+  position: relative;
+  width: var(--stage-w);
+  height: var(--stage-h);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  isolation: isolate;
+}
+
+/* ---- Banner (FLOLAC swoosh + logo) ------------------------------------- */
+
+/* The teal swoosh is the official master background (`swoosh.svg`, a 4:3
+   asset) laid across the top of the slide; the logo is overlaid separately so
+   it never distorts and can also sit over full-bleed image slides. */
+.slide {
+  background: #fff var(--swoosh) top center / 100% auto no-repeat;
+}
+
+.corner-logo {
+  position: absolute;
+  top: calc(var(--u) * 4);
+  right: calc(var(--u) * 4.5);
+  width: calc(var(--u) * 25);
+  height: auto;
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* Keep the logo legible when it sits over a photo instead of the teal. */
+.slide--image .corner-logo {
+  filter: drop-shadow(0 calc(var(--u) * 0.2) calc(var(--u) * 0.6) rgba(0, 0, 0, 0.45));
+}
+
+/* ---- Content ----------------------------------------------------------- */
+
+.content {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-height: 0;
+  padding: calc(var(--u) * 18) calc(var(--u) * 7) calc(var(--u) * 9);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.content--hero {
+  justify-content: center;
+  align-items: flex-start;
+  padding: calc(var(--u) * 20) calc(var(--u) * 9) calc(var(--u) * 12);
+}
+
+.slide-title {
+  margin: 0 0 calc(var(--u) * 3.5);
+  font-size: calc(var(--u) * 7.2);
+  font-weight: 400;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.body {
+  font-size: calc(var(--u) * 3.6);
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.body :first-child {
+  margin-top: 0;
+}
+
+.body p {
+  margin: 0 0 calc(var(--u) * 2.2);
+}
+
+.body strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.body ul,
+.body ol {
+  margin: 0 0 calc(var(--u) * 2);
+  padding-left: calc(var(--u) * 4);
+}
+
+.body li {
+  margin: 0 0 calc(var(--u) * 1.8);
+  padding-left: calc(var(--u) * 0.6);
+}
+
+.body li::marker {
+  color: var(--teal-deep);
+}
+
+.body a {
+  color: var(--teal-deep);
+}
+
+.body h2 {
+  font-size: calc(var(--u) * 4);
+  font-weight: 700;
+  color: var(--ink);
+  margin: calc(var(--u) * 1) 0 calc(var(--u) * 2);
+}
+
+/* Hero (title / section / emphasis) slides -------------------------------- */
+
+.slide--title .body,
+.slide--section .body,
+.slide--emphasis .body {
+  color: var(--ink);
+}
+
+.slide--title .body h1,
+.slide--section .body h1,
+.slide--emphasis .body h1 {
+  font-size: calc(var(--u) * 9);
+  font-weight: 400;
+  line-height: 1.12;
+  margin: 0 0 calc(var(--u) * 4);
+}
+
+/* Eyebrow above a part deck's title (e.g. "Part 1"), kept clear of the big
+   title so it reads as a label rather than a second heading line. */
+.slide--title .kicker {
+  margin: 0 0 calc(var(--u) * 2);
+  font-size: calc(var(--u) * 3.4);
+  font-weight: 700;
+  letter-spacing: calc(var(--u) * 0.3);
+  text-transform: uppercase;
+  color: var(--teal-deep);
+}
+
+/* Emphasis slides highlight the key phrase (echoing the GSlides orange marker)
+   instead of changing weight, so the title stays identical to the title slide. */
+.body .hl {
+  background: var(--accent-orange);
+  color: #20140a;
+  padding: 0.02em 0.3em;
+  border-radius: 0.16em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.body .q {
+  color: var(--accent-red);
+  font-weight: 700;
+  margin-left: 0.12em;
+}
+
+.slide--title .body .byline,
+.slide--section .body .byline {
+  font-size: calc(var(--u) * 3.4);
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* Pull the title-slide byline out of the centred flow so the title block sits
+   in exactly the same place as on the emphasis slides (no jump when paging). */
+.slide--title .body .byline {
+  position: absolute;
+  left: calc(var(--u) * 9);
+  bottom: calc(var(--u) * 10);
+  margin: 0;
+}
+
+/* Section / title slides over a full-bleed image -------------------------- */
+
+.slide--image .content {
+  justify-content: flex-start;
+}
+
+.slide--image .slide-bg {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-image) center / cover no-repeat;
+  z-index: 0;
+}
+
+.slide--image .body h1 {
+  display: block;
+  width: fit-content;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(2px);
+  padding: calc(var(--u) * 2) calc(var(--u) * 3);
+  border-radius: calc(var(--u) * 1.4);
+  box-shadow: 0 calc(var(--u) * 1) calc(var(--u) * 3) rgba(0, 0, 0, 0.18);
+}
+
+.slide--image .body .byline {
+  display: inline-block;
+  margin-top: calc(var(--u) * 2);
+  padding: calc(var(--u) * 1) calc(var(--u) * 1.8);
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: calc(var(--u) * 0.8);
+  color: var(--muted);
+  font-size: calc(var(--u) * 2.6);
+}
+
+/* ---- Code -------------------------------------------------------------- */
+
+.body :not(pre) > code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+  background: var(--code-bg);
+  color: var(--teal-deep);
+  padding: 0.08em 0.34em;
+  border-radius: 0.3em;
+}
+
+.body pre {
+  margin: 0 0 calc(var(--u) * 2.4);
+  padding: calc(var(--u) * 2.4) calc(var(--u) * 2.8);
+  background: var(--code-bg) !important;
+  border: 1px solid var(--rule);
+  border-radius: calc(var(--u) * 1.2);
+  font-size: calc(var(--u) * 3);
+  line-height: 1.5;
+  overflow: auto;
+}
+
+.body pre code {
+  font-family: var(--mono);
+  font-size: inherit;
+}
+
+/* Relational-algebra expressions are written as HTML (Unicode operators and
+   <sub> subscripts) since the deck has no math typesetting; styled like a code
+   block so a Datalog rule and its translation read as a pair. */
+.body .ra {
+  font-family: var(--mono);
+  background: var(--code-bg);
+  border: 1px solid var(--rule);
+  border-radius: calc(var(--u) * 1.2);
+  padding: calc(var(--u) * 2.2) calc(var(--u) * 2.8);
+  margin: 0 0 calc(var(--u) * 2.4);
+  font-size: calc(var(--u) * 3.1);
+  line-height: 1.8;
+}
+.body.is-tight .ra {
+  font-size: calc(var(--u) * 2.7);
+}
+.body .ra sub {
+  font-size: 0.66em;
+  vertical-align: -0.3em;
+  padding: 0 0.15em;
+}
+
+/* ---- Tables ------------------------------------------------------------ */
+
+.body table {
+  border-collapse: collapse;
+  margin: calc(var(--u) * 1) 0 calc(var(--u) * 2.4);
+  font-size: calc(var(--u) * 3.1);
+}
+
+.body th,
+.body td {
+  border: 1px solid var(--rule);
+  padding: calc(var(--u) * 1) calc(var(--u) * 2.2);
+  text-align: left;
+}
+
+.body th {
+  background: var(--teal-soft);
+  color: var(--teal-deep);
+  font-family: var(--mono);
+  font-weight: 700;
+}
+
+.body td {
+  color: var(--ink);
+}
+
+/* ---- Callout / caption ------------------------------------------------- */
+
+.body .caption {
+  display: block;
+  font-size: calc(var(--u) * 2.7);
+  color: var(--muted);
+  font-style: italic;
+  margin-top: calc(var(--u) * -1);
+}
+
+.body .mark {
+  background: var(--highlight);
+  padding: 0.05em 0.2em;
+  border-radius: 0.2em;
+}
+
+.body .aside {
+  display: block;
+  margin-top: calc(var(--u) * 0.7);
+  font-size: calc(var(--u) * 2.9);
+  color: #83888c;
+}
+
+.body .center {
+  text-align: center;
+}
+
+.body .center table {
+  margin-inline: auto;
+}
+
+/* Expressiveness spectrum: concentric labelled boxes (SQL outside, then
+   Datalog inside "Recursion" inside "Turing complete" inside "Higher-order
+   logic"). Each box reserves a top strip for its label so nesting never
+   obscures it. */
+.body .expr {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: calc(var(--u) * 1.5) 0 calc(var(--u) * 0.5);
+  font-size: calc(var(--u) * 3);
+}
+
+.expr__node {
+  background: #fff;
+  border: 1.5px solid var(--teal);
+  border-radius: calc(var(--u) * 0.8);
+  padding: calc(var(--u) * 1.5) calc(var(--u) * 2);
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.expr__arrow {
+  position: relative;
+  flex: none;
+  width: calc(var(--u) * 4);
+  height: 2px;
+  margin: 0 calc(var(--u) * 0.7);
+  background: var(--teal-deep);
+}
+
+.expr__arrow::after {
+  content: "";
+  position: absolute;
+  right: -1px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-left: calc(var(--u) * 1.1) solid var(--teal-deep);
+  border-top: calc(var(--u) * 0.7) solid transparent;
+  border-bottom: calc(var(--u) * 0.7) solid transparent;
+}
+
+.expr__box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border: 1.5px solid var(--teal);
+  border-radius: calc(var(--u) * 1.2);
+  background: rgba(96, 192, 189, 0.1);
+  padding: calc(var(--u) * 4.4) calc(var(--u) * 1.8) calc(var(--u) * 1.8);
+}
+
+.expr__box::before {
+  content: attr(data-label);
+  position: absolute;
+  top: calc(var(--u) * 1);
+  left: calc(var(--u) * 1.8);
+  font-size: calc(var(--u) * 2.4);
+  font-weight: 600;
+  color: var(--teal-deep);
+  white-space: nowrap;
+}
+
+/* The innermost box only holds a short node, so widen it to fit its long
+   "Higher-order logic" label and centre the node within. */
+.expr__box--inner {
+  justify-content: center;
+  min-width: calc(var(--u) * 26);
+}
+
+/* Expressiveness axis: a left-to-right arrow with a label at each end. */
+.body .spectrum {
+  margin: calc(var(--u) * 1) calc(var(--u) * 1) 0;
+}
+
+.spectrum__line {
+  position: relative;
+  height: 0;
+  border-top: 2px solid var(--muted);
+  margin: 0 calc(var(--u) * 1.5) calc(var(--u) * 0.9);
+}
+
+.spectrum__line::after {
+  content: "";
+  position: absolute;
+  right: calc(var(--u) * -0.4);
+  top: 50%;
+  transform: translateY(-50%);
+  border-left: calc(var(--u) * 1.6) solid var(--muted);
+  border-top: calc(var(--u) * 0.9) solid transparent;
+  border-bottom: calc(var(--u) * 0.9) solid transparent;
+}
+
+.spectrum__ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: calc(var(--u) * 2.7);
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+.spectrum__ends span:last-child {
+  text-align: right;
+}
+
+/* Denser typography for the formula-heavy propositional-logic slides. */
+.body.is-tight {
+  font-size: calc(var(--u) * 3.1);
+}
+
+.body.is-tight pre {
+  font-size: calc(var(--u) * 2.4);
+  line-height: 1.4;
+  padding: calc(var(--u) * 1.8) calc(var(--u) * 2.2);
+  margin-bottom: calc(var(--u) * 1.6);
+}
+
+.body.is-tight p {
+  margin-bottom: calc(var(--u) * 1.4);
+}
+
+/* Full-width code with a few long rules (e.g. the parse-and-evaluate slide):
+   shrink a touch so the widest line does not overrun. */
+.body .dense-code pre {
+  font-size: calc(var(--u) * 2.2);
+}
+
+.formula {
+  font-family: var(--mono);
+  text-align: center;
+  color: var(--ink);
+  font-size: calc(var(--u) * 3.2);
+  margin: calc(var(--u) * 1) 0 calc(var(--u) * 2);
+}
+
+/* Inline propositional-logic formula: the same monospace family as the
+   displayed formulas (.formula / .clauses / .deriv), so every formula reads
+   consistently and stands out from the surrounding prose. */
+.body .fml {
+  font-family: var(--mono);
+  font-size: 0.92em;
+}
+
+.body .note {
+  border-left: calc(var(--u) * 0.6) solid var(--teal);
+  background: var(--teal-soft);
+  padding: calc(var(--u) * 1.6) calc(var(--u) * 2.4);
+  border-radius: 0 calc(var(--u) * 1) calc(var(--u) * 1) 0;
+  color: var(--ink);
+  margin: calc(var(--u) * 1) 0 calc(var(--u) * 2);
+}
+
+.body .columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: calc(var(--u) * 4);
+  align-items: start;
+}
+
+/* Two content-sized columns (e.g. tables) followed by a wide one (an image). */
+.body .cols3 {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: calc(var(--u) * 4);
+  align-items: start;
+}
+
+/* The grammar slide sets a BNF column beside the Datalog rules. Shrink the
+   code so the longest rule fits, and the shared padding plus unitless
+   line-height keep each production level with its rule. */
+.body .columns.grammar pre {
+  font-size: calc(var(--u) * 2.2);
+}
+
+/* The extensionals slide shows the same data as a set and a table side by
+   side; shrink both so the pair sits comfortably within the columns. */
+.body .columns.data pre,
+.body .columns.data table {
+  font-size: calc(var(--u) * 2.4);
+}
+
+/* Give an embedded live demo some breathing room and a slide-friendly, scaling
+   font size (the embed ships at a fixed 14px, small against the deck's type). */
+.body .datamog-embed {
+  padding: calc(var(--u) * 2);
+  font-size: calc(var(--u) * 2.2);
+}
+.body .datamog-embed .cm-editor {
+  font-size: calc(var(--u) * 2.2);
+}
+
+/* Tight (code-dense) slides pack a taller editor; shrink the code and trim the
+   padding so a long program still fits the stage. */
+.body.is-tight .datamog-embed {
+  padding: calc(var(--u) * 1);
+}
+.body.is-tight .datamog-embed .cm-editor {
+  font-size: calc(var(--u) * 1.8);
+}
+
+.body img {
+  max-width: 100%;
+  border-radius: calc(var(--u) * 1);
+}
+
+/* A centred figure (e.g. the Datamog logo) sized to leave room for the text. */
+.body .logo-figure {
+  display: block;
+  margin: calc(var(--u) * 1.5) auto 0;
+  width: auto;
+  max-height: calc(var(--u) * 27);
+}
+
+/* Static graph diagrams (SVGs extracted from the rendered Mermaid). */
+.body img.graph {
+  display: block;
+  margin: calc(var(--u) * 1) auto calc(var(--u) * 1.5);
+  max-width: 100%;
+  max-height: calc(var(--u) * 32);
+  width: auto;
+}
+
+/* Metro-style line diagrams (hand-authored SVGs). */
+.body img.metro {
+  display: block;
+  margin: calc(var(--u) * 1.5) auto calc(var(--u) * 2);
+  max-width: 100%;
+  max-height: calc(var(--u) * 34);
+  width: auto;
+}
+
+/* The metro slide also carries a code block, so shrink its diagram a little. */
+.body.is-tight img.metro {
+  max-height: calc(var(--u) * 26);
+}
+
+/* Pokédex screenshot (slide 8) with boxes relating regions to the bold terms
+   in the prose; box and term share a colour. */
+.pk {
+  font-weight: 700;
+}
+.pk--name {
+  color: #2f8576;
+}
+.pk--types {
+  color: #cf8400;
+}
+.pk--abil {
+  color: #7b4fb0;
+}
+.pk--stats {
+  color: #2b6cb0;
+}
+
+.body .pdx {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  margin: 0;
+}
+
+.body .pdx img {
+  display: block;
+  width: auto;
+  max-height: calc(var(--u) * 54);
+}
+
+.pdx-box {
+  position: absolute;
+  border: 3px solid;
+  border-radius: calc(var(--u) * 0.6);
+  box-sizing: border-box;
+  pointer-events: none;
+}
+.pdx-box--name {
+  border-color: #2f8576;
+}
+.pdx-box--types {
+  border-color: #f5a31e;
+}
+.pdx-box--abil {
+  border-color: #7b4fb0;
+}
+.pdx-box--stats {
+  border-color: #2b6cb0;
+}
+
+/* Rule anatomy (slide 16): shaded head / body boxes with labels above. */
+.body .rule {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: calc(var(--u) * 1.2);
+  font-family: var(--mono);
+  font-size: calc(var(--u) * 3.4);
+  background: var(--code-bg);
+  border: 1px solid var(--rule);
+  border-radius: calc(var(--u) * 1.2);
+  padding: calc(var(--u) * 5.5) calc(var(--u) * 3) calc(var(--u) * 3);
+  margin: 0 0 calc(var(--u) * 2.6);
+}
+.rule__part {
+  position: relative;
+  padding: calc(var(--u) * 0.9) calc(var(--u) * 1.3);
+  border-radius: calc(var(--u) * 0.7);
+  white-space: nowrap;
+}
+.rule__part--head {
+  background: #d9e6f7;
+}
+.rule__part--body {
+  background: #fbeec6;
+}
+.rule__part::before {
+  content: attr(data-label);
+  position: absolute;
+  left: 0;
+  top: calc(var(--u) * -3.6);
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: calc(var(--u) * 2.5);
+}
+.rule__part--head::before {
+  color: #3f6aa6;
+}
+.rule__part--body::before {
+  color: #9a7b1f;
+}
+.rule__op {
+  color: var(--teal-deep);
+  padding: 0 calc(var(--u) * 0.3);
+}
+.body .rule .tk-var {
+  color: #7b4fb0;
+}
+.body .rule .tk-num {
+  color: #2b6cb0;
+}
+.body .rule .tk-op {
+  color: var(--teal-deep);
+}
+
+/* Clause-numbered formula (slides 46/47): each ①..④ sits above its clause. */
+.body .clauses {
+  font-family: var(--mono);
+  text-align: center;
+  color: var(--ink);
+  font-size: calc(var(--u) * 3.2);
+  margin: calc(var(--u) * 4.2) 0 calc(var(--u) * 2.4);
+  line-height: 1.2;
+}
+.clauses .clause {
+  position: relative;
+}
+.clauses .clause::before {
+  content: attr(data-n);
+  position: absolute;
+  top: calc(var(--u) * -3.6);
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--teal-deep);
+  font-size: calc(var(--u) * 3);
+}
+
+/* Rewrite derivations (slide 44): monospace block; `mark` shows the bit that
+   changes at each step. */
+.body .deriv {
+  font-family: var(--mono);
+  font-size: calc(var(--u) * 2.5);
+  line-height: 1.5;
+  background: var(--code-bg);
+  border: 1px solid var(--rule);
+  border-radius: calc(var(--u) * 1.2);
+  padding: calc(var(--u) * 1.8) calc(var(--u) * 2.2);
+  margin: 0 0 calc(var(--u) * 2);
+  overflow-x: auto;
+}
+
+/* Bit-field layout (slide 47): which bit of the packed integer holds which
+   variable, plus a worked decoding. */
+.body .bits {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 1.2);
+  margin: calc(var(--u) * 1.6) 0 calc(var(--u) * 2);
+  font-family: var(--mono);
+}
+.bitcol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--u) * 0.5);
+}
+.bitcol__n {
+  font-size: calc(var(--u) * 1.9);
+  color: var(--muted);
+}
+.bitcol__v {
+  display: grid;
+  place-items: center;
+  width: calc(var(--u) * 6.5);
+  height: calc(var(--u) * 6.5);
+  border: 1.5px solid var(--teal);
+  border-radius: calc(var(--u) * 0.8);
+  background: rgba(96, 192, 189, 0.12);
+  color: var(--teal-deep);
+  font-size: calc(var(--u) * 3.6);
+  font-weight: 700;
+}
+.bits__eg {
+  margin-left: calc(var(--u) * 1.5);
+  font-size: calc(var(--u) * 2.7);
+  color: var(--muted);
+}
+
+/* Slide 26: shrink the stacked extensional tables so both fit. */
+.body.is-tight table {
+  font-size: calc(var(--u) * 2.6);
+  margin-bottom: calc(var(--u) * 1.4);
+}
+.body.is-tight th,
+.body.is-tight td {
+  padding: calc(var(--u) * 0.55) calc(var(--u) * 1.6);
+}
+
+/* Nested example sub-bullets (slide 43). */
+.body li ul {
+  margin: calc(var(--u) * 0.7) 0 calc(var(--u) * 0.6);
+}
+.body li li {
+  margin-bottom: calc(var(--u) * 0.8);
+}
+.body li li::marker {
+  color: #b6bcc0;
+  content: "◦  ";
+}
+
+/* Placeholder (unwritten) slides ----------------------------------------- */
+
+.slide--placeholder .body {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+}
+
+.draft-flag {
+  font-size: calc(var(--u) * 3);
+  color: #b0b6bb;
+  border: 1px dashed #c7ccd0;
+  border-radius: calc(var(--u) * 1);
+  padding: calc(var(--u) * 2) calc(var(--u) * 3);
+  font-style: italic;
+}
+
+/* ---- Mermaid ----------------------------------------------------------- */
+
+.body pre.mermaid {
+  background: transparent !important;
+  border: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.body pre.mermaid:not([data-processed]) {
+  visibility: hidden;
+}
+
+.body pre.mermaid svg {
+  max-width: 100%;
+  max-height: calc(var(--u) * 26);
+  height: auto;
+}
+
+/* ---- Footer chrome ----------------------------------------------------- */
+
+.chrome {
+  position: absolute;
+  inset: auto 0 0 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(var(--u) * 2) calc(var(--u) * 4);
+  font-size: calc(var(--u) * 2.4);
+  color: #9aa0a6;
+}
+
+.chrome__section {
+  text-transform: uppercase;
+  letter-spacing: calc(var(--u) * 0.25);
+  font-size: calc(var(--u) * 2.1);
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 1.6);
+}
+
+.pager__btn {
+  display: grid;
+  place-items: center;
+  width: calc(var(--u) * 5);
+  height: calc(var(--u) * 5);
+  border-radius: 50%;
+  text-decoration: none;
+  color: var(--teal-deep);
+  font-size: calc(var(--u) * 4);
+  line-height: 1;
+  transition: background 0.15s ease;
+}
+
+.pager__btn:hover {
+  background: var(--teal-soft);
+}
+
+.pager__btn--off {
+  color: #d0d4d7;
+}
+
+.pager__count {
+  min-width: calc(var(--u) * 12);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.progress {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: calc(var(--u) * 0.7);
+  z-index: 4;
+  background: var(--teal-soft);
+}
+
+.progress::after {
+  content: "";
+  display: block;
+  height: 100%;
+  width: calc(var(--p) * 100%);
+  background: var(--teal-deep);
+  transition: width 0.25s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress::after,
+  .pager__btn,
+  .home__deck a {
+    transition: none;
+  }
+}
+
+/* ---- Course overview roadmap ------------------------------------------- */
+
+/* Three stacked parts; the deck's own part is highlighted via the
+   `data-part` attribute the layout sets on <body>, so the one shared slide
+   reads "you are here" differently in each deck. */
+.body .roadmap {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: calc(var(--u) * 1.6);
+  margin: calc(var(--u) * 1.8) 0 0;
+}
+
+/* The about slide is a single full-width illustration. */
+.body img.journey {
+  display: block;
+  margin: calc(var(--u) * 1) auto 0;
+  max-height: calc(var(--u) * 58);
+  max-width: 100%;
+}
+
+.roadmap__item {
+  display: flex;
+  align-items: baseline;
+  gap: calc(var(--u) * 2.5);
+  padding: calc(var(--u) * 1.3) calc(var(--u) * 2.6);
+  border: 1.5px solid var(--rule);
+  border-left: calc(var(--u) * 0.8) solid var(--rule);
+  border-radius: calc(var(--u) * 1);
+  background: #fff;
+  text-decoration: none;
+  color: inherit;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.roadmap__item:hover {
+  border-color: var(--teal);
+  border-left-color: var(--teal-deep);
+}
+
+.roadmap__n {
+  flex: none;
+  min-width: calc(var(--u) * 12);
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: calc(var(--u) * 3);
+  color: var(--muted);
+}
+
+.roadmap__text {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--u) * 0.4);
+}
+
+.roadmap__t {
+  font-size: calc(var(--u) * 3.6);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.roadmap__d {
+  font-size: calc(var(--u) * 2.8);
+  color: var(--muted);
+}
+
+/* The current part (opening overview) and the next-up part (end-of-part
+   roadmap) share the teal highlight; completed parts get a distinct amber. */
+.roadmap__item--current,
+.roadmap__item--current:hover,
+.roadmap__item--next,
+.roadmap__item--next:hover {
+  border-color: var(--teal);
+  border-left-color: var(--teal-deep);
+  background: var(--teal-soft);
+}
+
+.roadmap__item--current .roadmap__n,
+.roadmap__item--next .roadmap__n {
+  color: var(--teal-deep);
+}
+
+.roadmap__item--done,
+.roadmap__item--done:hover {
+  border-color: var(--accent-orange);
+  border-left-color: #c47e0a;
+  background: #fdf1d8;
+}
+
+.roadmap__item--done .roadmap__n {
+  color: #b4740a;
+}
+
+/* The "you are here" / "next up" / "done" chip after the part title. */
+.roadmap__item--current .roadmap__t::after,
+.roadmap__item--next .roadmap__t::after,
+.roadmap__item--done .roadmap__t::after {
+  margin-left: calc(var(--u) * 1.5);
+  padding: calc(var(--u) * 0.3) calc(var(--u) * 1.3);
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: calc(var(--u) * 2.1);
+  background: #fff;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+
+.roadmap__item--current .roadmap__t::after {
+  content: "you are here";
+  color: var(--teal-deep);
+  border: 1px solid var(--teal);
+}
+
+.roadmap__item--next .roadmap__t::after {
+  content: "next up";
+  color: var(--teal-deep);
+  border: 1px solid var(--teal);
+}
+
+.roadmap__item--done .roadmap__t::after {
+  content: "done";
+  color: #b4740a;
+  border: 1px solid var(--accent-orange);
+}
+
+/* ---- Course home page -------------------------------------------------- */
+
+.home {
+  position: relative;
+  width: var(--stage-w);
+  height: var(--stage-h);
+  overflow: hidden;
+  background: #fff var(--swoosh) top center / 100% auto no-repeat;
+  padding: calc(var(--u) * 13) calc(var(--u) * 9) calc(var(--u) * 6);
+  display: flex;
+  flex-direction: column;
+}
+
+.home__title {
+  margin: 0;
+  font-size: calc(var(--u) * 7);
+  font-weight: 400;
+  line-height: 1.12;
+  color: var(--ink);
+}
+
+.home__sub {
+  margin: calc(var(--u) * 1.4) 0 calc(var(--u) * 2.8);
+  font-size: calc(var(--u) * 3.1);
+  color: var(--muted);
+}
+
+.home__decks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: calc(var(--u) * 1.5);
+}
+
+/* Chips fill their grid cell so they all come out the same size; the intro is
+   a single centred chip on top, with the four parts in the 2x2 below it. */
+.home__deck {
+  display: flex;
+}
+.home__deck:first-child {
+  grid-column: 1 / -1;
+  justify-self: center;
+  width: calc((100% - calc(var(--u) * 1.5)) / 2);
+}
+
+/* Author credit, pushed to the bottom of the home stage. */
+.home__byline {
+  margin-top: auto;
+  padding-top: calc(var(--u) * 4);
+  color: var(--muted);
+  font-size: calc(var(--u) * 3);
+}
+.home__byline a {
+  color: var(--teal-deep);
+  text-decoration: none;
+}
+.home__byline a:hover {
+  text-decoration: underline;
+}
+
+.home__deck a {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 3);
+  padding: calc(var(--u) * 1.9) calc(var(--u) * 3);
+  border: 1.5px solid var(--teal);
+  border-radius: calc(var(--u) * 1.4);
+  background: var(--teal-soft);
+  text-decoration: none;
+  transition:
+    background 0.15s ease,
+    transform 0.15s ease;
+}
+
+.home__deck a:hover {
+  background: #d4ede9;
+  transform: translateY(calc(var(--u) * -0.3));
+}
+
+.home__deck--draft a {
+  border-color: var(--rule);
+  border-style: dashed;
+  background: #fafbfb;
+}
+
+.home__deck--draft a:hover {
+  background: #f3f5f5;
+}
+
+.home__part {
+  flex: none;
+  min-width: calc(var(--u) * 12);
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: calc(var(--u) * 3);
+  color: var(--teal-deep);
+}
+
+.home__deck--draft .home__part {
+  color: var(--muted);
+}
+
+.home__text {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--u) * 0.4);
+}
+
+.home__name {
+  font-size: calc(var(--u) * 3.8);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.home__flag {
+  margin-left: calc(var(--u) * 1.4);
+  font-size: calc(var(--u) * 2.2);
+  font-weight: 600;
+  font-style: italic;
+  color: var(--muted);
+}
+
+.home__blurb {
+  font-size: calc(var(--u) * 2.9);
+  color: var(--muted);
+}

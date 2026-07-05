@@ -1,0 +1,15 @@
+# Transitive closure on a directed graph — the structural twin of
+# the ancestor example, showing that "recursion" is a pattern, not
+# a bespoke family-tree feature.
+#
+#   a --> b --> c --> d
+#   a --> e --> f
+#   d --> f
+
+extensional edge(src: string, dst: string).
+
+reach(X, Y) :- edge(X, Y).
+reach(X, Y) :- edge(X, Z), reach(Z, Y).
+
+?- reach("a", Y).      # everything reachable from a
+?- reach(X, "f").      # everything that can reach f

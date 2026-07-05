@@ -1,0 +1,28 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      // One-shot bundle build (esbuild), used as the F5 preLaunchTask.
+      "label": "build-vscode-extension",
+      "type": "process",
+      "command": "node",
+      "args": ["packages/vscode-extension/esbuild.mjs"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "silent", "clear": true }
+    },
+    {
+      // Background watcher: rebuilds on every source change. Start it once
+      // (Terminal -> Run Task -> watch-vscode-extension), then reload the
+      // dev host window after edits.
+      "label": "watch-vscode-extension",
+      "type": "process",
+      "command": "node",
+      "args": ["packages/vscode-extension/esbuild.mjs", "--watch"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    }
+  ]
+}

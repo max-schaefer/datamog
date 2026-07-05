@@ -1,0 +1,31 @@
+{
+  "name": "datamog-backend-sqljs",
+  "version": "0.1.0",
+  "private": true,
+  "description": "sql.js WebAssembly SQLite backend for Datamog",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "bun": ">=1.3.0"
+  },
+  "files": ["src"],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/max-schaefer/datamog",
+    "directory": "packages/backend/sqljs"
+  },
+  "keywords": ["datalog", "sqlite", "sql.js", "webassembly", "backend", "bun", "datamog"],
+  "author": "Max Schaefer",
+  "homepage": "https://github.com/max-schaefer/datamog/tree/main/packages/backend/sqljs#readme",
+  "bugs": {
+    "url": "https://github.com/max-schaefer/datamog/issues"
+  },
+  "dependencies": {
+    "datamog-backend-sqlite": "workspace:*",
+    "datamog-engine": "workspace:*",
+    "sql.js": "^1"
+  }
+}

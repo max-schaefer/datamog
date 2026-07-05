@@ -1,0 +1,6 @@
+course,requires
+algorithms,data_structures
+data_structures,programming_101
+discrete_math,programming_101
+compilers,algorithms
+compilers,discrete_math

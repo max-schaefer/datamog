@@ -1,0 +1,21 @@
+# Exercise 11.1 — A harder whodunit.
+#
+# Extend the data with three more people and encode three more
+# clues. Keep going until only one name comes back as a suspect.
+
+extensional person(name: string).
+extensional drinks(name: string, beverage: string).
+extensional hand(name: string, handedness: string).
+
+# TODO: extend the data (you'll need to edit the CSVs) and add
+# more clue predicates.
+
+drinks_tea(N) :- drinks(N, "tea").
+right_handed(N) :- hand(N, "right").
+
+suspect(N) :-
+    person(N),
+    drinks_tea(N),
+    right_handed(N).
+
+?- suspect(X).

@@ -1,0 +1,8 @@
+src,dst
+start,b1
+b1,b2
+b1,b3
+b2,b4
+b3,b4
+b4,b1
+b4,end

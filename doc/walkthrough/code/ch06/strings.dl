@@ -1,0 +1,25 @@
+# Tutorial, chapter 6 — string manipulation.
+#
+# Datamog supports: string concatenation (`+` when either operand is `string`),
+# length (`length(W)`), indexing (`W[0]` — a single character), and
+# slicing (`W[0:3]` — a substring). All work inside rule bodies
+# and heads.
+
+extensional words(w: string).
+
+# Concatenation.
+greeting(G) :- words(W), G = "hello, " + W.
+
+# Length in characters.
+length_of(W, N) :- words(W), N = length(W).
+
+# First character.
+first_char(W, C) :- words(W), C = W[0].
+
+# First three characters, or as many as exist.
+prefix3(W, P) :- words(W), length(W) >= 3, P = W[:3].
+
+?- greeting(G).
+?- length_of(W, N).
+?- first_char(W, C).
+?- prefix3(W, P).

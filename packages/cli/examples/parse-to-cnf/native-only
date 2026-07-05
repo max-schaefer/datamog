@@ -1,0 +1,4 @@
+This example uses non-linear recursion (both the chart parser and the CNF
+derivation combine two recursive sub-results), which the SQL backends reject.
+The examples test therefore skips the sqlite backend here and uses the
+seminaive backend as the canonical source for expected.json.

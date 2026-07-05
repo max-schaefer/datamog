@@ -1,0 +1,5 @@
+{
+  "name": "Parse to CNF",
+  "description": "Parse a formula string, derive its CNF, and decide whether it is a theorem — the full pipeline",
+  "order": 160
+}

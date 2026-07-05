@@ -1,0 +1,15 @@
+part,subpart,qty
+bike,frame,1
+bike,wheel,2
+frame,top_tube,1
+frame,down_tube,1
+frame,head_tube,1
+frame,seat_mast,1
+frame,seat_stay,2
+frame,chain_stay,2
+frame,fork,1
+wheel,spoke,36
+wheel,nipple,36
+wheel,rim,1
+wheel,hub,1
+wheel,tire,1

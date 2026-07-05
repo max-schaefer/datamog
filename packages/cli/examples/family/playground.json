@@ -1,0 +1,8 @@
+{
+  "name": "Family",
+  "description": "Ancestor relation via transitive closure (recursive, with CSV data)",
+  "order": 10,
+  "csvDataOverride": {
+    "parent": ["name,child", "alice,bob", "alice,carol", "bob,dave", "bob,eve"]
+  }
+}

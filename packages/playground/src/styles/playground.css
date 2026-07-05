@@ -1,0 +1,1539 @@
+:root {
+  --bg: #f4f5f8;
+  --surface: #ffffff;
+  --surface-muted: #f8fafc;
+  --surface-sunken: #f1f3f8;
+  --border: #e5e7eb;
+  --border-strong: #d1d5db;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --text-subtle: #94a3b8;
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+  --primary-soft: rgba(79, 70, 229, 0.12);
+  --primary-ring: rgba(79, 70, 229, 0.25);
+  --selection-bg: rgba(79, 70, 229, 0.3);
+  --danger-bg: #fef2f2;
+  --danger-border: #fecaca;
+  --danger-text: #b91c1c;
+  --warning: #d97706;
+  --warning-hover: #b45309;
+  --warning-soft: rgba(217, 119, 6, 0.14);
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.06), 0 2px 4px rgba(15, 23, 42, 0.04);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.08), 0 4px 8px rgba(15, 23, 42, 0.04);
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
+
+  --syn-keyword: #7c3aed;
+  --syn-type: #0891b2;
+  --syn-variable: #0f172a;
+  --syn-string: #b91c1c;
+  --syn-number: #047857;
+  --syn-comment: #94a3b8;
+  --syn-operator: #64748b;
+  --syn-punctuation: #475569;
+  --syn-property: #b45309;
+  --syn-atom: #2563eb;
+}
+
+[data-theme="dark"] {
+  --bg: #0b0f17;
+  --surface: #111827;
+  --surface-muted: #1a2230;
+  --surface-sunken: #0d1320;
+  --border: #253143;
+  --border-strong: #344257;
+  --text: #e5e7eb;
+  --text-muted: #9ca3af;
+  --text-subtle: #6b7280;
+  --primary: #818cf8;
+  --primary-hover: #a5b4fc;
+  --primary-soft: rgba(129, 140, 248, 0.18);
+  --primary-ring: rgba(129, 140, 248, 0.4);
+  --selection-bg: rgba(129, 140, 248, 0.42);
+  --danger-bg: rgba(220, 38, 38, 0.12);
+  --danger-border: rgba(248, 113, 113, 0.38);
+  --danger-text: #fca5a5;
+  --warning: #fbbf24;
+  --warning-hover: #fcd34d;
+  --warning-soft: rgba(251, 191, 36, 0.18);
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6), 0 4px 8px rgba(0, 0, 0, 0.35);
+
+  --syn-keyword: #c4b5fd;
+  --syn-type: #67e8f9;
+  --syn-variable: #e5e7eb;
+  --syn-string: #fca5a5;
+  --syn-number: #86efac;
+  --syn-comment: #64748b;
+  --syn-operator: #9ca3af;
+  --syn-punctuation: #cbd5e1;
+  --syn-property: #fde68a;
+  --syn-atom: #93c5fd;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Disable programming-ligature substitutions (`!=` → `≠`, `>=` → `≥`,
+   `->` → `→`, `=>` → `⇒`, …) wherever we render code. JetBrains Mono /
+   Fira Code / Cascadia Code all ship these on by default; they're
+   pretty in display but actively hostile in an editor where the user
+   needs to know which keystrokes produce the operator they see.
+   Selectors enumerated rather than wildcarded so the body's
+   "cv11", "ss01" stylistic alternates on the sans font keep working
+   (font-feature-settings replaces, doesn't merge). */
+.cm-editor,
+.cm-editor *,
+.shortcut,
+.data-textarea,
+.data-url-input,
+.data-entry code,
+.result-query,
+.sql-block,
+.sql-block *,
+.sql-block-label code,
+.error-box,
+.step-counter {
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
+}
+
+#app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Layout */
+
+.playground {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--bg);
+}
+
+.playground-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  flex: 1;
+  min-height: 0;
+  gap: 12px;
+  padding: 12px;
+}
+
+.editor-side,
+.output-side {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.output-side {
+  overflow-y: auto;
+  padding: 16px 18px;
+}
+
+/* Toolbar */
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 18px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-xs);
+  flex-shrink: 0;
+  z-index: 2;
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-logo {
+  height: 32px;
+  width: 32px;
+  border-radius: 8px;
+  object-fit: cover;
+  box-shadow: var(--shadow-sm);
+}
+
+.toolbar-title {
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.toolbar-title:hover {
+  color: var(--primary);
+}
+
+.toolbar-title::after {
+  content: "";
+  display: inline-block;
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+  margin: 0 4px 0 10px;
+  vertical-align: -3px;
+}
+
+.example-select,
+.backend-select {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 6px 28px 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2364748b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  color: var(--text);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+[data-theme="dark"] .example-select,
+[data-theme="dark"] .backend-select {
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%239ca3af' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.example-select:hover,
+.backend-select:hover {
+  border-color: var(--border-strong);
+}
+
+.example-select:focus,
+.backend-select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
+.example-select {
+  max-width: 360px;
+}
+
+.btn {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-weight: 500;
+  line-height: 1.2;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.05s
+    ease;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
+.btn-primary {
+  background: linear-gradient(180deg, #5b52ea 0%, #4f46e5 100%);
+  color: #fff;
+  border-color: #4338ca;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset, 0 1px 2px rgba(15, 23, 42, 0.15);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #4f46e5 0%, #4338ca 100%);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0.5px);
+}
+
+.btn-secondary {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-xs);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--surface-muted);
+  border-color: var(--border-strong);
+}
+
+.btn-icon {
+  padding: 7px 9px;
+  color: var(--text-muted);
+}
+
+.btn-icon:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.btn-icon svg {
+  display: block;
+}
+
+/* Warnings-visibility toggle: amber when warnings are shown, muted grey
+ * when hidden. Driven off aria-pressed so the styling stays coupled to
+ * the same source of truth as accessibility state. */
+.btn-warnings-toggle[aria-pressed="true"] {
+  color: var(--warning);
+}
+
+.btn-warnings-toggle[aria-pressed="true"]:hover:not(:disabled) {
+  color: var(--warning-hover);
+}
+
+.btn-warnings-toggle[aria-pressed="false"] {
+  color: var(--text-subtle);
+  opacity: 0.6;
+}
+
+.btn-warnings-toggle[aria-pressed="false"]:hover:not(:disabled) {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+.shortcut {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  padding: 1px 5px;
+  margin-left: 2px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: 0.02em;
+}
+
+/* Editor */
+
+.editor-container {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.editor-container .cm-editor {
+  height: 100%;
+  font-size: 14px;
+}
+
+.editor-container .cm-scroller {
+  font-family: var(--font-mono);
+  line-height: 1.6;
+}
+
+.editor-container .cm-editor.cm-focused {
+  outline: none;
+}
+
+/* Syntax highlighting (classHighlighter) — used by both the Datalog editor
+   and SQL preview blocks. Colors are CSS variables so dark mode swaps
+   automatically. */
+
+.cm-editor .tok-keyword {
+  color: var(--syn-keyword);
+  font-weight: 600;
+}
+
+.cm-editor .tok-typeName {
+  color: var(--syn-type);
+}
+
+.cm-editor .tok-variableName {
+  color: var(--syn-variable);
+}
+
+.cm-editor .tok-string,
+.cm-editor .tok-string2 {
+  color: var(--syn-string);
+}
+
+.cm-editor .tok-number {
+  color: var(--syn-number);
+}
+
+.cm-editor .tok-comment,
+.cm-editor .tok-lineComment,
+.cm-editor .tok-blockComment {
+  color: var(--syn-comment);
+  font-style: italic;
+}
+
+.cm-editor .tok-operator {
+  color: var(--syn-operator);
+}
+
+.cm-editor .tok-punctuation,
+.cm-editor .tok-bracket,
+.cm-editor .tok-paren,
+.cm-editor .tok-brace,
+.cm-editor .tok-squareBracket,
+.cm-editor .tok-angleBracket,
+.cm-editor .tok-separator {
+  color: var(--syn-punctuation);
+}
+
+.cm-editor .tok-propertyName {
+  color: var(--syn-property);
+}
+
+.cm-editor .tok-atom,
+.cm-editor .tok-bool,
+.cm-editor .tok-null,
+.cm-editor .tok-function,
+.cm-editor .tok-labelName {
+  color: var(--syn-atom);
+}
+
+/* Data panel */
+
+.data-panel {
+  border-top: 1px solid var(--border);
+  background: var(--surface-muted);
+  flex-shrink: 0;
+  max-height: 40%;
+  overflow-y: auto;
+  padding: 12px 16px;
+}
+
+.data-entry {
+  margin-bottom: 12px;
+}
+
+.data-entry:last-child {
+  margin-bottom: 2px;
+}
+
+.data-entry-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.data-entry label {
+  min-width: 0;
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.data-format-select {
+  flex: 0 0 auto;
+  font-family: inherit;
+  font-size: 11px;
+  padding: 2px 22px 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2364748b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  color: var(--text);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+[data-theme="dark"] .data-format-select {
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%239ca3af' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.data-format-select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
+.data-entry code {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.45;
+  background: var(--surface);
+  color: var(--text);
+  padding: 3px 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  scrollbar-width: thin;
+}
+
+.data-entry code::-webkit-scrollbar {
+  height: 6px;
+}
+
+.data-entry code::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.data-entry code::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+}
+
+.data-textarea,
+.data-url-input {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  resize: vertical;
+  line-height: 1.55;
+  background: var(--surface);
+  color: var(--text);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.data-textarea {
+  height: 100px;
+}
+
+.data-url-input {
+  height: 36px;
+}
+
+.data-url-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.data-url-row .data-url-input {
+  width: auto;
+  min-width: 0;
+  flex: 1;
+}
+
+.data-url-open-button {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--primary);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, box-shadow 0.15s
+    ease;
+}
+
+.data-url-open-button:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary-hover);
+}
+
+.data-url-open-button:focus-visible {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
+.data-url-open-button:disabled {
+  color: var(--text-subtle);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.data-textarea::placeholder {
+  color: var(--text-subtle);
+}
+
+.data-url-input::placeholder {
+  color: var(--text-subtle);
+}
+
+.data-textarea:focus,
+.data-url-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
+/* Results */
+
+.results-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.result-block {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
+}
+
+.result-header {
+  display: flex;
+  align-items: center;
+  background: var(--surface-muted);
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+  padding: 6px 10px 6px 14px;
+}
+
+.result-query {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.5;
+}
+
+/* Segmented toggle. Shared visual for the format toggle and the step-panel
+ * option groups (speed, granularity) — a single pill containing borderless
+ * buttons, so the surrounding edge groups them the way .step-nav groups its
+ * icons. */
+.segmented,
+.format-toggle {
+  display: inline-flex;
+  align-items: stretch;
+  padding: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-xs);
+}
+
+.segmented button,
+.format-toggle-btn {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  line-height: 1.4;
+  text-transform: none;
+  letter-spacing: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.segmented button.active,
+.format-toggle-btn.active {
+  background: var(--primary);
+  color: #fff;
+}
+
+.segmented button:disabled,
+.format-toggle-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.segmented button:hover:not(:disabled):not(.active),
+.format-toggle-btn:hover:not(:disabled):not(.active) {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.mermaid-view {
+  padding: 14px;
+  background: var(--surface);
+  overflow: auto;
+}
+
+.mermaid-container {
+  display: flex;
+  justify-content: center;
+}
+
+.mermaid-container svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.result-json {
+  margin: 0;
+  padding: 14px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--surface);
+  color: var(--text);
+  overflow: auto;
+  max-height: 400px;
+  line-height: 1.55;
+}
+
+.result-empty,
+.result-yes {
+  padding: 14px;
+  font-size: 13px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+.result-empty {
+  color: var(--text-subtle);
+}
+
+.result-yes {
+  color: var(--text);
+}
+
+.result-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.result-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.result-table th {
+  text-align: left;
+  padding: 9px 14px;
+  background: var(--surface-muted);
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.result-table td {
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--text);
+}
+
+.result-table tbody tr {
+  transition: background 0.1s ease;
+}
+
+.result-table tbody tr:nth-child(even) {
+  background: var(--surface-muted);
+}
+
+.result-table tbody tr:hover {
+  background: var(--primary-soft);
+}
+
+.result-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* SQL Preview */
+
+.sql-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.sql-block {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 8px;
+  background: var(--surface-muted);
+}
+
+.sql-block-wrapper {
+  border-radius: var(--radius);
+  transition: box-shadow 0.15s ease, outline-color 0.15s ease;
+  outline: 2px solid transparent;
+  outline-offset: 1px;
+  margin-bottom: 10px;
+}
+
+.sql-block-wrapper.highlighted {
+  outline-color: var(--primary);
+  box-shadow: 0 0 0 4px var(--primary-ring);
+}
+
+.sql-block-wrapper .sql-block {
+  margin-bottom: 0;
+}
+
+.sql-block-label {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 2px 0 6px;
+}
+
+.sql-block-label code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Error */
+
+.error-box {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 12px 14px;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius);
+  color: var(--danger-text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.55;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-xs);
+}
+
+/* Placeholder */
+
+.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-subtle);
+  font-size: 14px;
+  letter-spacing: -0.005em;
+}
+
+/* Cycle modal — triggered from the "Show cycle" lint action; renders a
+ * Mermaid diagram of the SCC the warning came from, with growing edges
+ * highlighted in amber to match the toolbar warning toggle's "on" colour.
+ * Built on the native <dialog> element so we get focus trapping,
+ * Escape-to-close, and ::backdrop for free. */
+
+dialog.cycle-modal {
+  padding: 0;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  width: min(720px, calc(100vw - 48px));
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+dialog.cycle-modal:not([open]) {
+  display: none;
+}
+
+dialog.cycle-modal::backdrop {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.cycle-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.cycle-modal-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.cycle-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0 6px;
+  border-radius: 4px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.cycle-modal-close:hover {
+  background: var(--surface-sunken);
+  color: var(--text);
+}
+
+.cycle-modal-close:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
+.cycle-modal-body {
+  padding: 18px;
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.cycle-modal-diagram {
+  display: flex;
+  justify-content: center;
+}
+
+.cycle-modal-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.cycle-modal-legend {
+  display: flex;
+  gap: 18px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-muted);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.cycle-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cycle-legend-swatch {
+  display: inline-block;
+  width: 18px;
+  height: 2.5px;
+  border-radius: 1px;
+}
+
+.cycle-legend-swatch-grow {
+  background: var(--warning);
+}
+
+.cycle-legend-swatch-flow {
+  background: var(--text-subtle);
+}
+
+.cycle-legend-swatch-neg {
+  background: var(--danger-text);
+}
+
+.cycle-legend-swatch-pos {
+  background: var(--text-subtle);
+}
+
+/* Mascot loading animation */
+
+.mascot-drive {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.mascot-img {
+  position: absolute;
+  height: 180px;
+  width: 180px;
+  object-fit: cover;
+  border-radius: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  box-shadow: var(--shadow-md);
+  animation: drive 2s linear infinite, bounce 0.3s ease-in-out infinite;
+}
+
+@keyframes drive {
+  0% {
+    left: -200px;
+  }
+  100% {
+    left: calc(100% + 20px);
+  }
+}
+
+@keyframes bounce {
+  0%,
+  100% {
+    margin-top: 0;
+  }
+  50% {
+    margin-top: -6px;
+  }
+}
+
+/* Scrollbars */
+
+.output-side::-webkit-scrollbar,
+.data-panel::-webkit-scrollbar,
+.result-json::-webkit-scrollbar,
+.mermaid-view::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.output-side::-webkit-scrollbar-track,
+.data-panel::-webkit-scrollbar-track,
+.result-json::-webkit-scrollbar-track,
+.mermaid-view::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.output-side::-webkit-scrollbar-thumb,
+.data-panel::-webkit-scrollbar-thumb,
+.result-json::-webkit-scrollbar-thumb,
+.mermaid-view::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 5px;
+  border: 2px solid var(--surface);
+}
+
+.output-side::-webkit-scrollbar-thumb:hover,
+.data-panel::-webkit-scrollbar-thumb:hover,
+.result-json::-webkit-scrollbar-thumb:hover,
+.mermaid-view::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
+}
+
+/* Tabbed results */
+
+.tabbed-results {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  padding: 6px 14px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+
+.tab:hover {
+  color: var(--text);
+  background: var(--surface-muted);
+}
+
+.tab.active {
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--border);
+  border-bottom-color: var(--surface);
+  font-weight: 600;
+}
+
+.tab-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tab-placeholder {
+  padding: 24px;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* Step-through viewer */
+
+.step-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* The actual scroll container is `.output-side` (see the top of this file).
+ * scrollIntoView() would otherwise leave targets tucked behind the sticky
+ * controls + caption header. `scroll-margin-top` on each plausible scroll
+ * target (relation tables, stratum boxes, newly-added rows) tells the
+ * browser to reserve that much space above the target when scrolling to it,
+ * so targets land below the sticky header. 140px covers the controls +
+ * caption stack at typical sizes. */
+.step-panel .stratum-box,
+.step-panel .relation-table,
+.step-panel tr.added {
+  scroll-margin-top: 140px;
+  scroll-margin-bottom: 16px;
+}
+
+/* Pin controls + caption to the top of the panel so they stay visible
+ * regardless of how far the user scrolls through the snapshot tables. The
+ * wrapper sits as a direct child of the overflow-auto .step-panel, which
+ * is what `position: sticky` anchors to. */
+.step-sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 6px;
+  background: var(--bg);
+}
+
+.step-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+/* Wraps the icon pill and the counter into one compact group so they stay
+ * together when the toolbar wraps on narrow widths. */
+.step-nav-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* VS Code-style debug toolbar: a single bordered pill holding icon-only
+ * buttons, with the play/pause button visually lifted as the primary
+ * action. Individual buttons intentionally have no border of their own —
+ * the pill's edge is what groups them. */
+.step-nav {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.step-nav button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.step-nav button:hover:not(:disabled) {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.step-nav button:focus-visible {
+  outline: 2px solid var(--primary-ring);
+  outline-offset: 1px;
+}
+
+/* The play/pause button is the primary action — filled, slightly larger,
+ * sticks out of the pill the way VS Code's debug-continue does. */
+.step-nav .step-play {
+  width: 30px;
+  height: 30px;
+  margin: 0 2px;
+  background: var(--primary);
+  color: white;
+}
+
+.step-nav .step-play:hover:not(:disabled) {
+  background: var(--primary-hover);
+  color: white;
+}
+
+.step-nav button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.step-counter {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.step-options {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.step-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.step-option-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.step-caption {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--primary-soft);
+  border-left: 3px solid var(--primary);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.step-tree {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 4px;
+  padding: 6px;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-sm);
+}
+
+.step-tree-item {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.step-tree-item:hover {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+}
+
+.step-tree-item.current {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+  font-weight: 600;
+}
+
+.step-snapshot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stratum-box {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.stratum-box.current {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-ring);
+}
+
+.stratum-box.extensional {
+  background: var(--surface-sunken);
+}
+
+.stratum-header {
+  width: 100%;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  text-align: left;
+  font-family: inherit;
+}
+
+button.stratum-header {
+  cursor: pointer;
+}
+
+button.stratum-header:hover {
+  color: var(--text);
+}
+
+.stratum-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  color: var(--text-subtle);
+  transition: transform 0.15s ease;
+}
+
+.stratum-chevron svg {
+  display: block;
+}
+
+.stratum-box.collapsed .stratum-chevron {
+  transform: rotate(-90deg);
+}
+
+.stratum-summary {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  color: var(--text-subtle);
+}
+
+.stratum-box.collapsed .stratum-header {
+  margin-bottom: 0;
+}
+
+.stratum-tag {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+}
+
+.relation-table {
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.relation-table:last-child {
+  margin-bottom: 0;
+}
+
+.relation-name {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--surface-muted);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.relation-size {
+  color: var(--text-subtle);
+  font-weight: 400;
+  margin-left: 2px;
+}
+
+.relation-empty {
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-subtle);
+}
+
+.relation-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.relation-table thead th {
+  text-align: left;
+  padding: 6px 10px;
+  background: var(--surface-muted);
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 10.5px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.relation-table tbody td {
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.relation-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.relation-table tbody tr:nth-child(even) {
+  background: var(--surface-muted);
+}
+
+.relation-table tbody tr.added td {
+  background: var(--primary-soft);
+  font-weight: 600;
+  animation: step-added-fade 0.6s ease-out;
+}
+
+@keyframes step-added-fade {
+  from {
+    background: var(--primary);
+    color: white;
+  }
+  to {
+    background: var(--primary-soft);
+    color: var(--text);
+  }
+}
+
+.step-queries {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+/* Shared section-title style. Every uppercase small-caps heading in the
+ * output panel (data panel, SQL sections, step queries) uses this so they
+ * all carry the same weight and color. */
+.section-title,
+.step-section-title,
+.sql-section-title,
+.data-panel-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+}
+
+/* Responsive */
+
+@media (max-width: 768px) {
+  .playground-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .toolbar {
+    padding: 8px 12px;
+  }
+
+  .toolbar-left {
+    gap: 10px;
+  }
+
+  .toolbar-title::after {
+    display: none;
+  }
+
+  .example-select {
+    max-width: 180px;
+  }
+
+  .shortcut {
+    display: none;
+  }
+}

@@ -1,0 +1,11 @@
+# Exercise 6.2 — Running sums.
+#
+# Define sum_to(N, S) = "1 + 2 + ... + N equals S", for N from 1
+# to 20. Use linear recursion. Don't forget the termination bound.
+
+# Placeholder so the file parses.
+sum_to(N, S) :- N = 0, S = 0.
+
+# TODO: replace with a base case and a recursive rule.
+
+?- sum_to(N, S).

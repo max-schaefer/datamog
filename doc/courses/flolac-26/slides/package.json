@@ -1,0 +1,21 @@
+{
+  "name": "datalog-slides",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Introduction to Logic Programming with Datalog - slide deck (Astro static site)",
+  "scripts": {
+    "build:embed": "bun build ../../../../packages/playground/src/embed/index.ts --target=browser --format=esm --minify --outdir public/embed",
+    "dev": "bun run build:embed && astro dev",
+    "build": "bun run build:embed && rm -f .astro/data-store.json node_modules/.astro/data-store.json && astro build",
+    "preview": "astro preview",
+    "slides:pdf": "bun run build && bun run scripts/build-pdf.mjs"
+  },
+  "dependencies": {
+    "astro": "^5.7.0",
+    "mermaid": "^11.6.0"
+  },
+  "devDependencies": {
+    "pdf-lib": "^1.17.1"
+  }
+}

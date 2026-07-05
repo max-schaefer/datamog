@@ -1,0 +1,25 @@
+[
+  [
+    {
+      "W": "and2",
+      "Why": "a half-sum x XOR y that does not feed an AND"
+    },
+    {
+      "W": "hs2",
+      "Why": "an AND whose output does not feed an OR"
+    },
+    {
+      "W": "prop3",
+      "Why": "an XOR that is neither a half-sum nor a sum bit"
+    },
+    {
+      "W": "z03",
+      "Why": "a sum bit z.. not produced by an XOR"
+    }
+  ],
+  [
+    {
+      "Names": "and2,hs2,prop3,z03"
+    }
+  ]
+]

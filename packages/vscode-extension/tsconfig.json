@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
+    "outDir": "out"
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../parser" },
+    { "path": "../core" },
+    { "path": "../engine" },
+    { "path": "../backend/seminaive" },
+    { "path": "../loader/csv" },
+    { "path": "../loader/json" },
+    { "path": "../loader/jsonl" }
+  ]
+}

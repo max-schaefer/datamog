@@ -1,0 +1,12 @@
+# Exercise 9.2 — Ranks via filtering.
+
+extensional scores(student: string, subject: string, score: integer).
+
+# TODO: write avg_by_subject and top_subject.
+
+# Placeholders.
+avg_by_subject(S, avg(Score)) :- scores(_, S, Score), S = "__never_matches__".
+top_subject(S) :- avg_by_subject(S, _).
+
+?- avg_by_subject(S, A).
+?- top_subject(S).

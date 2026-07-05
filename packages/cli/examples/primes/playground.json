@@ -1,0 +1,5 @@
+{
+  "name": "Primes",
+  "description": "Sieve of Eratosthenes using ranges, negation, and arithmetic",
+  "order": 30
+}

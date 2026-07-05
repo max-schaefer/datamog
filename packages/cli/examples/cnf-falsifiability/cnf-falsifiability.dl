@@ -1,0 +1,87 @@
+# Theorem proving by falsifiability -- step 1 of 3: the CNF engine
+#
+# Goal of the series: decide whether a propositional formula is a *theorem*
+# (a tautology -- true under every assignment). This file is the engine the
+# later steps feed. It takes a formula already in conjunctive normal form
+# (CNF) and decides whether that CNF is *falsifiable*: whether some
+# assignment makes it false.
+#
+#     the formula is a theorem   <=>   its CNF is NOT falsifiable
+#
+# When the CNF *is* falsifiable, a falsifying assignment is a *counterexample*:
+# concrete evidence that the formula is not a theorem.
+#
+# A CNF is a conjunction of clauses; each clause is a disjunction of
+# literals; each literal is a variable with a polarity (positive = the
+# variable, negative = its negation). We represent it with two predicates:
+#
+#     clause_lit(C, V, Pol)   clause C contains variable V with polarity Pol
+#                             (Pol = 1 positive, 0 negative)
+#     nvars(N)                the formula uses variables 0 .. N-1
+#
+# This is the *extensional* interface. Step 2 will delete the `extensional`
+# declarations below and *derive* clause_lit / nvars from a formula's AST
+# with rules -- the engine underneath stays byte-for-byte the same, because
+# it treats a clause id as an opaque value.
+#
+# Note there is NO recursion here: enumerating assignments and testing each
+# clause is pure arithmetic plus stratified negation, so this engine runs on
+# every backend, the SQL ones included. (The CNF-deriving step later needs
+# non-linear recursion, which only the in-memory native/seminaive backends
+# support.)
+#
+# The CNF used here is that of   (p | q) & (~q | r)   with p=0, q=1, r=2. It is
+# satisfiable but not valid, so the formula is NOT a theorem and we expect
+# counterexamples. A *valid* CNF is one whose every clause contains some
+# variable in both polarities (e.g., a clause p | ~p); such a CNF has no
+# counterexample and yields a "yes" verdict. Direct validity checking makes
+# the "yes" case syntactically trivial -- which is exactly why the Tseitin
+# variant later reframes the question as refuting the negation.
+
+# --- The CNF instance (the extensional input that step 2 will replace) ---
+#
+# The data lives in sibling files clause_lit.csv and nvars.csv -- this is a
+# genuine extensional, loaded from outside the program. The CNF there is
+#     c1 = (p | q),  c2 = (~q | r)    with p=0, q=1, r=2,  nvars = 3.
+# Step 2 deletes these two declarations (and the CSVs) and grows clause_lit
+# and nvars into intensional predicates derived from a formula's AST.
+
+extensional clause_lit(c: string, v: integer, pol: integer).
+extensional nvars(n: integer).
+
+# --- The engine ---
+
+# A clause is whatever appears in clause_lit.
+clause(C) :- clause_lit(C, _, _).
+
+# Variables are represented as numbers between 0 and N - 1.
+var(V) :- nvars(N), V in [0 .. N - 1].
+
+# Assignments are represented as bitfields of width N,
+# i.e., numbers between 0 (all variables false) and 2^N - 1 (all variables true).
+assignment(A) :- nvars(N), A in [0 .. (1 << N) - 1].
+
+# Look up a variable V in an assignment A by extracting the V'th
+# bit from the bitfield A.
+eval(A, V, (A >> V) & 1)  :- assignment(A), var(V).
+
+# A literal occurrence of a variable V in a clause C is satisfied by A
+# if V's value in A is the same as the polarity of V in C: if V appears
+# unnegated, A must set V to true; if V appears negated, A must set V
+# to false.
+satisfies(A, C) :- clause_lit(C, V, Pol), eval(A, V, Pol).
+
+# Assignment A falsifies clause C if it does not satisfy it.
+falsifies(A, C) :- assignment(A), clause(C), not satisfies(A, C).
+
+# The CNF is falsifiable if some clause has a falsifying assignment.
+falsifiable() :- falsifies(_, _).
+
+# The CNF is a theorem if its CNF cannot be falsified.
+theorem() :- nvars(_), not falsifiable().
+
+# Expand falsifying assignment A into a table showing the value B for each variable V.
+counterexample(A, V, B) :- falsifies(A, C), eval(A, V, B).
+
+?- theorem().
+?- counterexample(A, V, Value).

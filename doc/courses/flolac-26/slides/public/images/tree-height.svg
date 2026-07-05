@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="150 48 360 320" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif">
+  <!-- tree edges (drawn first; circles cover the ends) -->
+  <g stroke="#2f8576" stroke-width="3" fill="none">
+    <line x1="300" y1="80" x2="195" y2="200"/>
+    <line x1="300" y1="80" x2="405" y2="200"/>
+    <line x1="195" y1="200" x2="195" y2="320"/>
+  </g>
+  <!-- nodes -->
+  <g fill="#fff" stroke="#2f8576" stroke-width="3.5">
+    <circle cx="300" cy="80"  r="27"/>
+    <circle cx="195" cy="200" r="27"/>
+    <circle cx="405" cy="200" r="27"/>
+    <circle cx="195" cy="320" r="27"/>
+  </g>
+  <g fill="#16433c" font-size="24" text-anchor="middle">
+    <text x="300" y="88">a</text>
+    <text x="195" y="208">b</text>
+    <text x="405" y="208">c</text>
+    <text x="195" y="328">d</text>
+  </g>
+  <!-- heights -->
+  <g fill="#2f8576" font-size="19" font-style="italic">
+    <text x="340" y="86">h = 2</text>
+    <text x="235" y="206">h = 1</text>
+    <text x="445" y="206">h = 0</text>
+    <text x="235" y="326">h = 0</text>
+  </g>
+</svg>

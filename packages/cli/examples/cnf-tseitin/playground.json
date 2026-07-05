@@ -1,0 +1,5 @@
+{
+  "name": "Tseitin CNF",
+  "description": "Equisatisfiable CNF via the Tseitin transformation; prove by refuting the negation",
+  "order": 150
+}

@@ -1,0 +1,12 @@
+# Exercise 8.3 solution.
+
+extensional a(x: string).
+extensional b(x: string).
+
+only_in_a(X) :- a(X), not b(X).
+only_in_b(X) :- b(X), not a(X).
+in_both(X)   :- a(X), b(X).
+
+?- only_in_a(X).
+?- only_in_b(X).
+?- in_both(X).

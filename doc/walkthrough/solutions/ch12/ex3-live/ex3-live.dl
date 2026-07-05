@@ -1,0 +1,32 @@
+# Exercise 12.3 solution.
+#
+# live(Block, Var) = "Var's value at the entry of Block may be
+# used along some path to the end."
+#
+# Base case: if Var is used in the block itself, it's live at the
+# block's entry.
+#
+# Recursive case: if Var is live at a successor Block' AND the
+# current block does not kill Var, then Var is live at the current
+# block's entry.
+#
+# Note that the recursion goes "backward" along CFG edges — we
+# propagate from successor to predecessor.
+
+cfg("start", "b1").
+cfg("b1", "b2").
+cfg("b2", "b3").
+cfg("b3", "end").
+
+use("b1", "x").
+use("b3", "y").
+
+kill("b2", "x").
+
+live(Block, Var) :- use(Block, Var).
+live(Block, Var) :-
+    cfg(Block, Succ),
+    live(Succ, Var),
+    not kill(Block, Var).
+
+?- live(Block, Var).

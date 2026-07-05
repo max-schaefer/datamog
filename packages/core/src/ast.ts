@@ -1,0 +1,149 @@
+// Re-export Langium-generated AST types as the canonical AST.
+// The grammar and generated types live in datamog-parser; this module
+// provides backward-compatible type aliases consumed by the rest of the codebase.
+
+import type {
+  AggregateCall,
+  BinaryExpr,
+  BooleanLiteral,
+  FunctionCall,
+  NullLiteral,
+  NumberLiteral,
+  HeadAtom as ParserHeadAtom,
+  Rule as ParserRule,
+  Slice,
+  StringLiteral,
+  Subscript,
+  UnaryExpr,
+  Variable,
+} from "datamog-parser";
+
+export type {
+  AggregateCall,
+  ArrayLiteral,
+  BinaryExpr,
+  BodyElement,
+  BooleanLiteral,
+  ColumnDecl,
+  Equality,
+  ExtDecl,
+  Filter,
+  FunctionCall,
+  Literal,
+  NullLiteral,
+  NumberLiteral,
+  ObjectEntry,
+  ObjectLiteral,
+  Program,
+  Query,
+  RangeAtom,
+  Slice,
+  PrimitiveType,
+  Statement,
+  StringLiteral,
+  Subscript,
+  UnaryExpr,
+  Variable,
+  Wildcard,
+} from "datamog-parser";
+
+// Post-processing turns every `BracketAccess` node from the grammar into
+// either a `Subscript` or a `Slice`, so downstream code only ever
+// observes those two at runtime. Include all three in the static type
+// so narrowing compiles both ways: the impossible `$type ===
+// "BracketAccess"` branch becomes a dead check, and the real `$type ===
+// "Subscript"`/`"Slice"` branches type-check against the known union
+// members. The parser re-export still flows through the `BracketAccess`
+// member so downstream code reading raw grammar nodes (e.g. tests) can
+// see the pre-transform shape too.
+import type { ArrayLiteral, BracketAccess, ObjectLiteral, Wildcard } from "datamog-parser";
+export type Expression =
+  | ArrayLiteral
+  | BinaryExpr
+  | BooleanLiteral
+  | BracketAccess
+  | FunctionCall
+  | NullLiteral
+  | NumberLiteral
+  | ObjectLiteral
+  | Slice
+  | StringLiteral
+  | Subscript
+  | UnaryExpr
+  | Variable
+  // A bare `*`: only ever the argument of `count(*)`. Included in the
+  // union so expression walks narrow on it; the analyzer rejects it
+  // anywhere else.
+  | Wildcard;
+
+// HeadTerm from the grammar is just `Expression`; aggregates are injected
+// by post-processing (see `packages/parser/src/post-process.ts`). Declare
+// the union at the core boundary so downstream code can narrow on
+// `$type === "AggregateCall"` at head positions.
+export type HeadTerm = AggregateCall | Expression;
+
+// Mirror the parser's HeadAtom/Rule shapes but broaden `args` to include
+// the synthesised AggregateCall nodes.
+export type HeadAtom = Omit<ParserHeadAtom, "args"> & { args: HeadTerm[] };
+export type Rule = Omit<ParserRule, "head"> & { head: HeadAtom };
+
+export type { AggregateFunction, BinaryOp } from "datamog-parser";
+
+// Alias: the old AST called the expression union "Term"
+export type { Expression as Term } from "datamog-parser";
+
+/**
+ * Subset of `BinaryExpr.op` values that mean "comparison" — the
+ * operators that yield a boolean. Two equality families: `=`/`<>` are
+ * *logical* (null-aware) and `==`/`!=` are *computational* (3VL); the
+ * orderings are 3VL because null isn't orderable. The split sets below
+ * let downstream code (type inference, translator, runtime) distinguish
+ * the families without re-spelling the literals.
+ */
+export type ComparisonOp = "<" | "<=" | ">" | ">=" | "==" | "!=" | "=" | "<>";
+
+export const COMPARISON_OPS: ReadonlySet<string> = new Set<ComparisonOp>([
+  "<",
+  "<=",
+  ">",
+  ">=",
+  "==",
+  "!=",
+  "=",
+  "<>",
+]);
+
+/** `=` and `<>` — null-aware (`null = null` is true). */
+export const LOGICAL_EQ_OPS: ReadonlySet<string> = new Set(["=", "<>"]);
+
+/** `==` and `!=` — 3VL (`null == X` is null). */
+export const COMPUTATIONAL_EQ_OPS: ReadonlySet<string> = new Set(["==", "!="]);
+
+export const LOGICAL_BINARY_OPS: ReadonlySet<string> = new Set(["&&", "||"]);
+
+/**
+ * Bitwise / shift operators on 32-bit signed two's-complement integers
+ * (Java/JS `int` semantics): `>>` is arithmetic, `>>>` is logical, and the
+ * shift count is taken mod 32. Operands and result are `integer`.
+ */
+export type BitwiseOp = "&" | "|" | "^" | "<<" | ">>" | ">>>";
+
+export const BITWISE_OPS: ReadonlySet<string> = new Set<BitwiseOp>([
+  "&",
+  "|",
+  "^",
+  "<<",
+  ">>",
+  ">>>",
+]);
+
+/**
+ * True if a NumberLiteral was written as a float (i.e. its source text contains
+ * a decimal point or an exponent). Needed because the parser coerces NUMBER
+ * tokens to JavaScript numbers, which collapses `1.0` and `1` to the same
+ * value. The parser's post-processing preserves the original text on
+ * `rawText` so we can recover the distinction here.
+ */
+export function isFloatLiteral(n: NumberLiteral): boolean {
+  return n.rawText !== undefined && /[.eE]/.test(n.rawText);
+}

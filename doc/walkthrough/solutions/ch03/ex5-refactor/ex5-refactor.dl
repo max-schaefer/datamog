@@ -1,0 +1,17 @@
+# Exercise 3.5 solution — refactored form.
+
+extensional same_room(person1: string, person2: string).
+extensional connected_window(person1: string, person2: string).
+
+# Three named intermediate predicates, each with a single clear
+# semantic meaning.
+roommate(X, Y)          :- same_room(X, Y).
+roommate(X, Y)          :- same_room(Y, X).
+visible_window(X, Y)    :- connected_window(X, Y).
+
+# The union.
+can_see(X, Y) :- roommate(X, Y).
+can_see(X, Y) :- visible_window(X, Y).
+
+?- can_see(X, Y).
+?- roommate(X, Y).

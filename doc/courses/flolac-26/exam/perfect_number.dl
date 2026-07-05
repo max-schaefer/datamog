@@ -1,0 +1,6 @@
+num(N) :- N in [1..100].
+divides(D, N) :- num(D), num(N), N % D = 0, D < N.
+sum_divisor(N, sum(D)) :- divides(D, N).
+perfect_number(N) :- sum_divisor(N, N).
+
+?- perfect_number(N).

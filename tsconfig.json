@@ -1,0 +1,22 @@
+{
+  "references": [
+    { "path": "packages/parser" },
+    { "path": "packages/core" },
+    { "path": "packages/engine" },
+    { "path": "packages/backend/postgres" },
+    { "path": "packages/backend/sqlite" },
+    { "path": "packages/backend/sqljs" },
+    { "path": "packages/backend/native" },
+    { "path": "packages/backend/seminaive" },
+    { "path": "packages/loader/csv" },
+    { "path": "packages/loader/json" },
+    { "path": "packages/loader/jsonl" },
+    { "path": "packages/loader/gsheet" },
+    { "path": "packages/loader/mermaid" },
+    { "path": "packages/repl" },
+    { "path": "packages/cli" },
+    { "path": "packages/vscode-extension" },
+    { "path": "packages/playground" }
+  ],
+  "files": []
+}

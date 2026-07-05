@@ -1,0 +1,147 @@
+# Theorem proving by falsifiability -- step 1 of 3: parsing, and the whole
+# pipeline end to end.
+#
+# Steps 2 and 3 took the formula's abstract syntax tree as an *extensional*
+# input. This step removes that last given: it parses the AST out of a plain
+# input *string*, so node/node_var/node_child/root become intensional too.
+# What is left as extensional is just the source text. Stacking this on top
+# of the CNF derivation (from cnf-from-ast) and the falsifiability engine
+# (from cnf-falsifiability) gives the complete prover: a string goes in, a
+# theorem verdict (with a counterexample when it fails) comes out.
+#
+# The parser is a chart parser over character positions, in the style of
+# examples/grammar. A relation x(F, T, Id) means "nonterminal x spans
+# characters F..T-1 and builds AST node Id". Each node id is a structural
+# JSON object -- {"type": "and", "args": [L, R]}, {"type": "var", "name": "p"}
+# -- the same trick the CNF derivation uses for clauses: Datalog cannot invent
+# fresh names, so a node is named by its shape. Combining two sub-constituents
+# references the recursive parse relations twice, so like step 2 this is
+# NON-LINEAR recursion; run it on the in-memory backends:
+#
+#     bun run datamog --backend seminaive parse-to-cnf.dl
+#
+# Concrete syntax: variables are single characters; operators are ~ (not),
+# & (and), | (or), > (implies, lowest precedence, right associative); ( )
+# group. No spaces. Precedence is encoded by the nonterminal layering
+# pimp < por < pand < pnot < patom. The input string lives in input.csv and
+# is De Morgan's law  ~(p&q)>(~p|~q), a tautology -- expect a "yes" verdict.
+
+extensional input(s: string).
+
+# === Parser (new in this step) ===========================================
+
+# Character at each position, and which positions are operators/parens.
+char(I, C) :- input(S), I in [0 .. length(S) - 1], C = S[I].
+len(N) :- input(S), N = length(S).
+
+oper(I) :- char(I, "~").
+oper(I) :- char(I, "&").
+oper(I) :- char(I, "|").
+oper(I) :- char(I, ">").
+oper(I) :- char(I, "(").
+oper(I) :- char(I, ")").
+varchar(I, C) :- char(I, C), not oper(I).
+
+# patom: a variable, or a parenthesized formula (which reuses the inner id).
+patom(F, F1, {"type": "var", "name": C}) :- varchar(F, C), F1 = F + 1.
+patom(F, T, Id) :- char(F, "("), F1 = F + 1, pimp(F1, C, Id), char(C, ")"), T = C + 1.
+
+# pnot: a chain of ~ in front of an atom.
+pnot(F, T, Id) :- patom(F, T, Id).
+pnot(F, T, {"type": "not", "args": [Id]}) :- char(F, "~"), F1 = F + 1, pnot(F1, T, Id).
+
+# pand / por: left associative.
+pand(F, T, Id) :- pnot(F, T, Id).
+pand(F, T, {"type": "and", "args": [L, R]}) :- pand(F, M, L), char(M, "&"), M1 = M + 1, pnot(M1, T, R).
+por(F, T, Id) :- pand(F, T, Id).
+por(F, T, {"type": "or", "args": [L, R]}) :- por(F, M, L), char(M, "|"), M1 = M + 1, pand(M1, T, R).
+
+# pimp: right associative, lowest precedence.
+pimp(F, T, Id) :- por(F, T, Id).
+pimp(F, T, {"type": "imp", "args": [L, R]}) :- por(F, M, L), char(M, ">"), M1 = M + 1, pimp(M1, T, R).
+
+# The whole input must parse as one formula.
+root(Id) :- pimp(0, N, Id), len(N).
+
+# Record each node's kind, children and variable name as it is built. The
+# shape is also in the id, but reading it back with subscripts would return
+# value-typed pieces; recording keeps the kind and name as plain strings,
+# which the CNF derivation matches and orders.
+pnode({"type": "var", "name": C}, "var") :- varchar(F, C).
+pnode_var({"type": "var", "name": C}, C) :- varchar(F, C).
+pnode({"type": "not", "args": [Id]}, "not") :- char(F, "~"), F1 = F + 1, pnot(F1, T, Id).
+pnode_child({"type": "not", "args": [Id]}, 0, Id) :- char(F, "~"), F1 = F + 1, pnot(F1, T, Id).
+pnode({"type": "and", "args": [L, R]}, "and") :- pand(F, M, L), char(M, "&"), M1 = M + 1, pnot(M1, T, R).
+pnode_child({"type": "and", "args": [L, R]}, 0, L) :- pand(F, M, L), char(M, "&"), M1 = M + 1, pnot(M1, T, R).
+pnode_child({"type": "and", "args": [L, R]}, 1, R) :- pand(F, M, L), char(M, "&"), M1 = M + 1, pnot(M1, T, R).
+pnode({"type": "or", "args": [L, R]}, "or") :- por(F, M, L), char(M, "|"), M1 = M + 1, pand(M1, T, R).
+pnode_child({"type": "or", "args": [L, R]}, 0, L) :- por(F, M, L), char(M, "|"), M1 = M + 1, pand(M1, T, R).
+pnode_child({"type": "or", "args": [L, R]}, 1, R) :- por(F, M, L), char(M, "|"), M1 = M + 1, pand(M1, T, R).
+pnode({"type": "imp", "args": [L, R]}, "imp") :- por(F, M, L), char(M, ">"), M1 = M + 1, pimp(M1, T, R).
+pnode_child({"type": "imp", "args": [L, R]}, 0, L) :- por(F, M, L), char(M, ">"), M1 = M + 1, pimp(M1, T, R).
+pnode_child({"type": "imp", "args": [L, R]}, 1, R) :- por(F, M, L), char(M, ">"), M1 = M + 1, pimp(M1, T, R).
+
+# A chart parser also finds partial constituents that are not part of the
+# whole-string parse. Keep only the nodes reachable from the root: that is
+# exactly the parse tree, and it is the AST the CNF derivation expects.
+reachable(R) :- root(R).
+reachable(C) :- reachable(N), pnode_child(N, _, C).
+node(N, K) :- pnode(N, K), reachable(N).
+node_child(N, P, C) :- pnode_child(N, P, C), reachable(N).
+node_var(N, Name) :- pnode_var(N, Name), reachable(N).
+
+# === CNF derivation (from cnf-from-ast) ==================================
+
+pos(N, ["lit", N, 1]) :- node(N, "var").
+neg(N, ["lit", N, 0]) :- node(N, "var").
+clause_lit_named(["lit", N, 1], Name, 1) :- node(N, "var"), node_var(N, Name).
+clause_lit_named(["lit", N, 0], Name, 0) :- node(N, "var"), node_var(N, Name).
+
+pos(N, C) :- node(N, "not"), node_child(N, 0, K), neg(K, C).
+neg(N, C) :- node(N, "not"), node_child(N, 0, K), pos(K, C).
+
+pos(N, C) :- node(N, "and"), node_child(N, 0, L), pos(L, C).
+pos(N, C) :- node(N, "and"), node_child(N, 1, R), pos(R, C).
+neg(N, ["m", C, D]) :- node(N, "and"), node_child(N, 0, L), node_child(N, 1, R), neg(L, C), neg(R, D).
+merge(C, D)         :- node(N, "and"), node_child(N, 0, L), node_child(N, 1, R), neg(L, C), neg(R, D).
+
+pos(N, ["m", C, D]) :- node(N, "or"), node_child(N, 0, L), node_child(N, 1, R), pos(L, C), pos(R, D).
+merge(C, D)         :- node(N, "or"), node_child(N, 0, L), node_child(N, 1, R), pos(L, C), pos(R, D).
+neg(N, C) :- node(N, "or"), node_child(N, 0, L), neg(L, C).
+neg(N, C) :- node(N, "or"), node_child(N, 1, R), neg(R, C).
+
+pos(N, ["m", C, D]) :- node(N, "imp"), node_child(N, 0, L), node_child(N, 1, R), neg(L, C), pos(R, D).
+merge(C, D)         :- node(N, "imp"), node_child(N, 0, L), node_child(N, 1, R), neg(L, C), pos(R, D).
+neg(N, C) :- node(N, "imp"), node_child(N, 0, L), pos(L, C).
+neg(N, C) :- node(N, "imp"), node_child(N, 1, R), neg(R, C).
+
+clause_lit_named(["m", C, D], V, P) :- merge(C, D), clause_lit_named(C, V, P).
+clause_lit_named(["m", C, D], V, P) :- merge(C, D), clause_lit_named(D, V, P).
+
+varname(Name) :- node(_, "var"), node_var(_, Name).
+rank(Name, count(Other)) :- varname(Name), varname(Other), Other <= Name.
+var_index(Name, J) :- rank(Name, K), J = K - 1.
+nvars(count(Name)) :- varname(Name).
+
+root_clause(C) :- root(N), pos(N, C).
+clause_lit(C, Idx, Pol) :- root_clause(C), clause_lit_named(C, Name, Pol), var_index(Name, Idx).
+
+# === Engine (from cnf-falsifiability) ====================================
+
+clause(C) :- clause_lit(C, _, _).
+var(V) :- nvars(N), V in [0 .. N - 1].
+
+assignment(A) :- nvars(N), A in [0 .. (1 << N) - 1].
+eval(A, V, (A >> V) & 1)  :- assignment(A), var(V).
+
+satisfies(A, C) :- clause_lit(C, V, Pol), eval(A, V, Pol).
+falsifies(A, C) :- assignment(A), clause(C), not satisfies(A, C).
+falsifiable() :- falsifies(_, _).
+
+theorem() :- nvars(_), not falsifiable().
+
+counterexample(A, V, B) :- falsifies(A, C), eval(A, V, B).
+
+?- root(Ast).
+?- theorem().
+?- counterexample(A, V, Value).

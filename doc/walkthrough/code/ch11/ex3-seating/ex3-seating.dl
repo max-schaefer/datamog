@@ -1,0 +1,12 @@
+# Exercise 11.3 — Who sits where.
+#
+# Three people, three seats, three clues.
+
+# TODO: define seating(A, B, C) where each of alice, bob, carol
+# is assigned a seat number in [1..3], seats are distinct, and
+# the three clues are satisfied.
+
+# Placeholder.
+seating(A, B, C) :- A in [1..3], B = A, C = A, A = 0.
+
+?- seating(Alice, Bob, Carol).

@@ -1,0 +1,16 @@
+# Exercise 4.5 solution.
+#
+# Base case: if X and Y share a parent P, they are same-generation.
+# Recursive step: if X and Y have parents who are same-generation,
+# then X and Y are same-generation.
+#
+# The naive rule here also derives same_gen(X, X) for every X that
+# has a parent, because (P, X) and (P, X) qualifies with the same
+# P. Eliminating that requires inequality, which we'll meet later.
+
+extensional parent(parent_name: string, child_name: string).
+
+same_gen(X, Y) :- parent(P, X), parent(P, Y).
+same_gen(X, Y) :- parent(A, X), parent(B, Y), same_gen(A, B).
+
+?- same_gen("greg", Y).

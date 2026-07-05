@@ -1,0 +1,16 @@
+# Tutorial, chapter 1 — a tiny "people" database.
+#
+# The `extensional` declaration tells datamog that `person` is a
+# base predicate backed by a table; the data comes from the sibling
+# `person.csv` (auto-loaded by predicate name).
+
+extensional person(name: string, country: string, year_born: integer).
+
+# Simplest possible query: print every fact.
+?- person(Name, Country, Year).
+
+# Everyone from the UK.
+?- person(Name, "uk", Year).
+
+# Who was born in 1912?
+?- person(Name, Country, 1912).

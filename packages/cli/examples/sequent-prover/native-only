@@ -1,0 +1,5 @@
+This example uses non-linear recursion: copying a sequent's membership to a
+premise (mem/carry/reach) and the AND in provability each reference a
+recursive relation twice. The SQL backends reject that, so the examples test
+skips the sqlite backend here and uses seminaive as the canonical source for
+expected.json.

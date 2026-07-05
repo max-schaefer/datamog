@@ -1,0 +1,5 @@
+{
+  "name": "CNF Falsifiability",
+  "description": "Decide whether a CNF is falsifiable — the recursion-free engine of a propositional theorem prover",
+  "order": 130
+}

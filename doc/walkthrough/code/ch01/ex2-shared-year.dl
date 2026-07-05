@@ -1,0 +1,9 @@
+# Exercise 1.2 — Who shares a birth year?
+#
+# Write a query that lists the name and country of everyone born in
+# 1934. Two people in our data qualify; if you get fewer or more,
+# re-check your query.
+
+extensional person(name: string, country: string, year_born: integer).
+
+# TODO: add your query below.

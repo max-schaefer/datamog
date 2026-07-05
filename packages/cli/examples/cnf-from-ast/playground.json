@@ -1,0 +1,5 @@
+{
+  "name": "CNF from AST",
+  "description": "Derive a formula's CNF from its syntax tree via the polarity trick (non-linear recursion)",
+  "order": 140
+}

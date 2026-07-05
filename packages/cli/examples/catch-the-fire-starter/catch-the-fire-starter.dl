@@ -1,0 +1,30 @@
+# Catch the Fire Starter — tutorial solution
+#
+# Someone set fire to the north field. Criminals live in the south,
+# but children (under 10) are not allowed to leave their home region.
+# A witness saw two bald people running from the scene.
+
+person("anna", 35, "brown", "north").
+person("brian", 8, "blond", "north").
+person("clara", 42, "black", "south").
+person("derek", 6, "brown", "south").
+person("emma", 55, "bald", "south").
+person("frank", 38, "bald", "south").
+person("gina", 28, "red", "south").
+person("henry", 9, "black", "south").
+person("iris", 47, "brown", "east").
+person("jake", 31, "blond", "west").
+
+# Derived predicates
+southerner(X) :- person(X, _, _, "south").
+
+child(X) :- person(X, Age, _, _), Age < 10.
+
+can_travel_north(X) :- southerner(X), not child(X).
+
+bald(X) :- person(X, _, "bald", _).
+
+# The fire starters: bald southerners who could reach the north
+fire_starter(X) :- can_travel_north(X), bald(X).
+
+?- fire_starter(X).

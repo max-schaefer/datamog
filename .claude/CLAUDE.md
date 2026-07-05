@@ -1,0 +1,201 @@
+# Datamog — Project Instructions
+
+Educational Datalog implementation with multiple evaluation backends — SQL (Postgres, SQLite via bun:sqlite, sql.js/WASM) and pure-TS in-memory interpreters (naive, seminaive). Every backend honours the same language semantics; the SQL ones go via a translator, the interpreters evaluate the AST directly. TypeScript/Bun monorepo. Uses **bun** as package manager and runtime — do not use pnpm/npm/yarn.
+
+Before running anything, verify `bun` is on PATH (`which bun`). If it is not, install via `curl -fsSL https://bun.sh/install | bash` and add `$HOME/.bun/bin` to PATH for the session (`export PATH="$HOME/.bun/bin:$PATH"`). The installer does not persist PATH, so export it on every new shell.
+
+## Commands
+
+```bash
+bun test                    # run all tests
+bun run test:coverage       # bun test with --coverage
+bun run typecheck           # tsc -b (project references, emits .d.ts only)
+bun run check               # biome lint + format check
+bun run check:fix           # auto-fix lint + format
+bun run datamog                       # start interactive REPL (no file → REPL mode is the default)
+bun run datamog <file.dl>             # run a Datamog program (in-memory SQLite via bun:sqlite)
+bun run datamog --dry-run <file.dl>   # preview generated SQL
+bun run datamog --backend postgres <file.dl>  # use Postgres backend
+bun run datamog --backend sqljs <file.dl>     # use sql.js backend (WASM SQLite)
+bun run datamog --backend native <file.dl>    # naive in-memory Datalog interpreter (no SQL)
+bun run datamog --backend seminaive <file.dl> # seminaive in-memory Datalog interpreter (no SQL)
+bun run datamog --repl --json         # REPL with JSONL protocol (used by datamog-magic)
+bun run build:cli                     # compile the CLI to a standalone binary (dist/datamog)
+bun run playground:dev                # start playground dev server (runs docs:html first)
+bun run playground:build              # production build (static files; runs docs:html first)
+bun run spec:html                     # render doc/spec.md to packages/playground/public/spec.html
+bun run tutorial:html                 # render doc/embed-tutorials to packages/playground/tutorial.html
+bun run docs:html                     # spec:html + tutorial:html (run by playground:build/dev)
+bun run e2e                           # Playwright e2e suite (auto-installs chromium on first run)
+bun run e2e:ui                        # Playwright e2e in UI mode
+bun run build:vscode                  # build VS Code extension (.vsix)
+bun run slides:build                  # render tutorial slide decks to PDF (one-shot)
+bun run slides:watch                  # render slides with watch mode
+```
+
+Bun ≥ 1.3.0 is required (root `engines` field).
+
+## Architecture
+
+Monorepo with Bun workspaces. Dependency graph (arrows point from a
+package to its dependencies, i.e. from consumer to foundation):
+
+```
+cli  ──────────────► imports everything (also drives the interactive REPL)
+  │
+  ├─► repl     (incremental REPL session engine — declarations/rules/queries accumulate)
+  │
+  ├─► loader/{csv,jsonl,json,gsheet,mermaid}  (json package also exports UrlJsonLoader for HTTP/HTTPS sources)
+  │       │
+  │       └─► engine (SQL translator, executor, Backend/SqlDialect interfaces)
+  │              │
+  │              ├─► backend/{postgres,sqlite,sqljs}  (implement SqlDialect)
+  │              ├─► backend/native     (no SQL; naive evaluator)
+  │              ├─► backend/seminaive  (no SQL; seminaive evaluator, reuses native's planner)
+  │              │
+  │              └─► core (analyzer, type inference)
+  │                     │
+  │                     └─► parser (Langium grammar, generated AST, post-processing)
+  │
+  └─► backend/*, engine, core, parser, repl (all directly)
+
+playground (Preact + Vite SPA, uses parser/core/engine/backend-sqljs via sql.js in a Web Worker; smart auto-complete wired in)
+vscode-extension (Langium LSP — syntax highlighting, validation, smart auto-complete)
+```
+
+A sibling Python package lives outside the Bun workspace at `python/datamog-magic/` — an IPython cell magic (`%%datamog`) that drives the CLI in `--repl --json` mode over stdin/stdout, with optional `--df NAME` to bind query results to a pandas DataFrame.
+
+### Key modules
+
+- `packages/parser/src/datamog.langium` — Langium grammar defining the Datalog syntax; lexer/parser/AST types are generated from this
+- `packages/parser/src/post-process.ts` — post-parse transforms: don't-care variable (`_`) desugaring, numeric literal `rawText` preservation, aggregate `FunctionCall → AggregateCall` rewrite in rule heads, and `BracketAccess` splitting into `Subscript` or `Slice` based on whether a `:` was present (the grammar parses a single `BracketAccess` to avoid an LL(k) ambiguity). The `mod` keyword is left as-is in the AST; the translator emits SQL `%` at codegen time.
+- `packages/core/src/ast.ts` — re-exports Langium-generated AST types as the canonical AST; widens `HeadAtom`/`Rule.head.args` to include the synthesised `AggregateCall` nodes and `Expression` to include the post-processed `Subscript`/`Slice`; adds `isFloatLiteral` helper
+- `packages/core/src/analyzer.ts` — EDB/IDB classification, arity tracking, safety checking (fixed-point iteration — order-independent), dependency graph, Tarjan's SCC, recursion detection, non-linear recursion detection, type-compatibility checks for comparisons/equalities
+- `packages/core/src/types.ts` — type inference (fixed-point iteration). Column types must be exactly one of `string`/`integer`/`float`/`boolean`/`value`. The fifth type (`value`) is the union of every shape: `null`, primitive leaves, arrays, and objects; stored as JSONB on Postgres, canonical TEXT on SQLite/sql.js. `joinTypes` (strict) tolerates `integer`↔`float` only and is used for arithmetic / range bounds. `joinTypesWithJsonLift` additionally accepts primitive↔value (resulting in `value`) and is used at the unify-with-value boundary: atom arg vs column type, comparison ops, IDB column unification across sibling rules. The translator's `liftToJsonIfNeeded` emits the runtime `dialect.toJson` lift that the type relaxation promises. Per-rule validation of range-bound types, operator operand types, function-argument types, comparison compatibility, and rejection of negative integer literals in subscript/slice positions
+- `packages/core/src/keywords.ts` — single source of truth for the lexical surface (`RESERVED_KEYWORDS`, `BUILTIN_TYPE_NAMES`). Mirrored by hand from the Langium grammar; consumed by the playground's CodeMirror highlighter. Update both this file and the grammar together when adding a new keyword or type
+- `packages/engine/src/backend.ts` — `Backend` interface. SQL backends set `sqlDialect` and implement `execute`. Non-SQL backends set `sqlDialect: null` and implement the optional `evaluateProgram(analyzed, loaders)` (replaces the translate→SQL path) and `insertRows(decl, rows)` (replaces SQL INSERTs from loaders)
+- `packages/engine/src/translator.ts` — AST → SQL generation; dialect-specific SQL controlled by `SqlDialect` interface. Per-rule body processing is two-pass: Pass 1 registers bindings from positive atoms; Pass 2 iterates to a fixed point over equalities and range atoms so forward references across the body are handled. Normalises runtime-partial operations to `NULL` across every backend: `/` and `%` wrap the divisor with `NULLIF`, `sqrt`/`ln`/`**` guard the argument with `CASE`. The `**` operator (exponentiation, float-valued) and the bitwise operators go through a `bitwise` dialect hook. Synthesises an empty `WHERE 1 = 0` anchor for `WITH RECURSIVE` CTEs whose rules are all self-referential (least fixed point = empty)
+- `packages/engine/src/dialect.ts` — `SqlDialect` interface (`supportsNonLinearRecursion`, view/CTE creation, range sources, aggregates, optional `divideIntegers` hook)
+- `packages/engine/src/executor.ts` — `DatamogExecutor` class: orchestrates parse → analyze. If the backend implements `evaluateProgram`, delegates to it; otherwise runs the SQL pipeline (translate → createTables → load → createViews → query)
+- `packages/backend/native/src/{base-evaluator,evaluator,planner,values,index}.ts` — naive bottom-up Datalog interpreter. `BaseDatalogEvaluator` (in `base-evaluator.ts`) holds EDB ingestion, query projection, dedup, and trace plumbing shared with the seminaive backend; `NaiveEvaluator` extends it and supplies only the naive fixed-point driver. `planner.ts` holds the shared planner/atom matcher/aggregate reducer/`enumerate` generator; `values.ts` reproduces the SQL translator's cross-backend invariants (NULL propagation, divide-by-zero, domain-error functions, slice bounds) directly in TS
+- `packages/backend/seminaive/src/{evaluator,index}.ts` — seminaive variant. Extends `BaseDatalogEvaluator`; differs from naive only in the fixed-point driver: a priming pass (iteration 0) seeds via `all`, then each delta iteration fires every recursive rule once per stratum-body-atom position with that position reading from the previous iteration's delta. Terminates when every delta is empty.
+- `packages/engine/src/loader.ts` — `ExtensionalLoader` plugin interface, `coerceValue`/`checkValue` for type validation. Loaders match external column/key names against declared columns by exact name (case-sensitively)
+- `packages/engine/src/directory-loader.ts` — `createDirectoryLoader` factory shared by the csv/jsonl/json/mermaid loaders (file-per-predicate pattern). Bun-only (uses `node:path` + `Bun.file`) and exposed via the `datamog-engine/directory-loader` subpath so the browser playground bundle doesn't pull it in
+- `packages/loader/json/src/json-loader.ts` — also exports `UrlJsonLoader` for HTTP/HTTPS JSON sources via the platform `fetch`. The whole-file parser lives in `parse-content.ts` (exposed via the `datamog-json/parse-content` subpath, mirroring csv/jsonl) so it can be bundled without dragging in the Bun-only `directory-loader`; `json-loader.ts` re-exports `parseJsonContent` for back-compat
+- `packages/repl/src/{repl,boundary,events,index}.ts` — incremental session engine. The CLI's `repl-driver.ts` wraps it for human use; `--repl --json` exposes a JSONL event stream for programmatic clients (datamog-magic)
+
+## Datalog semantics
+
+- **Extensional (EDB)**: declared with `extensional`, data loaded via loader plugins
+- **Intensional (IDB)**: defined by rules; the least fixed point of the union of all rules for the predicate
+- Multiple rules for the same predicate union their tuple sets
+- Linear recursion only — non-linear recursion is rejected at translation/evaluation time
+- **Aggregates**: aggregate functions (`count`, `sum`, `avg`, `min`, `max`, `concat`, `list`) in rule heads group by the non-aggregate head args; `count(*)` counts rows; `list` collects values into an array `value` (primitives are auto-lifted; sort key is the raw value for primitives, canonical text for `value` arguments); aggregate predicates cannot be recursive; all rules for a predicate must agree on which positions are aggregates
+- Don't-care variable `_` is desugared to unique anonymous variables in the parser
+
+## Runtime invariants (honoured by every backend)
+
+The SQL translator and the native interpreter's `values.ts` both implement these so the same program produces the same result on every backend:
+
+- **Divide-by-zero / modulo-by-zero**: always `NULL`. SQL translator wraps with `NULLIF(b, 0)`; interpreter returns `null`
+- **Domain-error math**: `sqrt(-x)`, `ln(≤0)`, `-x ** fractional`, `0 ** -n` all return `NULL` (plus `**` overflow). SQL: CASE guard around the call. Interpreter: same check in TS
+- **Bitwise / shift ops** (`& | ^ << >> >>>`): 32-bit signed two's-complement, Java/JS semantics (`>>` arithmetic, `>>>` logical, shift count mod 32). SQLite has no XOR/`>>>` and is 64-bit, so XOR is emulated and results are wrapped to int32; Postgres spells XOR `#` and emulates `>>>` via a bigint mask. See spec §5.9
+- **Slice**: `W[i:j]` with `i >= j` returns `''` via an explicit guard (so SQLite doesn't walk backwards and Postgres doesn't error on a negative SUBSTR length)
+- **Set semantics**: duplicate rows in EDB tables are deduplicated (SQL backends use `SELECT DISTINCT` against EDBs; interpreters dedup their tuple sets). IDB results are sets, not bags
+- **Recursive-only predicates**: a predicate whose every rule is self-referential evaluates to the empty set. SQL: synthesised empty anchor (`SELECT CAST(NULL AS …) WHERE 1 = 0`) in `WITH RECURSIVE`. Interpreter: starts from `∅` and stays there
+
+## Adding a new language feature
+
+Typical touch points (in dependency order):
+
+1. **Grammar** (`parser/src/datamog.langium`): add/modify rules; run `bunx langium generate` to regenerate `parser/src/generated/`
+2. **Post-processing** (`parser/src/post-process.ts`): add transforms if the new feature needs AST normalization (name desugaring, type rewriting, …)
+3. **Core re-exports** (`core/src/ast.ts`, `core/src/index.ts`): re-export new types from the generated AST; if the post-processed shape differs from the raw grammar shape (`AggregateCall`, `Subscript`/`Slice`), widen the relevant union here
+4. **Analyzer** (`core/src/analyzer.ts`): update `checkSafety()` — phase 1 collects safe vars (fixed-point iteration over atoms + equalities + ranges), phase 2 walks body elements and reports unsafe variables with a source position
+5. **Type inference** (`core/src/types.ts`): update var-type environment building in the fixed-point loop, add validation if needed. Column types must unify to a single basic type; `unifyColumnType` reports conflicts
+6. **SQL translator** (`engine/src/translator.ts`): update `translateRule()` — Pass 1 registers bindings from positive atoms, Pass 2 iterates to a fixed point over equalities / range atoms; comparisons and non-binding equalities are collected and emitted as WHERE conditions at the end
+7. **In-memory interpreters** (`backend/native/src/{planner,values}.ts`): mirror the new feature in the planner/value model so the native and seminaive backends produce the same results. `planner.ts` is shared with seminaive; `values.ts` is the place to land any new runtime invariant (NULL propagation, partial function, etc.)
+
+## SQL backends — compilation strategy and dialect differences
+
+Each SQL backend implements `SqlDialect` (in `engine/src/dialect.ts`) and goes through `translator.ts`. Compilation maps:
+
+- Non-recursive IDB → `CREATE [OR REPLACE] VIEW` (Postgres) / `CREATE VIEW IF NOT EXISTS` (SQLite/sql.js)
+- Recursive IDB → `CREATE RECURSIVE VIEW` (Postgres) / `CREATE VIEW ... WITH RECURSIVE` (SQLite/sql.js)
+- Mutually recursive IDB → Postgres: multiple CTEs in one `WITH RECURSIVE`; SQLite/sql.js: a combined CTE with a `__tag` discriminator column
+- Multiple rules for one predicate → `UNION`
+- IDB views use positional column names (`col1`, `col2`, …); EDB tables keep their declared names
+
+Dialect-specific quirks:
+
+- **Range sources**: Postgres uses `generate_series`; SQLite/sql.js use recursive CTE subqueries (literal bounds inlined; correlated bounds capped at 1 000 000 since SQLite has no LATERAL)
+- **`concat`**: `GROUP_CONCAT(expr, ',' ORDER BY expr)` (SQLite/sql.js) / `STRING_AGG(expr::TEXT, ',' ORDER BY expr)` (Postgres) — explicit `ORDER BY` so per-group output is deterministic
+- **`list`**: `JSON_GROUP_ARRAY(json(valueSql) ORDER BY argSql) FILTER (WHERE argSql IS NOT NULL)` wrapped in `NULLIF(…, '[]')` (SQLite/sql.js) / `JSONB_AGG(valueSql ORDER BY orderKey) FILTER (WHERE argSql IS NOT NULL)` (Postgres, with `orderKey = argSql::TEXT` for `value` args, `argSql` for primitives). FILTER tests the *raw* `argSql` because `json_quote(NULL) = 'null'` text would otherwise sneak a JSON `null` into the array. Empty/all-NULL groups → SQL NULL
+- **Integer division**: Postgres and SQLite's `/` already truncates integers — no per-dialect override needed. The `divideIntegers` hook on `SqlDialect` is kept for future backends whose `/` is float-valued
+
+## In-memory interpreters (native, seminaive)
+
+Pure-TS backends that bypass SQL entirely; useful for the playground (no WASM bootstrap), for tracing/teaching, and as a reference implementation against which the SQL translators are checked. `BaseDatalogEvaluator` (in `packages/backend/native/src/base-evaluator.ts`) holds the parts shared with seminaive — EDB ingestion, planning, atom matching, aggregate reduction, query projection, dedup, trace plumbing. Subclasses differ only in the fixed-point driver:
+
+- **Naive**: re-fires every rule each iteration until no new tuples appear
+- **Seminaive**: a priming pass seeds via `all`, then each delta iteration fires every recursive rule once per stratum-body-atom position, with that position reading from the previous iteration's delta. Terminates when every delta is empty
+
+`values.ts` reproduces the SQL translator's runtime invariants (NULL propagation, divide-by-zero, domain-error math, slice bounds) directly in TS — see the *Runtime invariants* section above.
+
+## Playground
+
+Purely client-side Preact + Vite SPA — no backend server. Runs the full datamog pipeline (parse → analyze → translate → execute) in a Web Worker; SQL backends use sql.js (WASM SQLite), and the `native`/`seminaive` evaluators run directly in JS. EDB data is supplied per-predicate via in-memory loaders: `InMemoryCsvLoader` parses with `csv-parse/browser/esm/sync` (the default `csv-parse/sync` build references Node's `Buffer` global) and shares row-coercion with the Bun-side loader via `datamog-csv/parse-content`; `InMemoryJsonlLoader` does the same via `datamog-jsonl/parse-content`. Both csv/jsonl packages have a Bun-side root entry that imports `node:path` and `Bun.file` — consuming the `parse-content` subpath bypasses that and keeps the browser bundle clean.
+
+- Example dropdown: an example opts in by placing a `playground.json` (`name`, `description`, `order`, optional `csvDataOverride`) in its `packages/cli/examples/<dir>/`; `packages/playground/src/examples/index.ts` discovers them via `import.meta.glob` and pulls the `.dl`/`.csv`/`.jsonl` straight from that dir (no second copy). There is no central list. `packages/playground/test/examples.test.ts` validates every `playground.json` and its sibling `.dl`. Examples run on the default `native` backend, so non-linear-recursion examples work without switching backends
+- Deployed to GitHub Pages automatically on push to `main` (`.github/workflows/deploy-pages.yml`)
+- Vite `base` is set to `/datamog/` in CI (via `process.env.GITHUB_ACTIONS`) so asset paths resolve correctly under the repo subpath
+- sql.js WASM is loaded at runtime from `https://sql.js.org/dist` (not bundled)
+- The language spec (`doc/spec.md`) is rendered to a standalone, themed `public/spec.html` (with a TOC) by `scripts/build-spec-html.mjs` (uses `marked`), run as part of `playground:build`/`playground:dev` or via `bun run spec:html`. It is gitignored, deployed alongside the SPA, and linked from the toolbar `Spec` button (`${BASE_URL}spec.html`, opens in a new tab). The embed tutorials are rendered the same way by `scripts/build-tutorial-html.mjs` (into the package-root `tutorial.html`, not `public/`); both renderers share the page stylesheet in `scripts/doc-style.mjs`, and `docs:html` runs both
+- e2e tests live in `packages/playground/e2e/*.e2e.ts` (Playwright, `.e2e.ts` suffix so `bun test` skips them); `bun run e2e` runs the suite and the script chains `playwright install chromium` so a fresh checkout works without a separate manual step
+
+### Embeddable mini-playground (`packages/playground/src/embed/`)
+
+A lightweight embed, separate from the SPA, for inlining live programs into tutorials/docs. It mounts every `[data-datamog]` element on the page (`index.ts` → `mount.ts`) and runs the program directly on the main thread with the pure-TS `native`/`seminaive` backend — no Web Worker, no sql.js/WASM (`engine.ts`). Each instance gets inline affordances (`affordances.ts`): a `▸ run` marker with a collapsible result panel under every `?-` query, and an editable data chip (`data-popover.ts`) next to every `extensional` declaration. The host element carries its payload (program + per-predicate csv/jsonl) in a child `<script type="application/json">`. Autocomplete reuses the shared `packages/playground/src/lib/completion-candidates.ts` (also used by the worker). It is built as a second Vite page (`tutorial.html`, see `vite.config.mjs` `rollupOptions.input`); `packages/playground/embed-demo.html` is a standalone demo. Tests: `packages/playground/test/embed-{engine,structure}.test.ts`; e2e: `packages/playground/e2e/{embed,tutorial,active-line}.e2e.ts`.
+
+## VS Code Extension
+
+Langium-based language server providing syntax highlighting (TextMate grammar) and semantic validation (runs analyzer + type inference). Built with `bun run build:vscode` → produces `datamog.vsix`. Also contributes a `datamog.run` command (`src/run-command.ts`) that evaluates the active buffer in-process via `DatamogExecutor` + the seminaive backend and prints results to a "Datamog" Output channel. Extensional data is loaded from sibling files next to a saved program by `src/disk-loader.ts` (a Node counterpart to the Bun-only directory loader: reads with `node:fs`, parses via the `datamog-{csv,json,jsonl}/parse-content` subpaths), one file per predicate (`<predicate>.csv`/`.json`/`.jsonl`).
+
+## Language Specification
+
+`doc/spec.md` is the detailed language specification. Keep it in sync when adding or changing language features, semantic rules, type system behavior, or SQL translation logic.
+
+## Tutorial and other documentation
+
+The `doc/` tree holds several standalone tutorials and course materials plus the spec:
+
+- `doc/walkthrough/` — the long-form language walkthrough. Main chapters `00-intro.md` through `14-json.md`; appendices `A-lenses.md` through `E-solutions.md`; runnable code in `doc/walkthrough/code/`, exercise solutions in `doc/walkthrough/solutions/`, Marp slides in `doc/walkthrough/slides/`, maintenance scripts in `doc/walkthrough/scripts/`.
+- `doc/case-studies/` — a puzzle-driven companion tutorial (8 chapters; chapters 2-7 adapted from the CodeQL, DES, and Soufflé tutorials, chapter 8 a propositional theorem prover built across five examples: `cnf-*`/`parse-to-cnf` for the model-search prover plus `sequent-prover` for the cut-free sequent-calculus alternative); complete solutions live in `packages/cli/examples/`.
+- `doc/jupyter/` — a standalone Jupyter-notebook tutorial (`datamog-jupyter.ipynb`) that drives Datamog via the `datamog-magic` IPython cell magic. Regenerate the notebook with `python3 doc/jupyter/build-jupyter-tutorial.py` (the script is the source of truth; the `.ipynb` is a committed build artifact).
+- `doc/courses/` — packaged course materials (currently `flolac-26/` for FLOLAC 2026).
+- `doc/embed-tutorials/` — Markdown tutorials whose ```` ```datamog ```` code blocks render to live, editable embeds (mounted by `packages/playground/src/embed/`). Per-block data comes from sibling `data/<predicate>.{csv,jsonl}` files, matched by `extensional` name (same file-per-predicate convention as the CLI examples). Rendered to the gitignored `packages/playground/tutorial.html` by `scripts/build-tutorial-html.mjs` (`tutorial:html`/`docs:html`), deployed alongside the SPA. Currently one page, `getting-started.md` (the source path is hard-coded in the script).
+
+## Tutorial slide decks
+
+Per-chapter Marp decks live under `doc/walkthrough/slides/<NN-name>.md`, one per main walkthrough chapter (00–13; chapter 14 and appendices not yet sliced). Conventions:
+
+- **Marp frontmatter**: `theme: default`, `paginate: true`, `size: 16:9`.
+- **Style**: condensed — roughly 10–17 slides per chapter, summarising the chapter rather than reproducing it. Keep code listings and lens callouts that earn their slide; drop the rest.
+- **Build**: `bun run slides:build` (one-shot) and `bun run slides:watch` invoke `bunx @marp-team/marp-cli` and write PDFs to `doc/walkthrough/slides/pdf/`. PDFs are gitignored — only the `.md` sources are committed, since PDF output is not byte-stable across Marp/Chromium versions.
+- **Fences and capitalisation**: same as the rest of the walkthrough — ```` ```prolog ```` for Datalog, "Datamog" always capitalised in prose.
+
+## Documentation style
+
+- Fence Datalog / Datamog source code in Markdown as ```` ```prolog ```` — it's not really Prolog, but the Prolog highlighter is a close enough fit to syntax-colour atoms, variables, and operators correctly. Keep other fences language-appropriate (```` ```sql ````, ```` ```bash ````, ```` ```csv ```` or plain ```` ``` ```` for tabular data).
+- Always capitalise "Datamog" in prose (the product name), including mid-sentence. The CLI command and package names stay lowercase as code identifiers (`datamog`, `datamog-*`).
+- Prefer ```` ```mermaid ```` diagrams over ASCII art for graphs, trees, and other structural pictures. GitHub renders them natively, and a `graph TD`/`graph LR` Mermaid block doubles as valid input for Datamog's own `MermaidLoader` — so the same source can be an illustration and a data file.
+
+## Conventions
+
+- Parser uses Langium grammar (`datamog.langium`) with generated lexer/parser/AST; post-processing in `post-process.ts`
+- Source positions available via Langium's `$cstNode` on AST nodes
+- `ParseError` with line/column for user-facing error messages, `AnalyzerError` for semantic errors
+- Tests use `bun:test` with TDD approach
+- `Backend` is the abstraction for evaluation targets — implement it to add new databases (with `sqlDialect` + `execute`) or new non-SQL evaluators (with `evaluateProgram` + `insertRows`)
+- Loaders use `coerceValue` (string → typed, for CSV/GSheet) or `checkValue` (native type validation, for JSONL)
+- Example tests (`cli/test/examples.test.ts`) auto-generate `expected.json` if missing; delete it to regenerate. Examples that use non-linear recursion (rejected by the SQL backends) carry an empty `native-only` marker file in their dir: the sqlite run is skipped and seminaive becomes the canonical `expected.json` source

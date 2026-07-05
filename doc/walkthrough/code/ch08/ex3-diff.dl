@@ -1,0 +1,15 @@
+# Exercise 8.3 — Set difference and intersection.
+
+extensional a(x: string).
+extensional b(x: string).
+
+# Placeholders.
+only_in_a(X) :- a(X), X = "__never_matches__".
+only_in_b(X) :- b(X), X = "__never_matches__".
+in_both(X) :- a(X), X = "__never_matches__".
+
+# TODO: float rules.
+
+?- only_in_a(X).
+?- only_in_b(X).
+?- in_both(X).

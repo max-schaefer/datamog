@@ -1,0 +1,10 @@
+# Exercise 9.2 solution.
+
+extensional scores(student: string, subject: string, score: integer).
+
+avg_by_subject(Subject, avg(Score)) :- scores(_, Subject, Score).
+
+top_subject(Subject) :- avg_by_subject(Subject, A), A > 83.
+
+?- avg_by_subject(S, A).
+?- top_subject(S).

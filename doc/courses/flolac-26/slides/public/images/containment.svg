@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 250" role="img"
+     font-family="Inter, 'Helvetica Neue', Arial, sans-serif" fill="#16433c">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#34786c"/>
+    </marker>
+  </defs>
+
+  <text x="310" y="28" text-anchor="middle" font-size="20" font-style="italic" fill="#57606a">for every input EDB E …</text>
+
+  <!-- input -->
+  <rect x="24" y="106" width="96" height="56" rx="10" fill="#e6f2ef" stroke="#5f9d92" stroke-width="1.5"/>
+  <text x="72" y="140" text-anchor="middle" font-size="20" font-weight="700" fill="#34786c">EDB E</text>
+  <path d="M124,134 L182,134" fill="none" stroke="#34786c" stroke-width="2.5" marker-end="url(#arr)"/>
+
+  <!-- P2's output (outer) -->
+  <rect x="190" y="60" width="406" height="152" rx="16" fill="#eef6f4" stroke="#5f9d92" stroke-width="1.5"/>
+  <text x="212" y="86" font-size="19" font-weight="600" fill="#34786c">P₂'s output</text>
+
+  <!-- P1's output (inner, fully contained) -->
+  <rect x="228" y="106" width="248" height="84" rx="12" fill="#cfe6e0" stroke="#34786c" stroke-width="1.75"/>
+  <text x="352" y="154" text-anchor="middle" font-size="19" font-weight="600" fill="#16433c">P₁'s output</text>
+
+  <text x="540" y="156" text-anchor="middle" font-size="30" fill="#34786c">⊆</text>
+</svg>

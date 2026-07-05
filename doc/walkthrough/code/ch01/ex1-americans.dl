@@ -1,0 +1,12 @@
+# Exercise 1.1 — American scientists.
+#
+# Write a query below that lists the name and birth year of every
+# person born in the US. The loader picks up person.csv from this
+# directory.
+#
+# Hint: one of the three arguments to `person(...)` should be a
+# string literal; the other two should be variables.
+
+extensional person(name: string, country: string, year_born: integer).
+
+# TODO: add a `?- person(...).` query that answers the exercise.

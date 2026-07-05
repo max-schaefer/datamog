@@ -1,0 +1,5 @@
+{
+  "name": "Sequent Calculus",
+  "description": "Prove a formula by cut-free sequent-calculus proof search instead of model search",
+  "order": 170
+}

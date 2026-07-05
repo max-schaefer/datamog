@@ -1,0 +1,13 @@
+# Exercise 6.3 — All prefixes.
+#
+# Enumerate every prefix of every word, using a range and slicing.
+
+extensional words(w: string).
+
+# Placeholder.
+prefix(W, P) :- words(W), P = "__never_matches__".
+
+# TODO: replace. Hint:
+#   prefix(W, P) :- words(W), I in [?? .. ??], P = W[:I].
+
+?- prefix(W, P).

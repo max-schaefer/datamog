@@ -1,0 +1,21 @@
+# Exercise 4.5 — Same-generation.
+#
+# Two people are same-generation if they share a common ancestor at
+# equal depth. Two rules:
+#
+#   - Base case: siblings are same-generation.
+#   - Recursive step: children of same-generation people are
+#     themselves same-generation.
+#
+# Our naive rule will also consider X same-generation as itself,
+# because X is trivially a sibling of X. We'll tighten this up with
+# inequality in a later chapter.
+
+extensional parent(parent_name: string, child_name: string).
+
+# Placeholder so the file parses.
+same_gen(X, Y) :- parent(X, Y), X = "__never_matches__".
+
+# TODO: write two rules for same_gen.
+
+?- same_gen("greg", Y).

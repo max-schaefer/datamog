@@ -1,0 +1,15 @@
+# Exercise 4.1 — Reachable within K steps.
+#
+# Define reach_in(K, X, Y) for K in {1, 2, 3}. Three rules, no
+# recursion.
+
+extensional edge(src: string, dst: string).
+
+# Placeholder so the file parses; replace with your rules.
+reach_in(K, X, Y) :- edge(X, Y), K = "0".
+
+# TODO: one rule per value of K.
+
+?- reach_in("1", "a", Y).
+?- reach_in("2", "a", Y).
+?- reach_in("3", "a", Y).

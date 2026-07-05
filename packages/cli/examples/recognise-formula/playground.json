@@ -1,0 +1,5 @@
+{
+  "name": "Recognise a Formula",
+  "description": "Recognise whether a string is a well-formed propositional formula, with a chart parser built one rule per BNF production",
+  "order": 155
+}

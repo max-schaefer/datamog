@@ -1,0 +1,193 @@
+---
+import "../styles/global.css";
+
+interface Props {
+  title: string;
+  kind: "content" | "title" | "section" | "emphasis" | "placeholder";
+  section?: string;
+  image?: string;
+  imageAlt?: string;
+  tight?: boolean;
+  number: number;
+  total: number;
+  prevUrl?: string;
+  nextUrl?: string;
+  firstUrl: string;
+  lastUrl: string;
+}
+
+const {
+  title,
+  kind,
+  section,
+  image,
+  imageAlt,
+  tight,
+  number,
+  total,
+  prevUrl,
+  nextUrl,
+  firstUrl,
+  lastUrl,
+} = Astro.props;
+
+const showHeading = kind === "content" || kind === "placeholder";
+const heroLike = kind === "title" || kind === "section" || kind === "emphasis";
+const assets = `${import.meta.env.BASE_URL}images/`;
+const bgImage = image ? `${assets}${image}` : undefined;
+const swooshUrl = `${assets}swoosh.svg`;
+const logoUrl = `${assets}flolac-logo.svg`;
+const pageTitle = `${title} · Datalog (${number}/${total})`;
+const slideStyle = [
+  `--swoosh: url('${swooshUrl}')`,
+  bgImage ? `--bg-image: url('${bgImage}')` : "",
+]
+  .filter(Boolean)
+  .join("; ");
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <link rel="stylesheet" href={`${import.meta.env.BASE_URL}embed/index.css`} />
+  </head>
+  <body
+    data-prev={prevUrl}
+    data-next={nextUrl}
+    data-first={firstUrl}
+    data-last={lastUrl}
+  >
+    <section
+      class:list={["slide", `slide--${kind}`, { "slide--image": !!bgImage }]}
+      style={slideStyle}
+    >
+      {bgImage && <div class="slide-bg" role={imageAlt ? "img" : undefined} aria-label={imageAlt}></div>}
+      <img class="corner-logo" src={logoUrl} alt="FLOLAC 2026" />
+
+      <main class:list={["content", { "content--hero": heroLike }]}>
+        {showHeading && <h1 class="slide-title">{title}</h1>}
+        <div class:list={["body", { "is-tight": tight }]}>
+          <slot />
+        </div>
+      </main>
+
+      <footer class="chrome">
+        <span class="chrome__section">{section ?? ""}</span>
+        <nav class="pager" aria-label="Slide navigation">
+          {prevUrl ? <a class="pager__btn" href={prevUrl} aria-label="Previous slide">‹</a> : <span class="pager__btn pager__btn--off">‹</span>}
+          <span class="pager__count">{number} / {total}</span>
+          {nextUrl ? <a class="pager__btn" href={nextUrl} aria-label="Next slide">›</a> : <span class="pager__btn pager__btn--off">›</span>}
+        </nav>
+      </footer>
+
+      <div class="progress" style={`--p:${number / total}`} aria-hidden="true"></div>
+    </section>
+
+    <script>
+      // Mermaid (~600 KB) is imported lazily, so it only loads on slides that
+      // actually contain a ```mermaid block.
+      async function renderDiagrams() {
+        const blocks = document.querySelectorAll<HTMLElement>(
+          "pre.mermaid:not([data-processed])",
+        );
+        if (blocks.length === 0) return;
+        const { default: mermaid } = await import("mermaid");
+        mermaid.initialize({
+          startOnLoad: false,
+          securityLevel: "loose",
+          theme: "base",
+          fontFamily:
+            "'Helvetica Neue', Helvetica, Arial, system-ui, sans-serif",
+          themeVariables: {
+            fontSize: "20px",
+            primaryColor: "#e6f2ef",
+            primaryBorderColor: "#5f9d92",
+            primaryTextColor: "#16433c",
+            lineColor: "#34786c",
+            clusterBkg: "#f2faf8",
+            clusterBorder: "#9cc7bf",
+          },
+          flowchart: {
+            curve: "basis",
+            padding: 16,
+            // Keep nested-subgraph titles clear of the inner boxes.
+            subGraphTitleMargin: { top: 6, bottom: 14 },
+          },
+        });
+        mermaid.run({ nodes: blocks });
+      }
+
+      function go(url: string | undefined) {
+        if (url) location.assign(url);
+      }
+
+      function toggleFullscreen() {
+        if (document.fullscreenElement) {
+          document.exitFullscreen();
+        } else {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+      }
+
+      // The handler reads the current slide's neighbours from <body> data
+      // attributes; each navigation is a full page load, so binding here once
+      // per page is correct.
+      document.addEventListener("keydown", (e) => {
+        if (e.metaKey || e.ctrlKey || e.altKey) return;
+        // Don't hijack keys while typing in a live demo (CodeMirror is a
+        // contenteditable; the data popover uses inputs), or Space/arrows would
+        // flip slides mid-edit.
+        const tgt = e.target as HTMLElement | null;
+        if (
+          tgt &&
+          (tgt.isContentEditable ||
+            /^(INPUT|TEXTAREA|SELECT)$/.test(tgt.tagName) ||
+            tgt.closest(".datamog-embed"))
+        ) {
+          return;
+        }
+        const b = document.body;
+        switch (e.key) {
+          case "ArrowRight":
+          case "PageDown":
+          case " ":
+          case "n":
+            e.preventDefault();
+            go(b.dataset.next);
+            break;
+          case "ArrowLeft":
+          case "PageUp":
+          case "p":
+            e.preventDefault();
+            go(b.dataset.prev);
+            break;
+          case "Home":
+            e.preventDefault();
+            go(b.dataset.first);
+            break;
+          case "End":
+            e.preventDefault();
+            go(b.dataset.last);
+            break;
+          case "f":
+            e.preventDefault();
+            toggleFullscreen();
+            break;
+        }
+      });
+
+      // Load the datamog embed bundle (CodeMirror + interpreter, ~1.9 MB) only
+      // on slides that actually contain a live ```datamog demo. The bundle
+      // auto-mounts every [data-datamog] element when it loads.
+      if (document.querySelector("[data-datamog]")) {
+        import(/* @vite-ignore */ `${import.meta.env.BASE_URL}embed/index.js`);
+      }
+
+      // Module scripts are deferred, so the DOM is ready here.
+      renderDiagrams();
+    </script>
+  </body>
+</html>

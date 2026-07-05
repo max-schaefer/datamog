@@ -1,0 +1,55 @@
+# Solving SAT while parsing a propositional formula -- no AST needed.
+#
+# This extends the recognise-formula grammar. There, a nonterminal x(F, T)
+# only recorded that x spans positions F..T-1. Here each nonterminal carries
+# two more parameters: an assignment A and the value V the sub-formula takes
+# under A. So x(F, T, A, V) means "x spans F..T-1 and evaluates to V under
+# assignment A" -- the same (A, V) the AST evaluator threaded through eval(N, A, V),
+# only now attached to the grammar rules directly.
+#
+# An assignment is an N-bit number, one bit per variable; prop_var maps each
+# variable character to its bit index. A variable reads its bit from A, and
+# every operator combines its operands the way it should: 1 - V for ~, & for
+# AND, | for OR, and (1 - VL) | VR for -> (which is ~L | R). formula(A, V) is
+# then the whole formula's value under A, and satisfies(A) keeps the A that
+# make it true -- SAT solved straight from the text, with no syntax tree.
+#
+# This is NON-LINEAR recursion, so run it on an in-memory backend:
+#
+#     bun run datamog --backend seminaive evaluate-formula.dl
+#
+# The input string lives in input.csv and is ~(p|q)&r|p; with p, q, r at bit
+# positions 0, 1, 2 the satisfying assignments are 1, 3, 4, 5, 7 -- the same
+# five the AST-based evaluator finds.
+
+extensional input(s: string).
+extensional prop_var(name: string, idx: integer).
+
+char(I, C) :- input(S), I in [0 .. length(S) - 1], C = S[I].
+len(N) :- input(S), N = length(S).
+
+# num_vars is the highest variable index + 1, found with negation (no aggregate
+# needed): a max is an index that nothing beats. Then enumerate every assignment.
+beaten(I)     :- prop_var(_, I), prop_var(_, J), J > I.
+num_vars(N)   :- prop_var(_, M), not beaten(M), N = M + 1.
+assignment(A) :- num_vars(N), A in [0 .. (1 << N) - 1].
+
+# Each BNF production, now also computing a value under the assignment A:
+# x(F, T, A, V) spans F..T-1 and evaluates to V under A. Unit productions and
+# the parentheses pass A and V straight through.
+atom(F, T, A, V) :- char(F, C), prop_var(C, I), assignment(A), T = F + 1, V = (A >> I) & 1.
+atom(F, T, A, V) :- char(F, "("), impl(F + 1, M, A, V), char(M, ")"), T = M + 1.
+lit(F, T, A, V)  :- atom(F, T, A, V).
+lit(F, T, A, V)  :- char(F, "~"), lit(F + 1, T, A, VC), V = 1 - VC.
+conj(F, T, A, V) :- lit(F, T, A, V).
+conj(F, T, A, V) :- conj(F, M, A, VL), char(M, "&"), lit(M + 1, T, A, VR), V = VL & VR.
+disj(F, T, A, V) :- conj(F, T, A, V).
+disj(F, T, A, V) :- disj(F, M, A, VL), char(M, "|"), conj(M + 1, T, A, VR), V = VL | VR.
+impl(F, T, A, V) :- disj(F, T, A, V).
+impl(F, T, A, V) :- disj(F, M, A, VL), char(M, "-"), char(M + 1, ">"), impl(M + 2, T, A, VR), V = (1 - VL) | VR.
+
+# The whole input is a formula spanning 0..len; satisfies(A) keeps the A that make it true.
+formula(A, V) :- impl(0, T, A, V), len(T).
+satisfies(A)  :- formula(A, 1).
+
+?- satisfies(A).

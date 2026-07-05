@@ -1,0 +1,7 @@
+num(N) :- N in [1..10].
+
+gcd(A, A, A) :- num(A).
+gcd(A, B, N) :- num(A), num(B), gcd(A-B, B, N).
+gcd(A, B, N) :- num(A), num(B), gcd(A, B-A, N).
+
+?- gcd(6, 4, N).

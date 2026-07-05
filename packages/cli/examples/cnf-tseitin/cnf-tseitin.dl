@@ -1,0 +1,137 @@
+# Theorem proving by falsifiability -- step 2, the Tseitin alternative
+#
+# Step 2 (../cnf-from-ast) converted a formula to an *equivalent* CNF by
+# distributing OR over AND. That is faithful but can blow up exponentially,
+# and the distribution needs non-linear recursion (native/seminaive only).
+#
+# The Tseitin transformation trades a different way. It invents one fresh
+# variable per subformula and emits a few *local* clauses per connective
+# saying "this fresh variable equals the connective applied to its children".
+# The result is only *equisatisfiable* with the formula, not equivalent, but:
+#
+#   * it is linear in the size of the formula (no blow-up), and
+#   * the encoding uses NO recursion -- each clause depends only on a node and
+#     its children. So unlike step 2, whose non-linear distribution the SQL
+#     backends reject outright, this encoding *translates* on every backend.
+#     (Confirm with `bun run datamog --dry-run --backend sqlite cnf-tseitin.dl`:
+#     valid SQL comes out, no rejection.)
+#
+# In practice we still evaluate on the in-memory backends, so this example
+# carries a `native-only` marker. The reason is NOT the encoding but the
+# truth-table enumeration shared by all three steps: once the variable count
+# is computed rather than a literal constant, SQLite has to regenerate the
+# unmaterialized assignment view inside the engine's correlated subqueries,
+# which is impractically slow. That is a property of the enumeration on SQL,
+# orthogonal to Tseitin. Run it with:
+#
+#     bun run datamog --backend seminaive cnf-tseitin.dl
+#
+# Because the encoding is equisatisfiable, the question flips. To prove the
+# formula is a theorem we *refute its negation*: assert that the root is
+# false and search for a model of the encoding. A model is a falsifying
+# assignment of the formula (a counterexample); no model means the formula
+# can never be made false, i.e. it is a theorem. So the engine below is the
+# dual of step 1's: step 1 hunts for a clause some assignment falsifies;
+# here we hunt for an assignment that satisfies every clause.
+#
+# The AST is the same one step 2 used, De Morgan's law  ~(p & q) -> (~p | ~q),
+# a tautology, so we again expect a "yes" verdict and no counterexamples.
+
+extensional node(id: integer, kind: string).
+extensional node_var(id: integer, name: string).
+extensional node_child(id: integer, pos: integer, child: integer).
+extensional root(id: integer).
+
+# --- Tseitin variables ---
+#
+# Every node gets a boolean variable standing for the truth value of the
+# subformula rooted there. A var leaf reuses its propositional variable's
+# index; each internal node gets a fresh index above the propositional ones.
+# tvar(Node, Index) maps a node to its variable index.
+
+# Propositional variables: distinct names, densely indexed 0 .. nprop-1.
+varname(Name) :- node(_, "var"), node_var(_, Name).
+rank(Name, count(Other)) :- varname(Name), varname(Other), Other <= Name.
+var_index(Name, J) :- rank(Name, K), J = K - 1.
+nprop(count(Name)) :- varname(Name).
+
+# Internal nodes: everything that is not a leaf, ranked by id and given a
+# fresh index starting just after the propositional variables.
+internal(N) :- node(N, Kind), Kind != "var".
+irank(N, count(M)) :- internal(N), internal(M), M <= N.
+ninternal(count(N)) :- internal(N).
+
+tvar(N, Idx) :- node(N, "var"), node_var(N, Name), var_index(Name, Idx).
+tvar(N, Idx) :- internal(N), irank(N, R), nprop(P), Idx = P + R - 1.
+
+# Total number of variables the engine enumerates over.
+nvars(V) :- nprop(P), ninternal(I), V = P + I.
+
+# --- Definitional clauses, one block per connective ---
+#
+# Clause ids are [Node, K] for the K-th clause of a node; the root assertion
+# is ["root"]. A literal is (variable index, polarity); 1 = positive, 0 = not.
+
+# not, X <-> ~A:  (~X | ~A), (X | A)
+clause_lit([N, 1], X, 0) :- node(N, "not"), tvar(N, X).
+clause_lit([N, 1], A, 0) :- node(N, "not"), node_child(N, 0, C0), tvar(C0, A).
+clause_lit([N, 2], X, 1) :- node(N, "not"), tvar(N, X).
+clause_lit([N, 2], A, 1) :- node(N, "not"), node_child(N, 0, C0), tvar(C0, A).
+
+# and, X <-> A & B:  (~X | A), (~X | B), (X | ~A | ~B)
+clause_lit([N, 1], X, 0) :- node(N, "and"), tvar(N, X).
+clause_lit([N, 1], A, 1) :- node(N, "and"), node_child(N, 0, C0), tvar(C0, A).
+clause_lit([N, 2], X, 0) :- node(N, "and"), tvar(N, X).
+clause_lit([N, 2], B, 1) :- node(N, "and"), node_child(N, 1, C1), tvar(C1, B).
+clause_lit([N, 3], X, 1) :- node(N, "and"), tvar(N, X).
+clause_lit([N, 3], A, 0) :- node(N, "and"), node_child(N, 0, C0), tvar(C0, A).
+clause_lit([N, 3], B, 0) :- node(N, "and"), node_child(N, 1, C1), tvar(C1, B).
+
+# or, X <-> A | B:  (X | ~A), (X | ~B), (~X | A | B)
+clause_lit([N, 1], X, 1) :- node(N, "or"), tvar(N, X).
+clause_lit([N, 1], A, 0) :- node(N, "or"), node_child(N, 0, C0), tvar(C0, A).
+clause_lit([N, 2], X, 1) :- node(N, "or"), tvar(N, X).
+clause_lit([N, 2], B, 0) :- node(N, "or"), node_child(N, 1, C1), tvar(C1, B).
+clause_lit([N, 3], X, 0) :- node(N, "or"), tvar(N, X).
+clause_lit([N, 3], A, 1) :- node(N, "or"), node_child(N, 0, C0), tvar(C0, A).
+clause_lit([N, 3], B, 1) :- node(N, "or"), node_child(N, 1, C1), tvar(C1, B).
+
+# imp, X <-> (A -> B):  (~X | ~A | B), (X | A), (X | ~B)
+clause_lit([N, 1], X, 0) :- node(N, "imp"), tvar(N, X).
+clause_lit([N, 1], A, 0) :- node(N, "imp"), node_child(N, 0, C0), tvar(C0, A).
+clause_lit([N, 1], B, 1) :- node(N, "imp"), node_child(N, 1, C1), tvar(C1, B).
+clause_lit([N, 2], X, 1) :- node(N, "imp"), tvar(N, X).
+clause_lit([N, 2], A, 1) :- node(N, "imp"), node_child(N, 0, C0), tvar(C0, A).
+clause_lit([N, 3], X, 1) :- node(N, "imp"), tvar(N, X).
+clause_lit([N, 3], B, 0) :- node(N, "imp"), node_child(N, 1, C1), tvar(C1, B).
+
+# Refutation: assert the formula is false by forcing the root variable to 0.
+clause_lit(["root"], X, 0) :- root(N), tvar(N, X).
+
+# --- The engine: search for a model (the dual of step 1) ---
+
+clause(C) :- clause_lit(C, _, _).
+
+# Enumerate every assignment as a bit pattern, exactly as steps 1 and 2 do.
+var(V) :- nvars(N), V in [0 .. N - 1].
+assignment(A) :- nvars(N), A in [0 .. (1 << N) - 1].
+eval(A, V, (A >> V) & 1)  :- assignment(A), var(V).
+
+# A satisfies clause C when some literal matches and falsifies it when
+# none do; A violates the CNF when it falsifies some clause.
+satisfies(A, C) :- clause_lit(C, V, Pol), eval(A, V, Pol).
+falsifies(A, C) :- assignment(A), clause(C), not satisfies(A, C).
+violated(A)     :- falsifies(A, _).
+
+# A model satisfies every clause. Each model is a falsifying assignment of
+# the formula; the formula is a theorem exactly when there is no model.
+model(A)       :- assignment(A), not violated(A).
+has_model() :- model(_).
+theorem() :- nvars(_), not has_model().
+
+# Report a counterexample over the original propositional variables only
+# (indices below nprop); the rest are Tseitin's auxiliary variables.
+counterexample(A, V, B) :- model(A), eval(A, V, B), nprop(P), V < P.
+
+?- theorem().
+?- counterexample(A, V, Value).

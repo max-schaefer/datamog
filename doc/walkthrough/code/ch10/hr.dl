@@ -1,0 +1,29 @@
+# Tutorial, chapter 10 — a small HR-style schema.
+
+extensional employee(id: integer, name: string, salary: integer).
+extensional in_department(emp_id: integer, dept_id: integer).
+extensional manages(manager: integer, report: integer).
+
+# Anyone who manages someone.
+is_manager(M) :- manages(M, _).
+
+# Transitively: employees who report up (directly or indirectly)
+# to a given manager.
+reports_to(R, M) :- manages(M, R).
+reports_to(R, M) :- manages(M, X), reports_to(R, X).
+
+# An individual contributor has no reports.
+ic(E) :- employee(E, _, _), not is_manager(E).
+
+# Head count per department.
+head_count(Dept, count(E)) :- in_department(E, Dept).
+
+# A "big team" manager is one who directly or indirectly manages
+# at least 2 reports. Two strata: compute report_count first,
+# then filter.
+report_count(M, count(R)) :- reports_to(R, M).
+big_team_manager(M) :- report_count(M, C), C >= 2.
+
+?- ic(E).
+?- head_count(D, N).
+?- big_team_manager(M).

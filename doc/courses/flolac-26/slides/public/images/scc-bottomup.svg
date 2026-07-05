@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="18 48 476 412" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif">
+  <defs>
+    <marker id="dep" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" viewBox="0 0 10 10" refX="8" refY="5" orient="auto"><path d="M0,1 L9,5 L0,9 z" fill="#2f8576"/></marker>
+    <marker id="big" markerUnits="userSpaceOnUse" markerWidth="16" markerHeight="16" viewBox="0 0 10 10" refX="5" refY="5" orient="auto"><path d="M0,1 L9,5 L0,9 z" fill="#7cc0b3"/></marker>
+  </defs>
+
+  <!-- evaluate bottom-up arrow + step numbers -->
+  <line x1="62" y1="405" x2="62" y2="78" stroke="#7cc0b3" stroke-width="7" marker-end="url(#big)"/>
+  <text x="38" y="240" transform="rotate(-90 38 240)" text-anchor="middle" fill="#2f8576" font-size="20" font-style="italic">bottom-up</text>
+  <g fill="#2f8576" font-size="22" font-weight="700" text-anchor="middle">
+    <text x="86" y="402">1</text>
+    <text x="86" y="247">2</text>
+    <text x="86" y="92">3</text>
+  </g>
+
+  <!-- SCC cluster -->
+  <rect x="200" y="190" width="282" height="100" rx="16" fill="none" stroke="#2f8576" stroke-width="2.5" stroke-dasharray="7 6"/>
+  <text x="208" y="183" fill="#2f8576" font-size="18" font-style="italic">one SCC</text>
+
+  <!-- data-flow edges (point up, toward the consumer) -->
+  <g stroke="#2f8576" stroke-width="2.5" fill="none">
+    <line x1="325" y1="369" x2="270" y2="267" marker-end="url(#dep)"/>
+    <line x1="355" y1="369" x2="411" y2="267" marker-end="url(#dep)"/>
+    <line x1="340" y1="188" x2="340" y2="116" marker-end="url(#dep)"/>
+    <!-- mutual recursion inside the SCC -->
+    <line x1="284" y1="231" x2="394" y2="231" marker-end="url(#dep)"/>
+    <line x1="396" y1="249" x2="286" y2="249" marker-end="url(#dep)"/>
+  </g>
+
+  <!-- nodes -->
+  <circle cx="340" cy="85"  r="28" fill="#fff" stroke="#2f8576" stroke-width="3.5"/>
+  <circle cx="255" cy="240" r="28" fill="#fff" stroke="#2f8576" stroke-width="3.5"/>
+  <circle cx="425" cy="240" r="28" fill="#fff" stroke="#2f8576" stroke-width="3.5"/>
+  <circle cx="340" cy="395" r="28" fill="#d9efe9" stroke="#2f8576" stroke-width="3.5"/>
+  <g fill="#16433c" font-size="26" text-anchor="middle">
+    <text x="340" y="94">t</text>
+    <text x="255" y="249">a</text>
+    <text x="425" y="249">b</text>
+    <text x="340" y="404">e</text>
+  </g>
+  <text x="340" y="443" text-anchor="middle" fill="#2f8576" font-size="17">EDB</text>
+</svg>

@@ -1,0 +1,34 @@
+{
+  // Launch a second VS Code window (Extension Development Host) with the
+  // Datamog extension loaded from source. The preLaunchTask rebuilds the
+  // bundle first, so each F5 reflects the latest changes under
+  // packages/vscode-extension/src.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Datamog Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/packages/vscode-extension",
+        "${workspaceFolder}/doc/walkthrough/code"
+      ],
+      "outFiles": ["${workspaceFolder}/packages/vscode-extension/out/**/*.js"],
+      "preLaunchTask": "build-vscode-extension"
+    },
+    {
+      // Same, but skips the one-shot build — pair it with the
+      // "watch-vscode-extension" task (Terminal → Run Task) for a fast
+      // edit/reload loop: edit source, the watcher rebuilds, then reload
+      // the dev host window (Cmd/Ctrl+R).
+      "name": "Run Datamog Extension (no prebuild)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/packages/vscode-extension",
+        "${workspaceFolder}/doc/walkthrough/code"
+      ],
+      "outFiles": ["${workspaceFolder}/packages/vscode-extension/out/**/*.js"]
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+# Exercise 2.1 solution.
+#
+# "X is a grandchild of Y" is the mirror image of
+# "Y is a grandparent of X" — swap the argument order and trace
+# through child→parent→parent.
+
+extensional parent(parent_name: string, child_name: string).
+
+grandchild(X, Y) :- parent(Z, X), parent(Y, Z).
+
+?- grandchild(X, Y).

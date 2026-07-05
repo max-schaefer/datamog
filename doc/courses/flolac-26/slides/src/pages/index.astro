@@ -1,0 +1,49 @@
+---
+import { getCollection } from "astro:content";
+import "../styles/global.css";
+import { DECKS, baseName, deckSequence, type Deck } from "../decks";
+
+const base = import.meta.env.BASE_URL;
+const assets = `${base}images/`;
+const all = await getCollection("slides");
+// Link each deck to its own first slide (the intro deck's title slide; the
+// overview for the part decks).
+const deckHref = (deck: Deck) =>
+  `${base}${deck.slug}/${baseName(deckSequence(deck, all)[0].id)}/`;
+const stageStyle = `--swoosh: url('${assets}swoosh.svg')`;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Introduction to Logic Programming with Datalog · FLOLAC 2026</title>
+  </head>
+  <body>
+    <main class="home" style={stageStyle}>
+      <img class="corner-logo" src={`${assets}flolac-logo.svg`} alt="FLOLAC 2026" />
+      <h1 class="home__title">Introduction to Logic<br />Programming with Datalog</h1>
+      <p class="home__sub">FLOLAC 2026 · a four-part course</p>
+      <ul class="home__decks">
+        {
+          DECKS.map((d) => (
+            <li class:list={["home__deck", { "home__deck--draft": !d.ready }]}>
+              <a href={deckHref(d)}>
+                <span class="home__part">{d.part ? `Part ${d.part}` : "Intro"}</span>
+                <span class="home__text">
+                  <span class="home__name">
+                    {d.title}
+                    {!d.ready && <span class="home__flag">in preparation</span>}
+                  </span>
+                  <span class="home__blurb">{d.tagline ?? d.blurb}</span>
+                </span>
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+      <p class="home__byline">Max Schaefer (<a href="mailto:xiemaisi@gmail.com">xiemaisi@gmail.com</a>)</p>
+    </main>
+  </body>
+</html>

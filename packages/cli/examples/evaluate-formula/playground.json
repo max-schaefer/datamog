@@ -1,0 +1,5 @@
+{
+  "name": "Evaluate a Formula",
+  "description": "Solve SAT while parsing: each grammar rule carries an assignment and a value, so the satisfying assignments fall out of the parse with no syntax tree",
+  "order": 156
+}

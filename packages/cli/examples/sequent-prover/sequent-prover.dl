@@ -1,0 +1,129 @@
+# Theorem proving by proof search: a cut-free sequent calculus
+#
+# The cnf-* / parse-to-cnf series decides a formula *semantically*: it hunts
+# for a falsifying assignment. This example decides the same question
+# *syntactically*: it searches for a proof in a cut-free sequent calculus.
+# Same verdicts, opposite philosophy -- model theory vs proof theory.
+#
+# A sequent is  Gamma |- Delta : the antecedent Gamma is assumed, the
+# succedent Delta is to be shown. We prove a formula phi by deriving  |- phi
+# (phi alone on the right). Reading the rules bottom-up, each rule decomposes
+# one connective into the subformulas of its conclusion -- the *subformula
+# property* of cut-free proofs -- so proof search is finite and terminating.
+# All propositional rules are invertible, so we can decompose eagerly with no
+# backtracking; a branch closes at an *axiom* (a variable on both sides), and
+# a sequent is provable when some rule's premises are all provable.
+#
+# Representation (the interesting part). A sequent is a *set* of signed
+# formulas, but Datalog cannot build sets in a recursion without a forbidden
+# recursive aggregate. So a sequent is a structural value id naming its
+# derivation (["step", Parent, Side, Node, Branch]) and its contents live in a
+# separate membership relation mem(SeqId, Side, NodeId). A rule builds a
+# premise by *copying* the conclusion's members except the principal and
+# adding the subformulas -- a relational copy, no set construction. Dropping
+# the principal needs disequality on the member node id, which is why this
+# only works now that =/!= are defined on value operands (ordering is not).
+#
+# The inference rules themselves are data: branch/decomp below describe how
+# each (connective, side) decomposes, and a handful of generic rules apply
+# them. Combining two premises (and the AND in provability) is NON-LINEAR
+# recursion, so run on an in-memory backend:
+#
+#     bun run datamog --backend seminaive sequent-prover.dl
+#
+# The AST (node/node_var/node_child/root) is taken as extensional here, the
+# De Morgan tautology ~(p&q)->(~p|~q); prepend parse-to-cnf's parser to go
+# straight from a string.
+
+extensional node(id: integer, kind: string).
+extensional node_var(id: integer, name: string).
+extensional node_child(id: integer, pos: integer, child: integer).
+extensional root(id: integer).
+
+# --- The calculus as data ------------------------------------------------
+#
+# branch(Kind, Side, Br): decomposing a Kind on a Side has a premise Br.
+# A (Kind, Side) with a branch 1 is a two-premise rule; otherwise one-premise.
+branch("not", "L", 0).
+branch("not", "R", 0).
+branch("and", "L", 0).
+branch("and", "R", 0).
+branch("and", "R", 1).
+branch("or", "L", 0).
+branch("or", "L", 1).
+branch("or", "R", 0).
+branch("imp", "L", 0).
+branch("imp", "L", 1).
+branch("imp", "R", 0).
+
+# decomp(Kind, Side, Br, ChildPos, AddSide): in premise Br, the child at
+# ChildPos is added on AddSide. (The principal itself is always removed.)
+decomp("not", "L", 0, 0, "R").              # ~A |-      becomes   |- A
+decomp("not", "R", 0, 0, "L").              #    |- ~A   becomes A |-
+decomp("and", "L", 0, 0, "L").              # A&B |-     becomes A,B |-
+decomp("and", "L", 0, 1, "L").
+decomp("and", "R", 0, 0, "R").              #     |- A&B becomes  |- A   and  |- B
+decomp("and", "R", 1, 1, "R").
+decomp("or", "L", 0, 0, "L").               # A|B |-     becomes A |-  and  B |-
+decomp("or", "L", 1, 1, "L").
+decomp("or", "R", 0, 0, "R").               #     |- A|B becomes  |- A,B
+decomp("or", "R", 0, 1, "R").
+decomp("imp", "L", 0, 0, "R").              # A->B |-    becomes  |- A   and  B |-
+decomp("imp", "L", 1, 1, "L").
+decomp("imp", "R", 0, 0, "L").              #     |- A->B becomes A |- B
+decomp("imp", "R", 0, 1, "R").
+
+two_premise(K, Side) :- branch(K, Side, 1).
+
+# --- The initial sequent  |- phi -----------------------------------------
+
+reach("init") :- root(_).
+mem("init", "R", Root) :- root(Root).
+
+# --- Rule application (generic, driven by branch/decomp) -----------------
+#
+# From a reachable sequent S with a decomposable principal (PSide, N), reach
+# each premise, record what to drop, and add the rule's subformulas.
+reach(["step", S, PSide, N, Br]) :-
+    reach(S), mem(S, PSide, N), node(N, K), branch(K, PSide, Br).
+carry(S, ["step", S, PSide, N, Br], PSide, N) :-
+    reach(S), mem(S, PSide, N), node(N, K), branch(K, PSide, Br).
+mem(["step", S, PSide, N, Br], AddSide, Child) :-
+    reach(S), mem(S, PSide, N), node(N, K), branch(K, PSide, Br),
+    decomp(K, PSide, Br, Pos, AddSide), node_child(N, Pos, Child).
+
+# Copy every member of the conclusion to the premise except the principal:
+# keep a member whose side differs, or whose node differs (their union is
+# everything but the exact principal pair). Disequality on value node ids.
+mem(Prem, S2, N2) :- carry(S, Prem, PS, PN), mem(S, S2, N2), S2 != PS.
+mem(Prem, S2, N2) :- carry(S, Prem, PS, PN), mem(S, S2, N2), N2 != PN.
+
+# --- Proof edges and provability -----------------------------------------
+
+step1(S, ["step", S, PSide, N, 0]) :-
+    reach(S), mem(S, PSide, N), node(N, K), branch(K, PSide, 0), not two_premise(K, PSide).
+step2(S, ["step", S, PSide, N, 0], ["step", S, PSide, N, 1]) :-
+    reach(S), mem(S, PSide, N), node(N, K), two_premise(K, PSide).
+
+# A branch closes when a variable appears on both sides.
+axiom(S) :- reach(S), mem(S, "L", N1), node_var(N1, P), mem(S, "R", N2), node_var(N2, P).
+
+# A sequent is provable if it is an axiom, or some rule's premises all are.
+provable(S) :- axiom(S).
+provable(C) :- step1(C, P), provable(P).
+provable(C) :- step2(C, P1, P2), provable(P1), provable(P2).
+
+theorem() :- root(_), provable("init").
+
+# --- Counterexamples from open branches ----------------------------------
+#
+# A fully decomposed sequent (only variables left) that is not an axiom is an
+# open branch: a countermodel. Variables on the left are true, on the right
+# false; no variable is on both (else it would be an axiom).
+compound(S) :- mem(S, _, N), node(N, K), branch(K, _, _).
+open_branch(S) :- reach(S), not compound(S), not axiom(S).
+counterexample(S, P, "true")  :- open_branch(S), mem(S, "L", N), node_var(N, P).
+counterexample(S, P, "false") :- open_branch(S), mem(S, "R", N), node_var(N, P).
+
+?- theorem().
+?- counterexample(Branch, Var, Value).

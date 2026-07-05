@@ -1,0 +1,31 @@
+# Shannon entropy of a string
+#
+# Given a string, computes:
+#  - the frequency of each distinct character
+#  - the probability p_c of each character
+#  - the Shannon entropy  H = -sum_c  p_c * log2(p_c)   (in bits)
+#
+# Uses the identity  log2(x) = ln(x) / ln(2)  to avoid depending on a
+# log-base-2 function, which is not portable across SQL dialects.
+
+text_input("abracadabra").
+
+# Position each character in the string.
+char_at(I, C) :- text_input(S), I in [0 .. length(S) - 1], C = S[I].
+
+# Total number of characters, and count of each distinct character.
+total(count(*)) :- char_at(_, _).
+freq(C, count(*)) :- char_at(_, C).
+
+# Probability of each character. Multiply by 1.0 to force floating-point division.
+prob(C, P) :- freq(C, N), total(T), P = (N * 1.0) / T.
+
+# Per-character contribution to entropy: -p * log2(p).
+contribution(C, X) :- prob(C, P), X = -1.0 * P * ln(P) / ln(2).
+
+# Total entropy in bits.
+entropy(sum(X)) :- contribution(_, X).
+
+?- freq(C, N).
+?- prob(C, P).
+?- entropy(H).

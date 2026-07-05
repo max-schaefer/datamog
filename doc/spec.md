@@ -1,0 +1,1941 @@
+# Datamog Language Specification
+
+Datamog is an educational Datalog dialect. Programs declare table-backed
+predicates, define derived predicates via rules, and issue queries.
+
+Datamog ships with five backends. All of them implement the same
+language semantics and agree on runtime invariants (divide-by-zero /
+domain-error NULLs, slice bounds, integer vs float division); they
+differ only in how rules are evaluated.
+
+The **SQL backends** — PostgreSQL, SQLite, and sql.js (WASM SQLite) —
+translate programs into standard SQL (CREATE TABLE, CREATE VIEW,
+SELECT) and execute them against a relational database. Dialect
+differences only affect the generated SQL.
+
+The **in-memory backends** evaluate Datalog directly, without going
+through SQL:
+
+- **`--backend native`** — naive bottom-up evaluator. Strata are evaluated
+  in topological order and each stratum is re-run in full until no new
+  tuples appear.
+- **`--backend seminaive`** — the same walk across strata, but each
+  recursive iteration fires every rule once per body atom referencing a
+  same-stratum predicate, forcing that atom to read from the previous
+  iteration's *delta* (newly-derived tuples) while other atoms read from
+  the accumulated result. Non-recursive strata finish in a single pass.
+  Produces identical results to `native`, but avoids re-deriving tuples
+  that couldn't yield new facts this round.
+
+## 1 Lexical Structure
+
+### 1.1 Character Set
+
+Datamog source files are UTF-8 encoded text.
+
+### 1.2 Whitespace
+
+Tabs, spaces, carriage returns, and newlines are ignored between tokens.
+
+### 1.3 Comments
+
+Line comments begin with `#` and extend to the end of the line:
+
+```
+# This is a comment.
+ancestor(X, Y) :- parent(X, Y).   # inline comment
+```
+
+### 1.4 Identifiers
+
+There is a single identifier surface, `IDENT`, matched by
+
+```
+/[a-zA-Z_][a-zA-Z0-9_]*/
+```
+
+Whether a given identifier denotes a *predicate*, a *function*, or a
+*variable* is determined by its **syntactic position**, not by its
+spelling:
+
+- An identifier immediately followed by `(` is a predicate or function
+  name (in declarations, rule heads, body literals, and call
+  expressions).
+- An identifier appearing anywhere else a term is expected is a
+  variable.
+
+Stylistically Datamog follows the Prolog convention of capitalising
+variables and lower-casing predicates (`parent(X, Y) :- mother(X, Y).`),
+and the editor highlighters render them that way — but the grammar
+imposes no such rule. `Foo(x, y) :- bar(x, y).` parses identically and
+binds `x`, `y` as variables.
+
+Either kind may also be written in **backtick-quoted** form. Backticks
+are a purely syntactic escape: they allow extra characters in a name
+(punctuation, spaces, reserved words) that the bare `IDENT` pattern
+wouldn't accept. The token is `QUOTED_IDENT`, matched by
+
+```
+/`(\\.|[^`\\\n\r])+`/
+```
+
+Quoting never changes the role: `` `X` `` and `X` are the same variable;
+`` `foo` `` and `foo` are the same predicate. Backticks decode backslash
+escapes inside and are stripped before the decoded name is exposed to
+downstream stages.
+
+```
+extensional `http-event`(`content-type`: string, `in`: integer).
+ok(`First Name`) :- `http-event`(`First Name`, _).
+```
+
+Function names are not backtick-quotable: `` `length`(X) `` parses as a
+predicate atom (with predicate name `length`), while `length(X)` in an
+expression is the built-in function call.
+
+### 1.5 Literals
+
+**String literals** are enclosed in double quotes. Backslash escapes are
+supported:
+
+```
+"hello"    "line\nbreak"    "say \"hi\""
+```
+
+Pattern: `/"(\\.|[^"\\])*"/`
+
+**Numeric literals** are integers or reals:
+
+```
+42    0    3.14    100.0    0b1010
+```
+
+Pattern: `/0[bB][01]+|[0-9]+(\.[0-9]+)?/`
+
+A literal written with a decimal point (e.g. `1.0`) is treated as `float`
+even if its mathematical value is integral. This distinction is preserved
+through parsing and used during type inference. Numeric literals must parse
+to finite JavaScript `Number` values; integer literals must also fit in the
+safe-integer range.
+
+A literal prefixed with `0b` (e.g. `0b1010`) is a **binary integer**; it is
+converted to its decimal value during parsing (so `0b1010` and `10` are
+indistinguishable thereafter) and is always an integer.
+
+**Boolean literals** are the keywords `true` and `false`:
+
+```
+true    false
+```
+
+They have type `boolean` and may appear anywhere a term is expected
+(facts, rule heads, atom arguments, equalities). They cannot be ordered
+with `<`, `<=`, `>`, `>=` (no boolean order in Datalog); equality
+comparisons are fine.
+
+**Null literal** is the keyword `null`:
+
+```
+null
+```
+
+It is polymorphic (no fixed base type) and propagates through every
+operation except logical equality (Section 5.4). A column can never be
+declared with type `null`; it acquires a type from another rule that
+contributes a non-null value, and `null` flows through at runtime.
+
+### 1.6 Keywords
+
+The following words are reserved and cannot be used as unquoted predicate
+or column names:
+
+```
+extensional    not    in    true    false    null
+string    integer    float    boolean    value
+object_entry    array_element
+upper    lower    trim    replace
+abs    round    floor    ceil    sqrt    ln    exp
+as_string    as_integer    as_float    as_boolean    length    type_of
+has_key    keys    values    to_json    parse_json
+to_string    to_integer    to_float    to_boolean
+```
+
+### 1.7 Operators and Punctuation
+
+```
+Arithmetic:    +  -  *  /  %  **
+Boolean:       &&  ||  !
+Bitwise:       &  |  ^  <<  >>  >>>
+Comparison:    <  >  <=  >=  ==  !=  =  <>
+Rule:          :-
+Query:         ?-
+Range:         ..
+Grouping:      (  )  [  ]
+Separators:    ,  :  .
+```
+
+`=`/`<>` are *logical* equality and inequality (null-aware); `==`/`!=`
+are *computational* (3VL — see §5.4). Body-level Equality reuses the
+logical operator and can bind an unbound bare variable on either side.
+
+## 2 Grammar
+
+### 2.1 Program
+
+A program is a sequence of statements, each terminated by a period (`.`):
+
+```
+Program     ::= Statement*
+Statement   ::= ExtDecl | Rule | Query
+```
+
+Programs are analysed as a whole. Extensional declarations, rules, and
+queries may be freely interleaved, and a query may reference predicates
+declared or defined later in the file. Query results are reported in source
+order.
+
+### 2.2 Extensional Declarations
+
+```
+ExtDecl     ::= 'extensional' Identifier '(' ColumnDecl (',' ColumnDecl)* ')' '.'
+ColumnDecl  ::= Identifier ':' PrimitiveType ('?')?
+PrimitiveType ::= 'string' | 'integer' | 'float' | 'boolean' | 'value'
+```
+
+An extensional declaration introduces a **table-backed predicate** (EDB).
+Each column has a name and a SQL type. At execution time, the corresponding
+table is created and populated from an external data source (CSV, JSONL,
+Google Sheets, or Mermaid diagram) via a loader plugin.
+
+```
+extensional scores(student: string, subject: string, score: integer).
+extensional survey(name: string, age: integer?, email: string?).
+```
+
+The optional `?` suffix marks an extensional column as nullable. Nullable
+columns keep the same Datamog base type for type inference, but loaders and
+the generated table permit runtime `NULL` values.
+
+### 2.3 Rules
+
+```
+Rule        ::= HeadAtom (':-' BodyElement (',' BodyElement)*)? '.'
+HeadAtom    ::= Identifier '(' (HeadTerm (',' HeadTerm)*)? ')'
+HeadTerm    ::= AggregateCall | Expression
+```
+
+A **rule** defines a derived predicate (IDB) in terms of other predicates.
+The head names the predicate being defined; the body is a conjunction of
+conditions. Multiple rules for the same predicate define alternative ways to
+derive tuples (their results are unioned).
+
+A rule with no body (`:-` omitted) is a **fact** -- it unconditionally
+asserts a tuple:
+
+```
+edge("a", "b").
+flight("london", "new_york", 9.0).
+```
+
+A rule with a body derives tuples when all body elements are satisfied:
+
+```
+ancestor(X, Y) :- parent(X, Y).
+ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
+```
+
+### 2.4 Queries
+
+```
+Query       ::= '?-' BodyElement (',' BodyElement)* '.'
+```
+
+A query is a conjunction of body elements — the same shape as a rule
+body — that yields rows of variable bindings. **Projection** is
+implicit: every distinct non-anonymous Variable that appears anywhere
+in the body becomes one output column, in source order of first
+mention. `_` is a wildcard and is never projected. Repeated use of
+the same named variable across positions constrains those positions
+to be equal (just as in rule bodies).
+
+```
+?- ancestor("alice", X).            # all descendants of alice
+?- ancestor(X, Y).                  # all ancestor-descendant pairs
+?- ancestor(X, _).                  # all ancestors (descendant unconstrained)
+?- ancestor(X, X).                  # all self-ancestors
+?- parent(N, C), ancestor(C, G).    # join two atoms; project N, C, G
+?- person(N, A), A > 30.            # filter on a body expression
+?- t(X), Y = X + 1.                 # equality binds a new projection column
+?- I in [1 .. 10].                  # range query — projects I
+?- t(X), not excluded(X).           # safe negation (X bound by the positive atom)
+```
+
+**Ground queries** are queries with no projected variables. They
+produce either a single empty row (signalling the query is
+satisfied — the conventional Prolog "yes") or zero rows (the
+conventional "no"):
+
+```
+?- ancestor("alice", "carol").      # `yes` if alice is an ancestor of carol
+```
+
+The CLI renders these as the literal strings `yes` / `no` to match
+the convention; embedding APIs see one empty record or zero records
+and can render however they like.
+
+Query bodies are subject to the same safety rule as rule bodies (§4.1):
+every variable mentioned in the body — including projected ones —
+must be bound by a positive atom, a binding equality, or a binding
+range somewhere in the body. `?- not p(X).` is therefore an error
+(X has no positive binding); `?- p(X), not q(X).` is fine.
+
+### 2.5 Body Elements
+
+```
+BodyElement ::= Literal | Equality | RangeAtom | Filter
+```
+
+#### Literals
+
+```
+Literal     ::= ('not')? Atom
+Atom        ::= Identifier '(' (Expression (',' Expression)*)? ')'
+```
+
+The `Atom` here is a predicate application `p(...)`. A predicate
+**literal** is either a positive atom or a negated atom (`not p(...)`): a
+positive atom tests membership in a predicate, a negated atom tests
+non-membership. Negation-as-failure is subject to stratification
+constraints (Section 4.3).
+
+```
+ancestor(X, Y)           # positive literal (an atom)
+not composite(X)         # negated literal
+```
+
+A predicate may be **nullary** (arity 0), written with empty parentheses
+`p()` — a boolean proposition that either holds or does not. (A bare `p` is
+a variable, so the parentheses are required.) Nullary predicates may be
+defined by rules (`p() :- ...`) or as facts (`p().`), used positively or
+negated in a body (`q() :- p(), not r().`), and queried: `?- p().` yields a
+single (empty) row when `p` holds and none otherwise.
+
+Built-in atoms (comparisons such as `X = Y` or `Age < 18`) may equally be
+negated — any atom can be negated, not only predicate calls. A negated
+built-in atom `not e` is logical negation of the comparison and is
+exactly equivalent to the filter `!(e)` (see *Filters* below); it carries
+no stratification obligation, since built-ins do not recurse.
+
+```
+not X = Y                # equivalent to the filter !(X = Y)
+not Age < 18             # equivalent to !(Age < 18)
+```
+
+#### Equalities
+
+```
+Equality    ::= Addition '=' Expression
+```
+
+`=` is *logical* (null-aware) equality (Section 5.4). At body level
+it has two roles:
+
+- **Binding** — either side is a bare variable that has not yet been
+  bound, and the other side is safe. The equality introduces that
+  variable and sets it to the value of the other side. `X = Y + 1`
+  and `Y + 1 = X` are therefore equivalent when `Y` is safe.
+- **Constraint** — both sides are already bound expressions. Both
+  sides are evaluated and compared with logical equality; the rule
+  fires when they match (including the case where both are NULL).
+
+```
+D = S * 2          # binding: D := S * 2
+C = X + Y + 1      # binding: C := X + Y + 1
+X + 1 = Y          # binding: Y := X + 1 when X is safe
+length(W) = 3      # constraint
+N = null           # constraint when N is bound (matches null rows);
+                   # binding when N is unbound (binds N to null)
+```
+
+`=` is also a Cmp-level operator at expression level (Section 2.6),
+so `B = (X = null)` parses as a binding equality whose RHS is a
+logical-equality comparison. The body-level Equality form is
+disambiguated from the expression-level operator by parsing the LHS
+at `Addition` precedence — no realistic LHS shape (variable, function
+call, arithmetic, subscript) involves a comparison.
+
+#### Range Atoms
+
+```
+RangeAtom   ::= Expression 'in' '[' Expression '..' Expression ']'
+```
+
+A range atom either binds a fresh variable to every integer in an inclusive
+range, or constrains an already-computed numeric value to lie between two
+bounds. When the left-hand side is an otherwise-unbound bare variable, the
+range **binds** that variable (making it safe). When the left-hand side is
+already bound, or is a complex expression, the range acts as a **filter**
+(BETWEEN):
+
+```
+I in [2 .. 30]                       # binds I to integers 2..30
+X in [1 .. length(S) - 1]           # binds X
+(A + B) in [10 .. 20]               # filters: 10 <= A+B <= 20
+```
+
+Binding ranges require integer bounds; filter ranges accept numeric
+integer/float expressions and bounds (Section 5).
+
+#### Filters
+
+```
+Filter      ::= ('not')? Expression
+```
+
+Any boolean Expression on its own line is a **filter**: the rule fires
+when the expression evaluates to `true`. Comparisons (`<`, `<=`, `>`,
+`>=`, `==`, `!=`) and the logical operators (`&&`, `||`, `!`) live in
+the expression hierarchy (Section 2.6), so they compose freely:
+
+A leading `not` negates a built-in atom — `not e` is sugar for the filter
+`!(e)`, applied after the predicate-literal alternative (so `not p(X)`
+remains a negated predicate literal, while `not X = Y` is a negated
+comparison). This is the negation referred to under *Literals* above.
+
+```
+Age >= 30                          # single comparison
+X != Y                             # single comparison
+(S > 80) && (S < 95)               # compound filter
+(N == 3) || (N == 5) || (N == 7)   # disjunction of equalities
+```
+
+A filter expression must have type `boolean` — non-boolean filters
+(`X + 1`, `length(S)`) are rejected at analysis time. NULL (3VL
+"unknown") is treated as "doesn't match", same as SQL's `WHERE`.
+A row whose filter expression is NULL is therefore dropped, but a
+filter that uses logical equality (e.g. `Y = null`, `X <> null`) is
+total: it never returns NULL, only true or false.
+
+### 2.6 Expressions
+
+Expressions are used in atom arguments, equality right-hand sides,
+comparisons, ranges, and rule heads. The grammar uses precedence levels:
+
+```
+Expression     ::= Or
+Or             ::= And ('||' And)*
+And            ::= BitOr ('&&' BitOr)*
+BitOr          ::= BitXor ('|' BitXor)*
+BitXor         ::= BitAnd ('^' BitAnd)*
+BitAnd         ::= Cmp ('&' Cmp)*
+Cmp            ::= Shift (('<' | '<=' | '>' | '>=' | '==' | '!='
+                                | '=' | '<>') Shift)?
+Shift          ::= Addition (('<<' | '>>' | '>>>') Addition)*
+Addition       ::= Multiplication (('+' | '-') Multiplication)*
+Multiplication ::= Exponent (('*' | '/' | '%') Exponent)*
+Exponent       ::= UnaryExpr ('**' Exponent)?
+UnaryExpr      ::= ('-' | '!') UnaryExpr | Postfix
+Postfix        ::= Primary (Subscript | Slice)*
+Primary        ::= '(' Expression ')' | FunctionCall | Variable | STRING
+                 | NUMBER | BOOLEAN | 'null' | ArrayLiteral | ObjectLiteral
+
+BOOLEAN        ::= 'true' | 'false'
+FunctionCall   ::= IDENT '(' Expression (',' Expression)* ')'
+Subscript      ::= '[' Expression ']'
+Slice          ::= '[' Expression? ':' Expression? ']'
+ArrayLiteral   ::= '[' (Expression (',' Expression)*)? ']'
+ObjectLiteral  ::= '{' (ObjectEntry (',' ObjectEntry)*)? '}'
+ObjectEntry    ::= STRING ':' Expression
+```
+
+**Operator precedence** (highest to lowest):
+
+1. Subscript/slice: `X[0]`, `X[1:3]`
+2. Unary minus / logical not: `-X`, `!P`
+3. Exponentiation: `**` (right-associative — `2 ** 3 ** 2` is `2 ** (3 ** 2)`)
+4. Multiplication, division, modulo: `*`, `/`, `%`
+5. Addition, subtraction: `+`, `-`
+6. Bit shifts: `<<`, `>>`, `>>>`
+7. Comparison: `<`, `<=`, `>`, `>=`, `==`, `!=`, `=`, `<>`
+   (non-associative — `X > Y > Z` is a parse error)
+8. Bitwise and: `&`
+9. Bitwise xor: `^`
+10. Bitwise or: `|`
+11. Logical and: `&&`
+12. Logical or: `||`
+
+`**` binds tighter than the multiplicative operators but its left operand
+is a unary expression, so `-2 ** 2` is `(-2) ** 2`. It is always float-
+valued, with the domain guards described in §5.4. The bitwise / shift
+levels mirror C and Java: shifts bind tighter than comparison, and
+`&`/`^`/`|` bind looser than comparison but tighter than the logical
+connectives. See §5.9 for their integer semantics.
+
+The Datalog source uses `%` for modulo, matching the SQL `%` operator
+that the translator emits. (Datamog comments use `#`, so the lexer
+sees the two characters distinctly.)
+
+#### Boolean Operators
+
+`&&`, `||`, and `!` are *logical* operators on `boolean` values
+(matching C's `&&`/`||`/`!`, not the bitwise `&`/`|`/`~`). Operands
+must be of type `boolean`; the result is also `boolean`. The
+translator emits `AND`, `OR`, and `NOT` respectively.
+
+NULL operands extend these via SQL three-valued logic — see
+Section 5.4 for the truth tables and short-circuit rules.
+
+#### Comparison Operators
+
+The comparison operators all produce `boolean`. They split into two
+families that differ in null behaviour:
+
+| operator | family | NULL behaviour | SQL emit |
+|----------|--------|----------------|----------|
+| `=` | logical equality | `null = null` is true; `null = X` is false | `IS NOT DISTINCT FROM` (Postgres), `IS` (SQLite / sql.js) |
+| `<>` | logical inequality | inverse of `=` | `IS DISTINCT FROM` / `IS NOT` |
+| `==` | computational equality | 3VL — null on either side returns null | `=` |
+| `!=` | computational inequality | 3VL | `<>` |
+| `<` `<=` `>` `>=` | ordering | 3VL — null on either side returns null | same operator |
+
+```
+Age >= 30                             # ordering (3VL)
+X != Y                                # computational (3VL)
+X = Y                                 # logical (null-aware)
+N = null                              # logical: matches null rows
+N <> null                             # logical: matches non-null rows
+B = (Score == 100)                    # bind B to a 3VL boolean
+```
+
+Operands must have compatible types (same type, or `integer`/`float`
+joining via Section 5.6); the `null` literal is polymorphic and
+composes with any operand type for `=`/`<>` and the 3VL operators.
+Booleans support equality only — both equality families accept them
+(set equality is well-defined) but ordering operators reject them.
+String ordering is lexicographic by Unicode code point, independent
+of backend locale.
+
+Comparisons are non-associative — `X > Y > Z` is a parse error
+rather than a misleading `(X > Y) > Z`. Use `&&` to combine:
+`(X > Y) && (Y > Z)`.
+
+Body-level Equality (Section 2.5) reuses `=` and additionally binds
+an unbound bare variable on either side. The expression-level `=`/`<>`
+operators are pure comparisons.
+
+#### Subscript and Slice
+
+Subscript extracts a single character (zero-indexed):
+
+```
+W[0]          # first character of W
+S[I]          # character at position I
+```
+
+Slice extracts a substring. Both bounds are optional:
+
+```
+W[1:3]        # characters at positions 1 and 2  (start inclusive, end exclusive)
+W[:3]         # first 3 characters (from start)
+W[2:]         # from position 2 to end
+W[:]          # the whole string
+```
+
+Subscript and slice on a `string` receiver always produce `string` values.
+On a `value` receiver, both produce `value` (see §2.9).
+
+Index conventions:
+
+- Indices are zero-based integers (with one exception: a `value` whose
+  shape is an object is indexed by a `string` key — see §2.9).
+- In a slice `W[i:j]`, the result is empty (`""` for string, `[]` for
+  array `value`s) when `i >= j`; the substring / sub-array never wraps
+  around.
+- Omitted bounds default to the start (`i = 0`) or end (`j = length(W)`
+  for string, the array length for `value`).
+- Negative integer literals (`W[-1]`, `W[0:-1]`, `W[:-1]`) are
+  rejected by the analyser. Variable-valued indices pass through —
+  the analyser can't prove them non-negative statically.
+- Indices beyond the receiver length produce `""` / `[]` for string /
+  array-`value` slices, `""` for string subscripts (the receiver's
+  empty value), and `NULL` for `value` subscripts that fall out of
+  range.
+
+#### Function Calls
+
+Only the following built-in functions are allowed. Using an unknown
+function name is an analyzer error.
+
+**String functions:**
+
+| Datamog              | SQL                  | Return type |
+|----------------------|----------------------|-------------|
+| `length(x)`        | `LENGTH(x)`        | `integer`   |
+| `upper(x)`           | `UPPER(x)`           | `string`      |
+| `lower(x)`           | `LOWER(x)`           | `string`      |
+| `trim(x)`            | `TRIM(x)`            | `string`      |
+| `replace(s,old,new)` | `REPLACE(s,old,new)` | `string`      |
+
+`upper` and `lower` case-fold ASCII letters only; non-ASCII code points are
+left unchanged so programs do not depend on backend locale or Unicode tables.
+
+**Math functions:**
+
+| Datamog              | SQL                  | Return type           |
+|----------------------|----------------------|-----------------------|
+| `abs(x)`             | `ABS(x)`             | same as `x`           |
+| `round(x)`           | `ROUND(x)`           | `integer`             |
+| `round(x, n)`        | `ROUND(x, n)`        | same as `x`           |
+| `floor(x)`           | `FLOOR(x)`           | `integer`             |
+| `ceil(x)`            | `CEIL(x)`            | `integer`             |
+| `sqrt(x)`            | `SQRT(x)`            | `float`                |
+| `ln(x)`              | `LN(x)`              | `float`                |
+| `exp(x)`             | `EXP(x)`             | `float`                |
+| `x ** y`             | guarded `POWER(x, y)` (see §5.4) | `float`    |
+
+`round`'s arity-2 form preserves the input domain: `round(integer, integer)`
+stays integer, `round(float, integer)` stays float. Positive `n` rounds to
+that many fractional digits; negative `n` rounds to tens, hundreds, and so
+on. Arity-1 always returns integer (rounding to the nearest whole number).
+
+All listed functions are portable across PostgreSQL and SQLite (and sql.js,
+which uses SQLite's JSON1 implementation).
+
+```
+contribution(C, X) :- prob(C, P), X = -1.0 * P * ln(P) / ln(2).
+```
+
+**Primitive conversions:**
+
+| Datamog              | Argument types          | Return type | Notes                                      |
+|----------------------|-------------------------|-------------|--------------------------------------------|
+| `to_string(x)`       | `integer`/`float`/`boolean` | `string`   | Decimal string for numbers; `'true'`/`'false'` for booleans. |
+| `to_integer(s)`      | `string`                  | `integer`   | Strict canonical decimal. NULL on parse failure. |
+| `to_float(s)`         | `string`                  | `float`      | Strict canonical decimal (no exponent). NULL on parse failure. |
+| `to_boolean(s)`      | `string`                  | `boolean`   | Accepts exactly `'true'` / `'false'`. NULL otherwise. |
+| `parse_json(s)`      | `string`                  | `value`     | Parse `s` as JSON syntax. NULL on malformed input. |
+
+The string → number parsers accept only canonical decimal form: optional
+`-`, no leading zeros (except plain `0`), no leading `+`, no whitespace.
+`to_integer` additionally caps at ±999,999,999 (9 digits absolute value)
+to fit within every backend's natural 32-bit integer range. `to_float`
+accepts an optional `.<digits>` fraction; exponent forms (`1e10`) are
+rejected.
+
+```
+parsed_int(R, N)   :- raw(R), N = to_integer(R).
+parsed_real(R, N)  :- raw(R), N = to_float(R).
+formatted(N, S)    :- numbers(N), S = to_string(N).
+# Auto-lift fires anywhere a `value` slot meets a primitive — no
+# explicit primitive-to-value conversion is needed.
+```
+
+Identity casts (`to_string("hi")`, `to_integer(42)`, etc.) are rejected
+at type-check — the value is already in the target type. Number-to-
+number conversions are intentionally absent: `integer` widens to `float`
+implicitly, and `floor`/`ceil`/`round` cover the `float → integer`
+direction.
+
+> **Cross-backend variance.** `to_string` of an integer-valued float
+> (`1.0`) renders as `'1'` on PostgreSQL and the native evaluator
+> (matching JS `String(1.0)`) but as `'1.0'` on SQLite/sql.js, which
+> always pads integer reals with a trailing `.0`. Programs that need
+> bit-identical string on every backend should round to integer first
+> (`to_string(round(x))`).
+
+#### String Concatenation
+
+The `+` operator, when either operand has type `string`, translates to SQL
+string concatenation (`||`):
+
+```
+prefixed(R) :- words(W), R = "hello_" + W.
+```
+
+### 2.7 Aggregates
+
+```
+AggregateCall ::= IDENT '(' (Expression | '*') ')'
+```
+
+The `*` wildcard is accepted only by `count` (see below).
+
+where `IDENT` is one of: `count`, `sum`, `avg`, `min`, `max`,
+`concat`, `list`.
+
+Aggregates may only appear as **top-level arguments** in rule heads (not
+nested in expressions, not in rule bodies). Non-aggregate head arguments
+become GROUP BY columns in the generated SQL.
+
+```
+student_avg(Student, avg(Score)) :- scores(Student, _, Score).
+#           ^^^^^^^ grouping      ^^^^^^^^^^^ aggregate
+
+record_count(count(*)) :- scores(_, _, _).
+#            ^^^^^^^^^ count with no grouping columns
+```
+
+The argument `*` is a wildcard accepted only by `count`: `count(*)` counts
+every row in the group and translates to SQL `COUNT(*)`. Given an expression,
+`count(expr)` counts the rows in which `expr` is non-null. Neither counts
+_distinct_ values: an aggregate sees one value per row (a multiset), so a value
+that occurs in several rows is counted several times. This holds for `sum` and
+`avg` too, and is what makes them useful — the relation is a set of rows, but
+the values fed to the aggregate are a bag.
+
+**Aggregate functions:**
+
+| Function         | SQL                          | Return type          |
+|------------------|------------------------------|----------------------|
+| `count(expr)`    | `COUNT(expr)` / `COUNT(*)`   | `integer`            |
+| `sum(expr)`      | `SUM(expr)`                  | same as `expr`       |
+| `avg(expr)`      | `AVG(expr)`                  | `float`               |
+| `min(expr)`      | `MIN(expr)`                  | same as `expr`       |
+| `max(expr)`      | `MAX(expr)`                  | same as `expr`       |
+| `concat(expr)` | dialect-specific         | `string`               |
+| `list(expr)`     | dialect-specific             | `value`                |
+
+`concat` translates to `GROUP_CONCAT(expr, ',' ORDER BY expr)` on
+SQLite/sql.js and `STRING_AGG(expr::TEXT, ',' ORDER BY expr)` on
+PostgreSQL. The native evaluator sorts the per-group values
+the same way before joining. Output is therefore deterministic and
+identical across every backend: numeric values come out in numeric
+order (`"2,7,10"`, not `"10,2,7"`), strings in Unicode-code-point
+lexicographic order.
+
+`list(expr)` collects values into an array `value`. Primitive
+arguments are auto-lifted to a `value` (`integer` / `float` → number
+leaf, `string` → string leaf, `boolean` → `true` / `false` leaf);
+already-`value` arguments pass through unchanged.
+
+Per-element order depends on the argument's type:
+
+- **Primitive arguments** sort by their natural SQL value — numeric
+  for numbers, Unicode-code-point lexicographic for strings,
+  false-before-true for booleans. So `list(N)` over integers `2`, `10`, `7` produces
+  `[2, 7, 10]`, not the lex-ordered `[10, 2, 7]`.
+- **`value` arguments** sort by their canonical-text form (object
+  keys in canonical JSON order, no whitespace), compared with the
+  same Unicode-code-point string order used for `string` arguments.
+  The natural jsonb / TEXT-storage ordering of objects and arrays
+  diverges between backends, so the canonical form is the only stable
+  cross-backend choice.
+
+In both cases the same program produces the same array on every
+backend. SQL `NULL` inputs are skipped, and an all-`NULL` or empty
+group yields `NULL` — matching `concat` and the rest of the
+aggregate family.
+
+`list` is the closest the language gets to a list comprehension:
+build a per-row value in a non-aggregate rule (a primitive
+expression or an array / object literal), then aggregate it.
+
+```
+records(Student, {"subject": Subject, "score": Score}) :-
+    scores(Student, Subject, Score).
+all_records(Student, list(R)) :- records(Student, R).
+
+# Primitive auto-lift — collect every score per student as an
+# array of numbers.
+all_scores(Student, list(Score)) :- scores(Student, _, Score).
+```
+
+### 2.8 Don't-Care Variable
+
+The anonymous variable `_` may appear anywhere a variable is expected.
+Each occurrence is internally renamed to a unique synthetic variable, so
+multiple uses of `_` are independent. User-written variables such as `_0` or
+`_X` are still ordinary variables:
+
+```
+composite(X) :- divides(_, X).    # _ is an independent unnamed variable
+record_count(count(*)) :- scores(_, _, _).   # four independent _'s
+```
+
+### 2.9 Value Operations
+
+Datamog has a `value` column type — the union of every kind a
+column can carry: primitive leaves (`null`, `boolean`,
+`integer`, `float`, `string`) plus the two structured shapes
+(arrays and objects). When persisted, `value` columns are
+stored as JSONB (Postgres) or canonical JSON text (SQLite /
+sql.js); when constructed in a program, the array and object
+literal forms `[e1, e2, ...]` and `{"k1": v1, "k2": v2, ...}`
+are visually JSON-like but produce native `value`s, not
+strings. The name "JSON" in this section is reserved for the
+syntax (parser-level) and the on-the-wire / on-disk
+representation; in the language proper the type is `value`.
+
+Programs can both **destructure** existing `value`s
+(subscript, slice, iterate, coerce to primitives) and
+**construct** new ones from primitives (auto-lift), from
+text (`parse_json`), or from array and object literals.
+The finiteness checker (§5.8) flags recursions that loop a
+constructed value back through any of these constructors as
+potentially-infinite, since these are the mechanisms that
+can grow an unbounded family of compounds.
+
+#### Sources
+
+A `value`-typed expression reaches a rule body in one of
+these ways:
+
+1. **A `value`-typed EDB column.** Declared via
+   `extensional p(col1: value, ...).` and populated via the JSONL
+   loader (with the single-`value`-column special case in §7.2)
+   or the standalone JSON loader (§7.5).
+2. **Subscript** `X[K]` where `X : value`. Returns `value`.
+   - When `K : integer`, looks up an array element.
+   - When `K : string`, looks up an object key.
+   - Out-of-range index, missing key, or wrong-shape receiver
+     (object indexed with integer / array indexed with string /
+     anything on a primitive leaf) → SQL `NULL`.
+3. **Slice** `X[I:J]` where `X : value`. Returns `value`.
+   - Operates on arrays only; slicing a non-array → SQL `NULL`.
+   - Empty / reversed range (`I >= J`) → `[]`.
+4. **Iteration primitives** (built-in body atoms — see below).
+5. **Coercion / introspection builtins** (see below).
+   `as_string` / `as_integer` / `as_float` / `as_boolean` /
+   `length` / `type_of` / `has_key` read leaf primitives or summarise
+   structure; `parse_json` produces a `value` from a JSON
+   syntax string (NULL on malformed input).
+6. **Auto-lift.** A primitive expression flowing into a
+   `value` slot is lifted automatically — see "Primitive ↔
+   value auto-lift" below.
+7. **Array and object literals.** `[e1, e2, ...]` constructs
+   an array; `{"k1": v1, "k2": v2, ...}` constructs an object
+   whose keys are written as string literals. Element / value
+   expressions of any primitive type are auto-lifted, so a
+   literal can mix integers, strings, booleans, already-value
+   expressions, and `null` directly. The literals are emitted
+   via each backend's `jsonb_build_*` / `json_array` /
+   `json_object` primitive — no string round-trip is involved.
+   If the same object-literal key appears more than once, the last
+   occurrence wins before canonicalisation.
+
+#### Iteration primitives
+
+Two built-in body atoms walk a `value` as a stream of
+`(key, value)` or `(index, value)` pairs:
+
+```prolog
+object_entry(O, K, V)   # K : string, V : value — one row per object entry
+array_element(A, I, V)  # I : integer, V : value — one row per array element
+```
+
+The first argument (the source) is a `value` slot and its
+variables must already be safe (bound by another body atom or
+range — same rule as range atoms). Primitive source expressions
+auto-lift to `value` leaves; since leaves are neither objects nor
+arrays, iterating them yields zero rows. The other two positions
+bind their variables when those are bare variables; non-variable
+expressions become equality constraints against the iterated
+key/value. Iterating a `value` of the wrong shape (`object_entry`
+on an array, `array_element` on an object, anything on a
+primitive leaf) yields zero rows.
+
+Built-in body-atom names (`object_entry`, `array_element`) are
+reserved: they cannot be declared as `extensional` or defined
+as IDB. Negation of a built-in body atom and using one in query
+position are both rejected.
+
+#### Coercion and introspection
+
+Functions over `value` (plus `length`, which is also available for
+strings). Most take one argument; `has_key(V, K)` also takes a string
+key. The coercion/projection functions return `NULL` on shape
+mismatch — there is no implicit conversion. `has_key` instead returns
+`false` for non-object values and absent keys, while preserving ordinary
+function NULL propagation for `NULL` arguments. `parse_json` parses a
+string as JSON syntax, returning `NULL` on malformed input rather than
+raising.
+
+| Datamog          | Returns   | Behaviour                                                          |
+|------------------|-----------|--------------------------------------------------------------------|
+| `as_string(V)`   | `string`  | string-leaf → string content; anything else → `NULL`.              |
+| `as_integer(V)`  | `integer` | Integer-valued numeric leaf in 64-bit signed range → integer; anything else (including a numeric leaf with a fractional part) → `NULL`. |
+| `as_float(V)`    | `float`   | Numeric leaf → float; anything else → `NULL`.                      |
+| `as_boolean(V)`  | `boolean` | Boolean leaf → boolean; anything else → `NULL`.                    |
+| `length(V)`      | `integer` | Array length / object key count / string length; non-collection → `NULL`. |
+| `type_of(V)`     | `string`  | Returns one of `"object"`, `"array"`, `"string"`, `"number"`, `"boolean"` for non-NULL values. Returns `NULL` if `V` evaluates to `NULL`. |
+| `has_key(V, K)`  | `boolean` | Object has own string key `K` → `true`; missing key or non-object `V` → `false`; `NULL` argument → `NULL`. |
+| `keys(V)`        | `value`   | Sorted array of the object's keys (each as a string; Unicode-code-point order); empty object → `[]`; non-object → `NULL`. |
+| `values(V)`      | `value`   | Array of the object's values, ordered by key in Unicode-code-point order; empty object → `[]`; non-object → `NULL`. |
+| `to_json(V)`     | `string`  | Canonical JSON text for canonical `value`s (object keys in canonical JSON order, no whitespace), safe as a hash / dedup key. |
+| `parse_json(s)`  | `value`   | Parse `s` as JSON syntax. `NULL` on any malformed input, matching `to_integer` / `to_float` / `to_boolean`. |
+
+#### Equality and ordering
+
+`value` operands are compared by structural equality:
+
+- `=` and `<>` (logical equality / inequality) are allowed.
+- `==` and `!=` (3VL equality / inequality) are allowed.
+- `<`, `<=`, `>`, `>=` are **rejected** at type-check (cross-
+  backend ordering on `value` does not agree).
+
+#### Primitive ↔ value auto-lift
+
+A primitive (`integer`, `float`, `string`, `boolean`) is
+auto-lifted to its `value` form anywhere a `value` slot meets a
+primitive expression:
+
+- **Atom args** matching a `value`-typed column: `t(5)` over
+  `extensional t(j: value)` matches rows where the column's
+  contents are the numeric leaf `5`.
+- **Equality variants** (`==`, `!=`, `=`, `<>`): `J == 5` where
+  `J : value` matches rows where `J` is the numeric leaf `5`.
+- **Function arguments** whose parameter type is `value`:
+  `type_of(5)`, `as_integer(5)`, and `to_json("hi")` are accepted
+  by embedding the primitive argument first.
+- **Iteration sources**: `object_entry(X, K, V)` accepts primitive
+  `X` values after auto-lift; primitive leaves simply produce zero
+  rows because there is no object to iterate.
+- **IDB column unification**: sibling rules contributing
+  primitive and `value` head terms unify upward to `value`; the
+  primitive branch's emission lifts via the dialect's
+  `to_jsonb` / `json_quote` / equivalent so every UNION member
+  produces JSONB / canonical-TEXT JSON.
+
+The lift is automatic and runtime-cheap (a single `to_jsonb` /
+`json_quote` / `CAST` call per emission site). Since auto-lift
+covers every site that demands a `value`, an explicit
+"primitive-to-value" function is no longer part of the surface
+language — the lift fires implicitly wherever it would have
+been needed.
+
+The lift **does not** apply to ordering comparisons (`<`, `<=`,
+`>`, `>=`). `value` has no cross-backend ordering, so the
+rejection there is the language-level guarantee, not an emission
+detail.
+
+#### Cross-backend invariants
+
+`value`s are canonicalised on insert: object keys are sorted
+recursively in canonical JSON order, numbers are normalised via
+`JSON.parse`/`JSON.stringify`. This makes textual equality
+coincide with structural equality on SQLite / sql.js (which
+store the type as canonical TEXT). PostgreSQL's `jsonb`
+canonicalises natively.
+
+Canonical JSON key order follows PostgreSQL `jsonb`: UTF-8 byte
+length first, then byte value. This is distinct from Datamog's
+Unicode-code-point string comparison order used by `<` / `>` and
+by `keys(V)` / `values(V)`.
+
+`parse_json` canonicalises parsed object keys into this same order, so
+values parsed from text join and deduplicate with equivalent values from
+EDB loaders, object literals, and other backends.
+
+The `null` leaf collapses to SQL `NULL` for cross-backend
+uniformity. As a consequence, `type_of(parse_json("null"))` and
+`type_of(J["key"])` for a JSON-null leaf return `NULL`, not the string
+`"null"`; the runtime expression model does not distinguish a JSON-null
+leaf from another NULL-producing expression.
+
+JS `Number` precision (IEEE doubles, 2⁵³) caps integer fidelity
+for numeric leaves — values larger than 2⁵³ may round through
+canonicalisation. This is the same constraint that already
+applies to `integer`-typed columns elsewhere in Datamog.
+Non-finite numeric leaves produced by host JSON parsers (for example
+`9e999` overflowing to IEEE `Infinity`) are rejected: `parse_json`
+returns `NULL` for the whole input.
+
+## 3 Formal Grammar
+
+For reference, the complete grammar in BNF notation:
+
+```
+Program        ::= Statement*
+
+Statement      ::= ExtDecl | Rule | Query
+
+ExtDecl        ::= 'extensional' Identifier '(' ColumnDecl (',' ColumnDecl)* ')' '.'
+ColumnDecl     ::= Identifier ':' PrimitiveType ('?')?
+PrimitiveType  ::= 'string' | 'integer' | 'float' | 'boolean' | 'value'
+
+Rule           ::= HeadAtom (':-' BodyElement (',' BodyElement)*)? '.'
+HeadAtom       ::= Identifier '(' (HeadTerm (',' HeadTerm)*)? ')'
+HeadTerm       ::= AggregateCall | Expression
+AggregateCall  ::= IDENT '(' Expression ')'
+
+Query          ::= '?-' BodyElement (',' BodyElement)* '.'
+
+BodyElement    ::= Literal | Equality | RangeAtom | Filter
+Literal        ::= ('not')? Atom
+Atom           ::= Identifier '(' (Expression (',' Expression)*)? ')'
+Equality       ::= Addition '=' Expression
+RangeAtom      ::= Expression 'in' '[' Expression '..' Expression ']'
+Filter         ::= Expression
+
+Expression     ::= Or
+Or             ::= And ('||' And)*
+And            ::= BitOr ('&&' BitOr)*
+BitOr          ::= BitXor ('|' BitXor)*
+BitXor         ::= BitAnd ('^' BitAnd)*
+BitAnd         ::= Cmp ('&' Cmp)*
+Cmp            ::= Shift (CmpOp Shift)?
+CmpOp          ::= '<' | '<=' | '>' | '>=' | '==' | '!=' | '=' | '<>'
+Shift          ::= Addition (('<<' | '>>' | '>>>') Addition)*
+Addition       ::= Multiplication (('+' | '-') Multiplication)*
+Multiplication ::= Exponent (('*' | '/' | '%') Exponent)*
+Exponent       ::= UnaryExpr ('**' Exponent)?
+UnaryExpr      ::= ('-' | '!') UnaryExpr | Postfix
+Postfix        ::= Primary (('[' Expression ']')
+                          | ('[' Expression? ':' Expression? ']'))*
+Primary        ::= '(' Expression ')' | FunctionCall
+                  | Variable | STRING | NUMBER | BOOLEAN | 'null'
+                  | ArrayLiteral | ObjectLiteral
+BOOLEAN        ::= 'true' | 'false'
+FunctionCall   ::= IDENT '(' Expression (',' Expression)* ')'
+ArrayLiteral   ::= '[' (Expression (',' Expression)*)? ']'
+ObjectLiteral  ::= '{' (STRING ':' Expression (',' STRING ':' Expression)*)? '}'
+Identifier     ::= IDENT | QUOTED_IDENT
+Variable       ::= Identifier
+```
+
+`Cmp` is non-associative — `X > Y > Z` is a parse error rather than
+a misleading `(X > Y) > Z`. `=`/`<>` and `==`/`!=` are the two
+equality families (Section 2.6 / 5.4); the LHS of body Equality
+is parsed at `Addition` precedence so `D = X * 2` reliably parses
+as a binding rather than a Cmp filter. A body element that doesn't
+match Literal / Equality / RangeAtom falls through to Filter, whose
+expression must have boolean type (checked post-parse).
+
+**Terminals:**
+
+```
+IDENT           ::= /[a-zA-Z_][a-zA-Z0-9_]*/
+QUOTED_IDENT    ::= /`(\\.|[^`\\\n\r])+`/
+STRING    ::= /"(\\.|[^"\\])*"/
+NUMBER    ::= /[0-9]+(\.[0-9]+)?/
+COMMENT   ::= /#[^\n\r]*/          (ignored)
+WS        ::= /[\t\r\n ]+/         (ignored)
+```
+
+## 4 Semantic Rules
+
+### 4.1 Variable Safety
+
+A rule is **safe** if every variable that appears in the head, in a negated
+atom, in a comparison, in an equality, or in range bounds is grounded by
+the rule body. A variable is **safe** (grounded) if:
+
+1. It appears as a direct argument of a positive (unnegated) body atom, or
+2. It is a bare-variable side of an equality whose other side's variables
+   are all safe, or
+3. It is bound via a range atom `V in [low .. high]` where all variables in
+   `low` and `high` are safe.
+
+Safety is computed by fixed-point iteration: start with variables from
+positive atoms, then repeatedly propagate through equalities and ranges
+until no new variables become safe.
+
+**Safe:**
+
+```
+foo(X, Z) :- bar(X, Y), Z = Y + 1.    # X, Y safe from bar; Z safe via equality
+foo(X, Z) :- bar(X, Y), Y + 1 = Z.    # same binding with equality reversed
+squares(X, Y) :- X in [1 .. 10], Y = X * X.   # X safe from range; Y safe via equality
+```
+
+**Unsafe:**
+
+```
+foo(X) :- bar(X), Y > 10.             # ERROR: Y is not grounded
+foo(X) :- not bar(X, Y).              # ERROR: Y in negation must be safe
+```
+
+### 4.2 Arity Consistency
+
+- All rules for the same predicate must have the same arity (number of
+  head arguments).
+- All uses of a predicate (in rule bodies and queries) must match its
+  declared arity.
+
+### 4.3 Stratification
+
+Datamog enforces **stratified negation**: if predicate `p` negatively
+depends on predicate `q` (i.e. some rule for `p` contains `not q(...)`),
+then `q` must not depend (directly or transitively) on `p`. In other words,
+negation may not occur within a strongly connected component of the
+predicate dependency graph.
+
+**Allowed** (stratified):
+
+```
+reachable(X) :- edge("a", X).
+reachable(X) :- edge(Y, X), reachable(Y).
+frontier(X) :- reachable(X), not has_outgoing(X).
+# frontier depends negatively on has_outgoing, but has_outgoing does not
+# depend on frontier.
+```
+
+**Forbidden** (unstratified):
+
+```
+p(X) :- not q(X).
+q(X) :- not p(X).     # ERROR: circular negative dependency
+```
+
+### 4.4 Recursion
+
+A predicate is **recursive** if it belongs to a non-trivial strongly
+connected component (SCC) in the dependency graph, or it has a self-loop
+(a rule whose body references itself). Recursive predicates are compiled
+to recursive SQL views using `WITH RECURSIVE`.
+
+A predicate is **non-linearly recursive** if some rule for a predicate in
+its SCC has more than one body atom referring to predicates in the same SCC:
+
+```
+# Linear recursion (one self-reference per rule):
+tc(X, Y) :- edge(X, Y).
+tc(X, Z) :- edge(X, Y), tc(Y, Z).
+
+# Non-linear recursion (two self-references):
+tc(X, Z) :- tc(X, Y), tc(Y, Z).
+```
+
+Non-linear recursion is rejected by every SQL backend: PostgreSQL,
+SQLite, and sql.js all reject non-linearly recursive predicates at
+translation time, because their `WITH RECURSIVE` semantics would
+silently miss derivations that combine an "old" tuple with a "new"
+one. The non-SQL `native` and `seminaive` evaluators accept it —
+their delta-aware iteration fires every recursive rule once per
+recursive body atom with that atom reading from the previous
+iteration's delta, computing the correct fixed point.
+
+**Mutually recursive** predicates (predicates that depend on each other)
+are compiled together into a shared recursive CTE block.
+
+### 4.5 Aggregate Constraints
+
+1. **No recursion:** A predicate with aggregate functions in its head cannot
+   be recursive.
+2. **Consistency:** All rules for the same predicate must agree on which
+   head positions are aggregates and which are grouping columns.
+3. **Top-level only:** Aggregates must appear as direct head arguments, not
+   embedded in arithmetic expressions.
+4. **No nesting:** Aggregate calls may not contain other aggregate calls.
+5. **Name conflict:** A predicate name cannot be the same as an aggregate
+   function name (`count`, `sum`, `avg`, `min`, `max`, `concat`).
+
+### 4.6 Predicate Uniqueness
+
+- A predicate cannot be declared as both extensional (EDB) and intensional
+  (IDB).
+- Extensional declarations may not be duplicated.
+
+## 5 Type System
+
+### 5.1 Types
+
+Datamog has five basic types:
+
+| Type      | Description           | SQL type                                  |
+|-----------|-----------------------|-------------------------------------------|
+| `string`    | Unicode strings       | `TEXT`                                    |
+| `integer` | Whole numbers         | `INTEGER`                                 |
+| `float`    | Floating-point numbers| `REAL`                                    |
+| `boolean` | True/false values     | `BOOLEAN`                                 |
+| `value`   | union of `null` / `boolean` / `integer` / `float` / `string` / array / object | `JSONB` (Postgres) / `TEXT` (SQLite/sql.js) |
+
+SQLite and sql.js have no native `BOOLEAN` storage type — they round-
+trip `TRUE`/`FALSE` and comparison results as `0` / `1`. The executor
+coerces those back to JS `true`/`false` at the result-row boundary
+for any column whose declared type is `boolean`, so query-result
+shape is uniform across every backend.
+
+The `value` type is opaque to the type system — the spec does not
+distinguish an object-shaped `value` from an array-shaped `value`
+from a string-leaf `value` statically. Only the EDB declaration, the
+iteration primitives, and the coercion builtins (§2.9) make any
+structural commitment. See §2.9 for the operators and builtins that
+work on `value`s.
+
+### 5.2 Type Inference
+
+Types are inferred automatically via fixed-point iteration over the
+predicate dependency graph (processed stratum-by-stratum):
+
+1. **EDB types** are taken directly from extensional declarations.
+2. **Fact types** are inferred from literal values in rules with empty
+   bodies (`"hello"` is `string`, `42` is `integer`, `3.14` is `float`,
+   `true`/`false` is `boolean`).
+3. **Variable types** are propagated from body atoms: if `p(X, Y)` has
+   column types `[string, integer]`, then `X` gets `string` and `Y` gets
+   `integer`.
+4. **Equality types** propagate through a bare-variable side: in `Z = expr`
+   or `expr = Z`, `Z` gets the type of `expr`.
+5. **Range types** propagate: in `V in [low .. high]`, `V` gets the joined
+   type of the bounds.
+
+It is an error if a column's type cannot be inferred from its context.
+
+### 5.3 Expression Typing Rules
+
+| Expression                | Result type                                |
+|---------------------------|--------------------------------------------|
+| String literal `"..."`    | `string`                                     |
+| Integer literal `42`      | `integer`                                  |
+| Real literal `3.14`       | `float`                                     |
+| Boolean literal `true`/`false` | `boolean`                             |
+| Null literal `null`       | polymorphic — composes with any operand    |
+| Variable                  | type from environment                      |
+| `a + b` (both numeric)    | `float` if either is `float`, else `integer`  |
+| `a + b` (either `string`)   | `string` (string concatenation)              |
+| `a - b`, `a * b`          | `float` if either is `float`, else `integer`  |
+| `a / b`, `a % b`          | `float` if either is `float`, else `integer`  |
+| `a ** b` (operands numeric) | `float` always (see §5.4)                  |
+| `a & b`, `a \| b`, `a ^ b`, `a << b`, `a >> b`, `a >>> b` (operands `integer`) | `integer` (see §5.9) |
+| `-a`                      | same as `a`                                |
+| `length(x)`               | `integer`                                  |
+| `upper(x)`, `lower(x)`, `trim(x)`, `replace(...)` | `string`           |
+| `abs(x)`                  | same as `x`                                |
+| `round(x)`                | `integer`                                  |
+| `round(x, n)`             | same as `x`                                |
+| `floor(x)`, `ceil(x)`     | `integer`                                 |
+| `sqrt(x)`, `ln(x)`, `exp(x)` | `float`                              |
+| `x[i]` (subscript), `x` is `string`         | `string`                     |
+| `x[i:j]` (slice), `x` is `string`           | `string`                     |
+| `x[i]` (subscript), `x` is `value`        | `value`                    |
+| `x[i:j]` (slice), `x` is `value`          | `value`                    |
+| `as_string(j)`              | `string`                                     |
+| `as_integer(j)`               | `integer`                                  |
+| `as_float(j)`              | `float`                                     |
+| `as_boolean(j)`              | `boolean`                                  |
+| `length(j)` / `length(s)` | `integer`                                  |
+| `type_of(j)`              | `string`                                     |
+| `has_key(j, s)`           | `boolean`                                  |
+| `to_string(x)`            | `string`                                     |
+| `to_integer(s)`           | `integer`                                  |
+| `to_float(s)`              | `float`                                     |
+| `to_boolean(s)`           | `boolean`                                  |
+| `parse_json(s)`           | `value`                                    |
+
+When both operands are `integer`, `/` performs truncated division
+(rounded toward zero): `7 / 2 = 3`, `-7 / 2 = -3`. Integer `%`
+returns the sign of the dividend: `-7 % 2 = -1`. When either
+operand is `float`, `/` is true floating-point division.
+
+A handful of these operations are *runtime-partial* — arithmetic
+overflow, `/`, `%`, `sqrt`, `ln`, `exp`, and `**` evaluate to
+`NULL` for inputs outside their mathematical / finite-number domain
+rather than raising an error or producing an IEEE special value. The
+full list, propagation rules, and three-valued logic are in Section 5.4.
+
+#### Expression totality
+
+Every well-typed expression denotes a total function from assignments of
+runtime values to its free variables (respecting their inferred types) to
+exactly one Datamog runtime value. Expressions are never nondeterministic,
+set-valued, or allowed to abort evaluation. Operations that would be
+partial in the host language or database instead return `NULL` as specified
+below, and ill-typed expressions are rejected by the analyzer before
+execution.
+
+### 5.4 NULL Semantics
+
+Datamog exposes NULL as the polymorphic literal `null` (Section
+1.5), but it is otherwise a *runtime* phenomenon: every column has
+a non-null declared base type, and most operations propagate NULL
+when given one. The *logical* equality operators `=`/`<>` (Section
+2.6) are the exception — they treat null as a value and return a
+total boolean.
+
+#### Sources
+
+NULL enters an expression through the `null` literal or through
+runtime-partial operations, builtins, and accessors:
+
+1. **The `null` literal** in source — appears anywhere a value is
+   expected, with no fixed base type.
+2. **Partial math operations** — the following yield `NULL` rather than
+   raising a database error or producing an IEEE special value, so
+   semantics are identical on every backend:
+
+   - `+`, `-`, `*`, `/`, `%`, unary `-`, and math builtins when the
+     result would be non-finite (`Infinity`, `-Infinity`, or `NaN`).
+   - `a / b` and `a % b` when `b = 0`.
+   - `sqrt(x)` for `x < 0`.
+   - `ln(x)` for `x <= 0`.
+   - `exp(x)` when the result overflows the finite `float` range.
+   - `x ** y` for `x < 0` with fractional `y`, or for `x = 0`
+     with `y < 0`, or when the result overflows the finite `float`
+     range.
+3. **Partial conversions, value builtins, and value accessors** —
+   malformed `parse_json`, failed `to_*` parses, failed `as_*`
+   projections, wrong-shape `length` / `keys` / `values`, and missing or
+   wrong-shape `value` subscripts/slices yield `NULL`.
+
+Slice with `i >= j` produces the empty string `""` / empty array `[]`
+(Section 2.6); a string subscript out of range produces `""`; a `value`
+subscript out of range / missing key / wrong-shape access produces `NULL`.
+
+Non-null EDB columns are emitted with `NOT NULL`, so loaders cannot
+introduce NULL through those extensional columns — coercion failures raise
+load-time errors instead. EDB columns declared with `?` omit `NOT NULL`
+and may contain runtime NULLs.
+
+#### Propagation in expressions
+
+NULL propagates through arithmetic, string concatenation, subscript,
+slice, and built-in (non-aggregate) functions: any `NULL` operand
+makes the whole expression `NULL`. The exceptions are `&&` and `||`
+(short-circuit, see below) and the logical-equality operators
+`=`/`<>` (null-aware, see below).
+
+#### Three-valued boolean logic
+
+`&&`, `||`, and `!` extend to NULL via SQL three-valued logic,
+identical on every backend including the native evaluator:
+
+```
+true  && true  = true       true  || true  = true       !true  = false
+true  && false = false      true  || false = true       !false = true
+false && false = false      false || false = false      !null  = null
+null  && true  = null       null  || true  = true
+null  && false = false      null  || false = null
+null  && null  = null       null  || null  = null
+```
+
+`false` dominates `&&` and `true` dominates `||` — when one operand
+decides the answer, NULL on the other side does not propagate.
+
+#### Comparisons and filters
+
+The orderings `<`, `<=`, `>`, `>=` and the *computational*
+equalities `==`, `!=` follow SQL three-valued logic — NULL on
+either side returns NULL. Body-level filters (Section 2.5) treat
+that NULL the same as `false`: the row is dropped.
+
+The *logical* equalities `=` and `<>` are total: `null = null` is
+`true`, `null = X` and `null <> X` are well-defined booleans. They
+never return NULL, so a filter using logical equality never drops a
+row "silently for null reasons."
+
+| left   | right  | `=`    | `<>`   | `==`  | `!=`  |
+|--------|--------|--------|--------|-------|-------|
+| `5`    | `5`    | true   | false  | true  | false |
+| `5`    | `6`    | false  | true   | false | true  |
+| `5`    | `null` | false  | true   | null  | null  |
+| `null` | `5`    | false  | true   | null  | null  |
+| `null` | `null` | true   | false  | null  | null  |
+
+#### Equalities (body-level)
+
+Body Equality (Section 2.5) is the same logical operator. It has two
+roles:
+
+- **Binding** (one side is an unbound bare variable): `X = expr` or
+  `expr = X` introduces `X` and sets it to the value of `expr`,
+  including when `expr` evaluates to NULL — the row is *not* dropped,
+  and subsequent uses of `X` propagate that NULL through any
+  non-logical operation.
+- **Constraint** (both sides already bound): the body equality emits a
+  null-aware comparison. `X = null` matches NULL rows; `Y = Z` with
+  both bound matches when both happen to be NULL.
+
+Atom matching keeps SQL-style 3VL join semantics — a literal `null`
+in an atom argument never matches, and a shared variable across two
+atoms doesn't join NULL to NULL. Use an explicit body Equality
+(`atom(N, V), V = null`) when null-aware matching is wanted.
+
+#### Aggregates
+
+Aggregates inherit standard SQL semantics:
+
+- `count(*)` translates to `COUNT(*)` — counts every group row,
+  including those with NULLs in other columns.
+- `count(expr)`, `sum(expr)`, `avg(expr)`, `min(expr)`, `max(expr)`,
+  `concat(expr)` ignore rows where `expr` is NULL.
+- A group whose `expr` is NULL for every row yields NULL for
+  `sum`/`avg`/`min`/`max`/`concat` and `0` for
+  `count(expr)`.
+
+The aggregate's result *type* (Section 5.5) is unaffected by this:
+Datamog has no nullable types, so an all-NULL group simply emits a
+runtime NULL in a column whose declared type is still "same as
+`expr`" (or `integer` / `float` / `string`, per Section 5.5). NULL is
+always a possible runtime value of any column; the type system
+only fixes what the *non-NULL* values look like.
+
+#### Heads
+
+A rule whose head expression evaluates to NULL still emits a row,
+with NULL in the corresponding column. Downstream rules reading
+that column propagate the NULL through the rules above (filtered
+out by comparisons, ignored by aggregates, kept by binding
+equalities).
+
+### 5.5 Aggregate Typing Rules
+
+| Aggregate          | Result type          |
+|--------------------|----------------------|
+| `count(expr)`      | `integer`            |
+| `sum(expr)`        | same as `expr` (`float` if `expr` is `float`, else `integer`) |
+| `avg(expr)`        | `float`               |
+| `min(expr)`        | same as `expr`       |
+| `max(expr)`        | same as `expr`       |
+| `concat(expr)` | `string`            |
+
+### 5.6 Type Widening
+
+When multiple rules define the same predicate, each column must unify
+to a single type across rules. The widening rules:
+
+- same type + same type = no change
+- `integer` + `float` = `float`
+- `value` + any primitive = `value` (the primitive auto-lifts; see §2.9)
+- any other pair (`string` + `integer`, `boolean` + `float`, …) = **error**
+
+Every column of every predicate is typed with exactly one of `string`,
+`integer`, `float`, `boolean`, or `value`. Rules whose head contributions
+imply incompatible types for the same column are rejected with
+`Column N of predicate 'p' has conflicting types 'X' and 'Y'`.
+
+### 5.7 Type Validation
+
+The following type constraints are enforced after type inference:
+
+- **Range atoms**: binding ranges (`X in [...]` where `X` is a fresh bare
+  variable) require integer bounds and bind `X : integer`. Filter ranges
+  require numeric bounds and expressions (`integer` or `float`).
+- **Unary minus**: the operand must have numeric type.
+- **Subscript** (`x[i]`): the object must have type `string` or `value`.
+  When `x : string`, the index must be `integer`. When `x : value`, the
+  index may be `integer` (array) or `string` (object key).
+- **Slice** (`x[i:j]`): the object must have type `string` or `value`.
+  Bounds are always `integer`.
+- **String functions** (`length`, `upper`, `lower`, `trim`): the first
+  argument must have type `string`. All arguments of `replace` must be
+  `string`. `length` is also overloaded for `value` arguments.
+- **Math functions** (`abs`, `round`, `floor`, `ceil`, `sqrt`, `ln`,
+  `exp`): all arguments must have numeric type.
+- **Exponentiation** (`x ** y`): both operands must have numeric type.
+- **Value coercion / introspection** (`as_string`, `as_integer`,
+  `as_float`, `as_boolean`, `length`, `type_of`, `has_key`, `keys`,
+  `values`, `to_json`): the inspected value argument must have type
+  `value`, except that `length` also accepts strings as an alias for
+  string length. `has_key`'s second argument must be `string`. Auto-lift does
+  **not** apply to any of these — passing another primitive is almost
+  always a mistake.
+- **Primitive conversions** (`to_string`, `to_integer`, `to_float`,
+  `to_boolean`, `parse_json`): `to_string` accepts any of
+  `integer`/`float`/`boolean` and rejects `string` (no identity
+  overload). The string → number/boolean parsers accept exactly
+  `string` and reject identity inputs of the target type.
+  `parse_json` accepts exactly `string` (NULL on malformed input).
+  Failed string parses produce `NULL` rather than raising.
+- **Iteration primitives** (`object_entry`, `array_element`): the
+  source argument (position 0) must have type `value`; the bound
+  positions are typed per §2.9.
+- **Comparisons and non-binding equalities**: the two sides must have
+  compatible types (same type, or `integer`/`float`, or
+  primitive ↔ `value` via auto-lift — see §2.9 and §5.6). The
+  ordering operators `<`, `<=`, `>`, `>=` additionally reject
+  `boolean` and `value` operands.
+
+```
+X in [1 .. 10]            # OK: integer bounds
+X in ["a" .. "z"]         # ERROR: non-numeric bounds
+-"hello"                  # ERROR: unary minus on string
+42[0]                     # ERROR: subscript on integer
+length(42)                # ERROR: length expects string or value
+sqrt("hello")             # ERROR: sqrt expects numeric
+X > "5"                   # ERROR: comparing integer with string (if X : integer)
+B > true                  # ERROR: '>' does not order booleans
+J > J2                    # ERROR: '>' does not order `value` (if J, J2 : value)
+as_integer("42")              # ERROR: as_integer expects value, got string
+length(42)                # ERROR: length expects string or value
+```
+
+### 5.8 Finiteness analysis (warnings)
+
+A separate, opt-in static check (CLI flag `--warn-finiteness`; always
+on in the playground) flags predicate columns whose values may grow
+without bound across recursive iterations. Pure Datalog terminates
+because every value reachable in the fixed point is drawn from the
+extensional input — but Datamog adds arithmetic, string concat, and
+`parse_json`, which can manufacture values outside that input set,
+so a recursive rule like `s(Y) :- s(X), Y = X + 1.` does not
+terminate, and neither does `g(parse_json(as_string(J))) :- g(J).`.
+
+The analysis builds a single program-wide dataflow graph:
+
+- A node for each `(predicate, columnIndex)` pair (shared across
+  rules).
+- A node for each `(rule, variable)` pair (rule-local).
+
+Edges are added when walking each rule:
+
+- A body atom `p(t1, …, tn)` (positive, non-negated):
+  - if `tj` is a Variable `V`, edge `(p, j) → (rule, V)`;
+  - if `tj` is any non-Variable expression, the variables of the
+    expression flow *into* `(p, j)`, marked **PLUS** to record that
+    the value is computed.
+- A head atom `q(e1, …, en)`:
+  - Variable / aggregate / literal head args produce *clean* edges;
+  - any other expression at position `j` adds edges
+    `(rule, V) → (q, j)` marked **PLUS** for every variable `V`
+    referenced.
+- A binding equality with a bare variable on either side: clean if the
+  other side is a bare variable or literal; **PLUS** otherwise.
+- A binding range `V in [lo .. hi]`: clean if both bounds are integer
+  literals (the range is finite by construction); **PLUS** if either
+  bound is a variable expression.
+- Comparisons, non-binding equalities, negated atoms, filter ranges
+  contribute *no* edges.
+
+The analysis runs Tarjan's SCC. Any SCC that contains both a cycle
+and at least one PLUS-labelled internal edge produces one warning per
+predicate-column node it includes:
+
+```
+warning: Column N of predicate 'p' is on a value-producing recursion
+cycle and may grow without bound
+```
+
+The check is intentionally conservative: it flags every program where
+termination depends on a comparison or filter the analyser doesn't
+read (e.g. Fibonacci's `I < 10`). It is therefore **only ever a
+warning** — programs are still translated and executed.
+
+### 5.9 Bitwise integer semantics
+
+The bitwise / shift operators `&`, `|`, `^`, `<<`, `>>`, `>>>` operate on
+**32-bit signed two's-complement integers**, matching Java/JavaScript `int`
+semantics. Both operands and the result are `integer`; a non-integer
+operand (`float`, `string`, `boolean`, `value`) is a compile-time type
+error (§5.7). A `NULL` operand propagates to `NULL` (§5.4).
+
+| Operator | Meaning                                                        |
+|----------|----------------------------------------------------------------|
+| `a & b`  | bitwise AND                                                    |
+| `a \| b` | bitwise OR                                                     |
+| `a ^ b`  | bitwise XOR                                                    |
+| `a << b` | left shift; bits shifted past bit 31 are discarded (wraps)     |
+| `a >> b` | arithmetic right shift (sign-extending)                        |
+| `a >>> b`| logical right shift (zero-fill), result reinterpreted as int32 |
+
+The shift count is taken **mod 32** (so `1 << 32 == 1`, and a negative
+count `n` shifts by `n & 31`). Left shifts wrap within 32 bits, so
+`1 << 31 == -2147483648`. These rules make every result fit the
+`integer` column type and be identical on every backend.
+
+The 32-bit width is not incidental: it is the width of the `integer`
+column type on the most constrained backend (Postgres `INTEGER`) and of
+JavaScript's native bitwise operators (used by the in-memory evaluators).
+The translator reconciles the backends that differ: SQLite has no XOR or
+`>>>` operator and computes in 64-bit, so XOR is emulated as
+`(a | b) & ~(a & b)`, `>>>` masks the operand to unsigned 32-bit before
+shifting, and both `<<` and `>>>` wrap their 64-bit result back to signed
+32-bit; Postgres spells XOR `#`, masks shift counts mod 32, and emulates
+`>>>` via a `bigint` mask. See §6.8.
+
+## 6 SQL Translation
+
+### 6.1 Overview
+
+A Datamog program translates to three groups of SQL statements:
+
+1. **CREATE TABLE** statements for each extensional predicate.
+2. **CREATE VIEW** statements for each intensional predicate (one view per
+   predicate, possibly recursive).
+3. **SELECT** statements for each query.
+
+IDB column names use the convention `col1`, `col2`, ..., `colN`. EDB
+column names use the declared names from the extensional declaration.
+
+### 6.2 Rule Translation
+
+Each rule translates to a SELECT statement. The translation makes a single
+left-to-right pass over the body elements, classifying them into:
+
+- **Positive atoms** -- become FROM clause entries with aliases (`__b0`,
+  `__b1`, ...).
+- **Negated atoms** -- become `NOT EXISTS (SELECT 1 FROM ...)` in the WHERE
+  clause.
+- **Equalities** -- register variable bindings used in the SELECT and WHERE
+  clauses.
+- **Comparisons** -- become WHERE conditions.
+- **Binding ranges** (variable `in` range) -- become FROM clause entries
+  using the dialect's range source.
+- **Filter ranges** (expression `in` range) -- become BETWEEN conditions in
+  the WHERE clause.
+
+Shared variables between atoms produce join conditions. Non-variable atom
+arguments produce equality filters.
+
+Multiple rules for the same predicate are combined with UNION.
+
+### 6.3 Non-Recursive Views
+
+```sql
+CREATE OR REPLACE VIEW "pred" AS        -- PostgreSQL
+  (SELECT ...) UNION (SELECT ...)
+
+CREATE VIEW IF NOT EXISTS "pred" AS     -- SQLite / sql.js
+  (SELECT ...) UNION (SELECT ...)
+```
+
+### 6.4 Recursive Views
+
+**PostgreSQL:**
+
+```sql
+CREATE RECURSIVE VIEW "pred" (col1, col2) AS
+  (base cases) UNION (recursive cases)
+```
+
+**SQLite / sql.js:**
+
+```sql
+CREATE VIEW IF NOT EXISTS "pred" AS
+  WITH RECURSIVE "pred"(col1, col2) AS (
+    (base cases) UNION (recursive cases)
+  )
+  SELECT * FROM "pred"
+```
+
+### 6.5 Mutually Recursive Views
+
+**PostgreSQL:** Multiple CTEs in a shared `WITH RECURSIVE` block:
+
+```sql
+WITH RECURSIVE
+  "pred1"(col1, col2) AS (...),
+  "pred2"(col1, col2) AS (...)
+```
+
+**SQLite / sql.js:** A combined CTE with a `__tag` discriminator column to
+separate the predicates, since SQLite does not support multiple recursive
+CTEs:
+
+```sql
+WITH RECURSIVE "__mutual__pred1__pred2"(__tag, col1, col2) AS (...)
+```
+
+Separate non-recursive views then filter by tag.
+
+### 6.6 Aggregate Views
+
+Rules with aggregates in the head produce GROUP BY queries:
+
+```
+student_avg(Student, avg(Score)) :- scores(Student, _, Score).
+```
+
+becomes:
+
+```sql
+SELECT __b0."student" AS col1, AVG(__b0."score") AS col2
+FROM "scores" AS __b0
+GROUP BY __b0."student"
+```
+
+### 6.7 Range Sources
+
+Binding ranges (where a variable is bound to a range of integers) use
+dialect-specific SQL:
+
+- **PostgreSQL:** `generate_series(low, high)` as a table source
+- **SQLite / sql.js:** A recursive CTE that generates values from `low` to
+  `high`
+
+### 6.8 SQL Dialect Summary
+
+| Feature                  | PostgreSQL                   | SQLite / sql.js              |
+|--------------------------|------------------------------|------------------------------|
+| CREATE VIEW              | `CREATE OR REPLACE VIEW`     | `CREATE VIEW IF NOT EXISTS`  |
+| Recursive view           | `CREATE RECURSIVE VIEW`      | `WITH RECURSIVE` in view     |
+| Non-linear recursion     | rejected                     | rejected                     |
+| Mutual recursion         | multiple CTEs                | tagged combined CTE          |
+| Range source             | `generate_series`            | recursive CTE                |
+| `concat`           | `STRING_AGG(expr::TEXT, ',' ORDER BY expr)` | `GROUP_CONCAT(expr, ',' ORDER BY expr)` |
+| `!=`                     | `<>`                         | `<>`                         |
+| bitwise XOR `^`          | `#`                          | emulated `(a\|b) & ~(a&b)`    |
+| `>>>` (logical shift)    | `bigint` mask + reinterpret  | unsigned mask + int32 wrap   |
+| `<<` / `>>` count        | masked mod 32                | masked mod 32; result int32-wrapped |
+
+## 7 Data Loading
+
+Extensional predicates are populated from external data sources via loader
+plugins. The loader determines which data source to use based on the
+predicate name and its configuration.
+
+If no configured loader matches a given extensional declaration, the
+predicate is simply left empty rather than treated as an error. Rules that
+reference an empty EDB produce no rows, and embedding APIs may populate
+predicates directly (e.g. via `insertRows`) without going through a loader
+at all. This keeps Datamog usable as a library and avoids spurious failures
+in scenarios where some EDBs are intentionally unsourced.
+
+**Header matching.** Loaders that resolve declared column names against
+external column or key names (CSV, JSONL object form, Google Sheets)
+match them **by exact name** (case-sensitively). A declaration
+`extensional p(Name: string, Age: integer).` accepts a CSV with headers
+`Name,Age`, a JSONL line `{"Name": "...", "Age": ...}`, or a Google
+Sheet whose first row reads `Name | Age`. Identifiers may be written in
+any case, so declared column names can be chosen to match the source's
+header casing exactly. Loaders that match positionally (Mermaid, CSV
+without a header row, JSONL array form) are unaffected.
+
+### 7.1 CSV Loader
+
+Loads data from a file named `{predicate}.csv` in a configured directory.
+
+- First row is a header by default (configurable).
+- Fields are delimiter-separated (default `,`).
+- String values are coerced to the declared column types. Coercion is
+  **strict**: `integer` requires canonical decimal `0` or
+  `-?[1-9]\d{0,8}` (nine digits maximum); `float` requires canonical
+  decimal `((0|-?[1-9]\d*)(\.\d+)?|-0\.\d+)` (no exponent, no leading
+  `+`, no leading zeros except plain `0`, no surface `-0`); `boolean`
+  accepts `true`/`1`/`yes` and `false`/`0`/`no` (case-insensitive,
+  surrounding whitespace allowed). Anything else raises a load-time error
+  rather than silently coercing.
+- A `value` column accepts any JSON text; the contents are parsed
+  with `JSON.parse` and canonicalised on insert.
+- For nullable columns (`type?`), an empty or whitespace-only cell is loaded
+  as runtime `NULL`.
+- Without a header row, every record's field count must match the predicate
+  arity. With a header row, every declared column must appear in the
+  header (matched by exact name per the §7 intro); extra header
+  columns are ignored, and each data row must provide values for the
+  declared columns.
+
+### 7.2 JSONL Loader
+
+Loads data from a file named `{predicate}.jsonl`. Each line is a JSON
+value matched in one of two shapes:
+
+- **Objects:** Every declared column must appear as a key (matched by
+  exact name per the §7 intro); extra keys are ignored.
+- **Arrays:** Length must match predicate arity; elements map to columns in
+  order.
+
+Values are type-checked (not coerced): a JSON string is not accepted for an
+`integer` column. For nullable columns (`type?`), JSON `null` is accepted
+and loaded as runtime `NULL`.
+
+**Single-`value`-column special case.** When the extensional declaration
+has exactly one column, and that column is typed `value`, each
+non-blank line is consumed as the column's contents directly — any
+JSON shape (object, array, primitive, null). This is the natural way
+to ingest a stream of heterogeneous self-describing records:
+
+```prolog
+extensional event(payload: value).
+```
+
+with `event.jsonl` of the form
+
+```jsonl
+{"id": 1, "method": "GET",  "path": "/v1/users",  "status": 200}
+{"id": 2, "method": "POST", "path": "/v1/users",  "status": 201}
+```
+
+— each line becomes one row whose `payload` column holds the parsed
+object as-is.
+
+### 7.3 Google Sheets Loader
+
+Loads data from a Google Sheets spreadsheet. Sheets are mapped to predicate
+names via configuration. The first row is treated as headers; every declared
+column must appear there (matched by exact name per the §7 intro)
+and extra sheet columns are ignored. Values are coerced from strings (like
+CSV).
+
+### 7.4 Mermaid Loader
+
+Loads data from a Mermaid graph file named `{predicate}.mmd`. Parses edges
+from `graph` or `flowchart` diagrams. Predicates with 2 columns (source,
+target) or 3 columns (source, target, label) are supported. Edge labels
+are extracted from the `-->|label|` syntax; edges without labels get an
+empty string for the label column.
+
+### 7.5 JSON Loader
+
+Loads a JSON document from a file named `{predicate}.json`. A
+URL-backed variant (`UrlJsonLoader`) fetches the document over HTTP /
+HTTPS instead, mapping each predicate to a configured URL; both
+loaders share parsing and error semantics — they only differ in where
+the bytes come from.
+
+The extensional declaration must have exactly one column, and that
+column must be typed `value`:
+
+```prolog
+extensional config(blob: value).
+```
+
+The whole file is parsed as a single JSON value (any shape — object,
+array, primitive, or null) and inserted as the sole row's column
+value. The natural use is "load this configuration blob and let rules
+destructure it":
+
+```prolog
+app_name(N) :- config(C), N = as_string(C["name"]).
+enabled_feature(F) :-
+    config(C),
+    object_entry(C["features"], F, Flag),
+    as_boolean(Flag) = true.
+```
+
+For the `UrlJsonLoader`, only `http:` and `https:` URLs are accepted;
+non-2xx responses raise a load-time error carrying the predicate name
+and the HTTP status.
+
+```typescript
+new UrlJsonLoader({
+  urls: {
+    config: "https://example.com/config.json",
+  },
+});
+```
+
+## 8 Examples
+
+### Transitive Closure (Recursion)
+
+```
+extensional parent(name: string, child: string).
+
+ancestor(X, Y) :- parent(X, Y).
+ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
+
+?- ancestor("alice", X).
+```
+
+### Fibonacci (Recursion with Arithmetic)
+
+```
+fib_step(1, 0, 1).
+fib_step(I + 1, Curr, Prev + Curr) :- fib_step(I, Prev, Curr), I < 10.
+
+fibonacci(I, V) :- fib_step(I, _, V).
+
+?- fibonacci(I, V).
+```
+
+### Primes (Ranges and Negation)
+
+```
+num(I) :- I in [2 .. 30].
+
+divides(D, X) :- num(D), num(X), D > 1, D < X, R = X % D, R < 1.
+
+composite(X) :- divides(_, X).
+
+prime(X) :- num(X), not composite(X).
+
+?- prime(X).
+```
+
+### Aggregates (Grouping and Counting)
+
+```
+extensional scores(student: string, subject: string, score: integer).
+
+student_avg(Student, avg(Score)) :- scores(Student, _, Score).
+total_score(Student, sum(Score)) :- scores(Student, _, Score).
+best_score(Student, max(Score)) :- scores(Student, _, Score).
+record_count(count(*)) :- scores(_, _, _).
+
+?- student_avg(Student, Avg).
+?- record_count(N).
+```
+
+### String Operations
+
+```
+extensional words(w: string).
+
+prefixed(R) :- words(W), R = "hello_" + W.
+lengths(W, N) :- words(W), N = length(W).
+initials(W, C) :- words(W), C = W[0].
+first_three(W, S) :- words(W), length(W) >= 3, S = W[:3].
+
+?- prefixed(R).
+```
+
+### Shortest Path (Recursion with Aggregation)
+
+```
+road("castle", "village", 2).
+road("castle", "forest", 5).
+road("village", "bridge", 4).
+road("village", "castle", 3).
+road("forest", "river", 3).
+road("river", "village", 1).
+road("river", "bridge", 2).
+
+max_cost(sum(W)) :- road(_, _, W).
+
+path(X, Y, C) :- road(X, Y, C).
+path(X, Y, C) :-
+  path(X, Z, C0), road(Z, Y, C1),
+  max_cost(Max), C0 < Max,
+  C = C0 + C1.
+
+shortest(X, Y, min(C)) :- path(X, Y, C).
+
+?- shortest(X, Y, C).
+```
+
+### Reaching Definitions (Data-Flow Analysis)
+
+```
+cfg("start", "b1").
+cfg("b1", "b2").
+cfg("b1", "b3").
+cfg("b2", "b4").
+cfg("b3", "b4").
+cfg("b4", "b1").
+cfg("b4", "end").
+
+gen("b2", "d1").
+gen("b4", "d2").
+
+kill("b4", "d1").
+kill("b2", "d2").
+
+reaches(D, U) :- gen(U, D).
+reaches(D, V) :- cfg(U, V), reaches(D, U), not kill(U, D).
+
+?- reaches(Def, Block).
+```
+
+### Shannon Entropy (Strings, Ranges, Aggregates, Math)
+
+```
+text_input("abracadabra").
+
+char_at(I, C) :- text_input(S), I in [0 .. length(S) - 1], C = S[I].
+
+total(count(*)) :- char_at(_, _).
+freq(C, count(*)) :- char_at(_, C).
+
+prob(C, P) :- freq(C, N), total(T), P = (N * 1.0) / T.
+
+contribution(C, X) :- prob(C, P), X = -1.0 * P * ln(P) / ln(2).
+
+entropy(sum(X)) :- contribution(_, X).
+
+?- freq(C, N).
+?- prob(C, P).
+?- entropy(H).
+```
+
+## 9 Error Categories
+
+Datamog reports errors with source positions (byte offsets) for IDE
+integration:
+
+| Category        | Examples                                                    |
+|-----------------|-------------------------------------------------------------|
+| **Parse error** | Missing period, unexpected token, malformed expression       |
+| **Analyzer error** | Undefined predicate, arity mismatch, unsafe variable, unstratifiable negation, duplicate extensional declaration, EDB/IDB conflict, aggregate constraint violation, unknown function, function arity mismatch |
+| **Type error**  | Non-numeric range bounds, unary minus on string, subscript/slice on non-string, wrong function argument type |
+| **Translation error** | Non-linear recursion (SQL backends only — `native` and `seminaive` accept it) |

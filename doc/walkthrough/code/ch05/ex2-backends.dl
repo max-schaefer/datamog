@@ -1,0 +1,13 @@
+# Exercise 5.2 — Same program, different backend.
+#
+# A simple recursive program. Run with each of sqlite, sqljs,
+# native, seminaive and compare.
+
+parent("a", "b").
+parent("b", "c").
+parent("c", "d").
+
+ancestor(X, Y) :- parent(X, Y).
+ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
+
+?- ancestor(X, Y).

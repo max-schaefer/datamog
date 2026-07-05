@@ -1,0 +1,6 @@
+# Exercise 6.2 solution.
+
+sum_to(1, 1).
+sum_to(N + 1, S + (N + 1)) :- sum_to(N, S), N < 20.
+
+?- sum_to(N, S).

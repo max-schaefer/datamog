@@ -1,0 +1,12 @@
+# Exercise 8.2 solution.
+
+extensional prereq(course: string, requires: string).
+
+course(C) :- prereq(C, _).
+course(C) :- prereq(_, C).
+
+has_prereq(C) :- prereq(C, _).
+
+starter_course(C) :- course(C), not has_prereq(C).
+
+?- starter_course(C).

@@ -1,0 +1,7 @@
+# Exercise 7.3 solution.
+#
+# Binding X via a range atom.
+
+cube(X, Y) :- X in [0 .. 10], Y = X * X * X.
+
+?- cube(X, Y).

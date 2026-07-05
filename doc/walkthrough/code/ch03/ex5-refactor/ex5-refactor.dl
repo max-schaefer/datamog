@@ -1,0 +1,18 @@
+# Exercise 3.5 — Refactoring disjunction.
+#
+# Starting from the three-rule `can_see` below, factor it out into
+# three named intermediate predicates plus a `can_see` that unions
+# them. Compare: which form reads better, and when?
+
+extensional same_room(person1: string, person2: string).
+extensional connected_window(person1: string, person2: string).
+
+# Original form.
+can_see(X, Y) :- same_room(X, Y).
+can_see(X, Y) :- same_room(Y, X).
+can_see(X, Y) :- connected_window(X, Y).
+
+# TODO: refactor into three separate predicates and a unioning
+# can_see_refactored.
+
+?- can_see(X, Y).

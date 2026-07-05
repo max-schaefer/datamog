@@ -1,0 +1,9 @@
+# Exercise 1.2 solution.
+#
+# The third column is pinned to 1934; we use `_` for that column in
+# the output alias list since we don't want to print the year we
+# already know.
+
+extensional person(name: string, country: string, year_born: integer).
+
+?- person(Name, Country, 1934).

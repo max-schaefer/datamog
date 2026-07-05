@@ -1,0 +1,9 @@
+# Exercise 7.3 — Fix the unsafe rule.
+#
+# The rule below is rejected because X appears in the head but
+# never in a positive body atom.
+
+# TODO: add a body atom (or range) that safely binds X.
+cube(X, Y) :- Y = X * X * X.
+
+?- cube(X, Y).

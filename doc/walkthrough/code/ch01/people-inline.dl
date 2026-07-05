@@ -1,0 +1,14 @@
+# Same facts as people.dl, but written inline instead of loaded
+# from a CSV. Useful for one-off experiments: no companion data
+# file is needed.
+
+person("ada_lovelace",    "uk", 1815).
+person("alan_turing",     "uk", 1912).
+person("grace_hopper",    "us", 1906).
+person("edsger_dijkstra", "nl", 1930).
+person("john_mccarthy",   "us", 1927).
+person("tony_hoare",      "uk", 1934).
+person("barbara_liskov",  "us", 1939).
+person("niklaus_wirth",   "ch", 1934).
+
+?- person(Name, Country, Year).

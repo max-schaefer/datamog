@@ -1,0 +1,75 @@
+# Propositional logic evaluator
+#
+# Evaluates a propositional formula under all possible truth assignments
+# and checks whether it is a tautology.
+#
+# The example formula is:  (p => q) => ((~p => q) => q)
+# This is a well-known tautology (one of Łukasiewicz's axiom schemas).
+#
+# Formulas are evaluated bottom-up: each subformula gets its own
+# predicate, composed from the truth tables of the connectives.
+# This avoids recursion, which would require non-linear recursive
+# CTEs (evaluating a binary connective needs values of both children)
+# — something neither SQLite nor Postgres supports.
+
+# --- Truth tables for connectives ---
+
+bool("T").
+bool("F").
+
+impl_tt("T", "T", "T").
+impl_tt("T", "F", "F").
+impl_tt("F", "T", "T").
+impl_tt("F", "F", "T").
+
+neg_tt("T", "F").
+neg_tt("F", "T").
+
+# --- Truth assignments ---
+#
+# With two variables (p, q) there are four assignments.
+
+assignment(P, Q) :- bool(P), bool(Q).
+
+# --- Subformula evaluation ---
+#
+#          impl_0
+#         /      \
+#      impl_1   impl_2
+#      /   \    /      \
+#     p    q  impl_3    q
+#             /    \
+#          neg_0    q
+#            |
+#            p
+#
+# Each intermediate predicate eval_X(P, Q, V) gives the truth value V
+# of subformula X under the assignment where p=P, q=Q.
+
+# Leaves: variable references
+eval_p(P, Q, P)  :- assignment(P, Q).
+eval_q(P, Q, Q)  :- assignment(P, Q).
+
+# neg_0 = ~p
+eval_neg0(P, Q, V) :- eval_p(P, Q, VP), neg_tt(VP, V).
+
+# impl_1 = p => q
+eval_impl1(P, Q, V) :- eval_p(P, Q, VP), eval_q(P, Q, VQ), impl_tt(VP, VQ, V).
+
+# impl_3 = ~p => q
+eval_impl3(P, Q, V) :- eval_neg0(P, Q, VL), eval_q(P, Q, VR), impl_tt(VL, VR, V).
+
+# impl_2 = (~p => q) => q
+eval_impl2(P, Q, V) :- eval_impl3(P, Q, VL), eval_q(P, Q, VR), impl_tt(VL, VR, V).
+
+# impl_0 = (p => q) => ((~p => q) => q)   [the root]
+eval_root(P, Q, V) :- eval_impl1(P, Q, VL), eval_impl2(P, Q, VR), impl_tt(VL, VR, V).
+
+# --- Tautology check ---
+
+counterexample(P, Q) :- eval_root(P, Q, "F").
+has_counterexample("yes") :- counterexample(_, _).
+is_tautology("yes") :- bool("T"), not has_counterexample("yes").
+
+?- eval_root(P, Q, Value).
+?- is_tautology(Answer).

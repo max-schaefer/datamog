@@ -1,0 +1,21 @@
+# Exercise 12.3 — Live variable analysis.
+#
+# Dual of reaching definitions: variables used later flow BACKWARDS
+# along the CFG.
+
+cfg("start", "b1").
+cfg("b1", "b2").
+cfg("b2", "b3").
+cfg("b3", "end").
+
+use("b1", "x").
+use("b3", "y").
+
+kill("b2", "x").
+
+# TODO: define live(Block, Var). Two rules:
+#   - A variable is live at a block where it's used.
+#   - A variable is live at a block if it is live at a successor
+#     and is not killed in that successor's predecessor block.
+
+?- live(Block, Var).

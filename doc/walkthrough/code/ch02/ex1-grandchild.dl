@@ -1,0 +1,10 @@
+# Exercise 2.1 — Grandchild.
+#
+# Define `grandchild(X, Y)` meaning "X is a grandchild of Y".
+# Don't reuse `grandparent`; build the rule from scratch.
+
+extensional parent(parent_name: string, child_name: string).
+
+# TODO: write the rule for grandchild.
+
+# TODO: write a query that lists every grandchild relationship.

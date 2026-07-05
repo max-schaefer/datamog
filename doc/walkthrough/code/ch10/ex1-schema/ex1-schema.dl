@@ -1,0 +1,22 @@
+# Exercise 10.1 — Library schema.
+#
+# A tiny library. Add rules for:
+#   - available(Book): books not currently checked out.
+#     (Interpretation: if a book appears in checkout at all, it's
+#     "out" — this is deliberately simplified.)
+#   - local_author(Author): authors from the UK.
+#   - most_borrowed(Book, count(Ev)): checkout count per book.
+
+extensional book(id: integer, title: string, author_id: integer).
+extensional author(id: integer, name: string, country: string).
+extensional checkout(book_id: integer, borrower_id: integer, date: string).
+
+# TODO.
+# Placeholders.
+available(B) :- book(B, _, _), B = -1.
+local_author(A) :- author(_, A, _), A = "__never__".
+most_borrowed(B, count(Ev)) :- checkout(B, Ev, _), B = -1.
+
+?- available(B).
+?- local_author(A).
+?- most_borrowed(B, N).

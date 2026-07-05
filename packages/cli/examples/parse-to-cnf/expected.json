@@ -1,0 +1,56 @@
+[
+  [
+    {
+      "Ast": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "name": "p",
+                    "type": "var"
+                  },
+                  {
+                    "name": "q",
+                    "type": "var"
+                  }
+                ],
+                "type": "and"
+              }
+            ],
+            "type": "not"
+          },
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "name": "p",
+                    "type": "var"
+                  }
+                ],
+                "type": "not"
+              },
+              {
+                "args": [
+                  {
+                    "name": "q",
+                    "type": "var"
+                  }
+                ],
+                "type": "not"
+              }
+            ],
+            "type": "or"
+          }
+        ],
+        "type": "imp"
+      }
+    }
+  ],
+  [
+    {}
+  ],
+  []
+]

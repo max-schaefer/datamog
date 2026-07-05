@@ -1,0 +1,9 @@
+# Graph reachability
+# Given a directed graph, find all nodes reachable from a given source.
+
+extensional edge(src: string, dst: string).
+
+reachable(X) :- edge("a", X).
+reachable(X) :- edge(Y, X), reachable(Y).
+
+?- reachable(X).

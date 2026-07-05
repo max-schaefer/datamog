@@ -1,0 +1,12 @@
+# Exercise 9.5 solution.
+#
+# Datamog accepts multiple aggregates in one head. The generated
+# SQL has one SELECT with three aggregate functions and a single
+# GROUP BY on Subject.
+
+extensional scores(student: string, subject: string, score: integer).
+
+subject_stats(Subject, min(Score), avg(Score), max(Score)) :-
+    scores(_, Subject, Score).
+
+?- subject_stats(Subject, Min, Avg, Max).

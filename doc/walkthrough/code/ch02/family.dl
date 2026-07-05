@@ -1,0 +1,32 @@
+# Tutorial, chapter 2 — rules, variables, and joins.
+#
+# A tiny three-generation family:
+#
+#   alice   bob      cecil   diana
+#       \  /              \  /
+#       erin ------------ frank
+#              /      \
+#           greg     helen
+#
+# `parent(X, Y)` means "X is a parent of Y". Data loads from
+# parent.csv next to this file.
+
+extensional parent(parent_name: string, child_name: string).
+
+# A grandparent of Z is a parent of some Y, whose Y is in turn a
+# parent of Z. Two body atoms, one shared variable — this is a join.
+grandparent(X, Z) :- parent(X, Y), parent(Y, Z).
+
+# Same pattern, one step deeper.
+great_grandparent(X, W) :- parent(X, Y), parent(Y, Z), parent(Z, W).
+
+# Rules can also have a single body atom — here we project `parent`
+# down to just the set of children (anyone who has a parent).
+has_a_parent(C) :- parent(_, C).
+
+?- grandparent(X, Y).
+?- great_grandparent(X, Y).
+?- has_a_parent(C).
+
+# A directed question: who are Greg's grandparents?
+?- grandparent(X, "greg").

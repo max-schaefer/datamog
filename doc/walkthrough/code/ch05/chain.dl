@@ -1,0 +1,15 @@
+# Tutorial, chapter 5 — a small chain to trace by hand.
+#
+#   a -> b -> c -> d
+#
+# Small enough to walk through the fixed-point iteration on paper,
+# big enough for naive and seminaive evaluation to differ on.
+
+parent("a", "b").
+parent("b", "c").
+parent("c", "d").
+
+ancestor(X, Y) :- parent(X, Y).
+ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
+
+?- ancestor(X, Y).

@@ -1,0 +1,1717 @@
+import {
+  type AggregateCall,
+  BITWISE_OPS,
+  BUILTINS,
+  BUILTIN_BODY_ATOMS,
+  BUILTIN_KEYS,
+  type BitwiseOp,
+  type BodyElement,
+  COMPARISON_OPS,
+  type Equality,
+  type Expression,
+  type Filter,
+  type FunctionCall,
+  type HeadAtom,
+  type HeadTerm,
+  type Literal,
+  type NumberLiteral,
+  type Overload,
+  type PrimitiveType,
+  type Query,
+  type Rule,
+  type TypedProgram,
+  type Variable,
+} from "datamog-core";
+import {
+  AnalyzerError,
+  assertNever,
+  inferTermType,
+  queryProjection,
+  rebuildVarTypes,
+} from "datamog-core";
+import { type SqlDialect, colList, emptyAnchor, ident, sqlTypeFor } from "./dialect.ts";
+
+export interface SqlSpan {
+  /** Offset of the SQL fragment within the containing statement. */
+  sqlStart: number;
+  sqlEnd: number;
+  /** Offset of the source AST node this fragment was generated from. */
+  astStart: number;
+  astEnd: number;
+}
+
+export interface TranslationResult {
+  createTables: string[];
+  createViews: string[];
+  queries: string[];
+  /** Predicate defined by each entry in `createViews` (same length / indexing). */
+  viewPredicates: string[];
+  /** Predicate queried by each entry in `queries` (same length / indexing). */
+  queryPredicates: string[];
+  /** For each `createViews[i]`, AST-to-SQL span mappings used for hover linking. */
+  viewSpans: SqlSpan[][];
+  /** For each `queries[i]`, AST-to-SQL span mappings used for hover linking. */
+  querySpans: SqlSpan[][];
+  /**
+   * For each `queries[i]`, the declared `PrimitiveType` of every result-row
+   * column. Keys match the `AS <alias>` names emitted in the SELECT
+   * (or the underlying predicate's column names when the SELECT is a
+   * `*`). Used by the executor to coerce backend-specific value
+   * representations back to a uniform shape — most importantly,
+   * SQLite's 0/1 booleans into JS true/false.
+   */
+  queryColumnTypes: Record<string, PrimitiveType>[];
+}
+
+export function translate(analyzed: TypedProgram, dialect: SqlDialect): TranslationResult {
+  const createTables = translateTables(analyzed, dialect);
+  const viewResult = translateViews(analyzed, dialect);
+  const queryResult = translateQueries(analyzed, dialect);
+  const viewStripped = viewResult.sql.map(stripSpanMarks);
+  const queryStripped = queryResult.sql.map(stripSpanMarks);
+  return {
+    createTables,
+    createViews: viewStripped.map((v) => v.sql),
+    queries: queryStripped.map((q) => q.sql),
+    viewPredicates: viewResult.predicates,
+    queryPredicates: queryResult.predicates,
+    viewSpans: viewStripped.map((v) => v.spans),
+    querySpans: queryStripped.map((q) => q.spans),
+    queryColumnTypes: queryResult.columnTypes,
+  };
+}
+
+// --- Span markers ---
+//
+// To link a generated SQL fragment to the Datalog AST node that produced it,
+// we wrap the fragment with control-character markers: `\u0001<start>,<end>\u0001`
+// opens a span covering the given AST offset range, `\u0002` closes the
+// innermost open span. Markers survive string concatenation unchanged, so
+// dialect wrappers (createView, createRecursiveView, ...) don't need to know
+// about them. After translation we strip markers from each statement and
+// emit the resulting `SqlSpan[]` alongside the clean SQL.
+
+const MARK_START = "\u0001";
+const MARK_END = "\u0002";
+
+function markSpan(
+  node: { $cstNode?: { offset: number; end: number } } | undefined,
+  sql: string,
+): string {
+  const cst = node?.$cstNode;
+  if (!cst) return sql;
+  return `${MARK_START}${cst.offset},${cst.end}${MARK_START}${sql}${MARK_END}`;
+}
+
+function stripSpanMarks(marked: string): { sql: string; spans: SqlSpan[] } {
+  const spans: SqlSpan[] = [];
+  const stack: { astStart: number; astEnd: number; sqlStart: number }[] = [];
+  let out = "";
+  let i = 0;
+  // Track whether the cursor sits inside a SQL string literal (`'...'`,
+  // with `''` for an embedded quote) or a double-quoted identifier
+  // (`"..."`, with `""` for an embedded quote). User-supplied string
+  // values and quoted identifiers (predicate / column names) can contain
+  // arbitrary bytes, including the very U+0001 / U+0002 chars we use as
+  // markers — without this guard, two stray U+0001s look like a span
+  // header and the stripper eats the SQL between them. Markers inside a
+  // string or identifier are always user data, so we pass them through
+  // verbatim. The translator never emits a U+0001 outside a string /
+  // identifier except as a real marker, so the outside branch is
+  // unambiguous. Tracking identifiers matters because a quoted name with
+  // a single quote — `"o'brien"` — would otherwise flip `inString` and
+  // desync the stripper.
+  let inString = false;
+  let inIdent = false;
+  while (i < marked.length) {
+    const c = marked[i]!;
+    if (c === "'" && !inIdent) {
+      out += c;
+      // `''` inside a string is a quoted single quote; consume both.
+      if (inString && marked[i + 1] === "'") {
+        out += "'";
+        i += 2;
+        continue;
+      }
+      inString = !inString;
+      i++;
+      continue;
+    }
+    if (c === '"' && !inString) {
+      out += c;
+      // `""` inside an identifier is a quoted double quote; consume both.
+      if (inIdent && marked[i + 1] === '"') {
+        out += '"';
+        i += 2;
+        continue;
+      }
+      inIdent = !inIdent;
+      i++;
+      continue;
+    }
+    if (inString || inIdent) {
+      out += c;
+      i++;
+      continue;
+    }
+    if (c === MARK_START) {
+      const close = marked.indexOf(MARK_START, i + 1);
+      if (close === -1) break;
+      const [aStr, bStr] = marked.slice(i + 1, close).split(",");
+      const a = Number(aStr);
+      const b = Number(bStr);
+      stack.push({ astStart: a, astEnd: b, sqlStart: out.length });
+      i = close + 1;
+    } else if (c === MARK_END) {
+      const frame = stack.pop();
+      if (frame) {
+        spans.push({
+          sqlStart: frame.sqlStart,
+          sqlEnd: out.length,
+          astStart: frame.astStart,
+          astEnd: frame.astEnd,
+        });
+      }
+      i++;
+    } else {
+      out += c;
+      i++;
+    }
+  }
+  return { sql: out, spans };
+}
+
+// --- Tables ---
+
+function translateTables(analyzed: TypedProgram, dialect: SqlDialect): string[] {
+  const tables: string[] = [];
+  for (const decl of analyzed.extDecls.values()) {
+    const cols = decl.columns.map((c) => {
+      const nullable = (c as { nullable?: boolean }).nullable;
+      return `  ${ident(c.name)} ${sqlTypeFor(dialect, c.type)}${nullable ? "" : " NOT NULL"}`;
+    });
+    tables.push(`CREATE TABLE IF NOT EXISTS ${ident(decl.predicate)} (\n${cols.join(",\n")}\n);`);
+  }
+  return tables;
+}
+
+// --- Views ---
+
+function translateViews(
+  analyzed: TypedProgram,
+  dialect: SqlDialect,
+): { sql: string[]; predicates: string[] } {
+  const sql: string[] = [];
+  const predicates: string[] = [];
+  for (const stratum of analyzed.sortedStrata) {
+    const isRecursive = analyzed.recursivePredicates.has(stratum[0]!);
+
+    if (
+      isRecursive &&
+      !dialect.supportsNonLinearRecursion &&
+      analyzed.nonLinearPredicates.has(stratum[0]!)
+    ) {
+      const preds = stratum.filter((p) => analyzed.nonLinearPredicates.has(p));
+      const predList = preds.map((p) => `'${p}'`).join(", ");
+      // Point the error at the first non-linear-recursive rule we can
+      // find — the rule whose body has more than one atom referencing
+      // a stratum predicate. Without this, the playground lint
+      // squiggly defaults to byte 0.
+      const stratumSet = new Set(stratum);
+      let cst: { offset: number; end: number } | undefined;
+      for (const p of preds) {
+        const rule = analyzed.rules.get(p)?.find((r) => {
+          let recBody = 0;
+          for (const elem of r.body) {
+            if (elem.$type === "Literal" && !elem.negated && stratumSet.has(elem.predicate)) {
+              recBody++;
+            }
+          }
+          return recBody > 1;
+        });
+        if (rule?.$cstNode) {
+          cst = { offset: rule.$cstNode.offset, end: rule.$cstNode.end };
+          break;
+        }
+      }
+      throw new AnalyzerError(
+        `Non-linear recursion is not supported by ${dialect.name}: ${stratum.length > 1 ? "predicates" : "predicate"} ${predList} ${preds.length > 1 ? "have" : "has"} rules with multiple recursive body atoms`,
+        cst?.offset,
+        cst?.end,
+      );
+    }
+
+    if (!isRecursive) {
+      const predicate = stratum[0]!;
+      const rules = analyzed.rules.get(predicate)!;
+      const ruleQueries = rules.map((rule) =>
+        translateRule(rule, analyzed, undefined, undefined, dialect),
+      );
+      const unionBody = ruleQueries.join("\n  UNION\n");
+      sql.push(dialect.createView(predicate, unionBody));
+      predicates.push(predicate);
+    } else if (stratum.length === 1) {
+      const predicate = stratum[0]!;
+      const rules = analyzed.rules.get(predicate)!;
+      const arity = analyzed.arities.get(predicate)!;
+      // SQLite's WITH RECURSIVE requires non-recursive anchor terms to appear
+      // before recursive terms in the UNION. Sort by whether the rule
+      // references the predicate. Postgres is order-insensitive, so sorting
+      // is safe for it too.
+      const ordered = [...rules].sort((a, b) => {
+        const aRec = isSelfRecursive(a, predicate) ? 1 : 0;
+        const bRec = isSelfRecursive(b, predicate) ? 1 : 0;
+        return aRec - bRec;
+      });
+      const ruleQueries = ordered.map((rule) =>
+        translateRule(rule, analyzed, undefined, undefined, dialect),
+      );
+      // Every rule for this predicate is self-recursive — its least
+      // fixed point is the empty relation, but SQL engines reject a
+      // `WITH RECURSIVE` CTE with no anchor branch ("circular
+      // reference" on SQLite, similar on Postgres). Prepend a
+      // typed empty anchor so the CTE compiles and evaluates to zero
+      // rows.
+      if (ordered.every((r) => isSelfRecursive(r, predicate))) {
+        ruleQueries.unshift(emptyAnchor(arity, analyzed.columnTypes.get(predicate)!, dialect));
+      }
+      const unionBody = ruleQueries.join("\n  UNION\n");
+      const colNames = colList(arity);
+      sql.push(dialect.createRecursiveView(predicate, colNames, unionBody));
+      predicates.push(predicate);
+    } else {
+      const ruleTranslator = (
+        rule: Rule,
+        renameMap?: Map<string, string>,
+        tagMap?: Map<string, string>,
+      ) => translateRule(rule, analyzed, renameMap, tagMap, dialect);
+
+      const mutualViews = dialect.createMutuallyRecursiveViews(
+        stratum,
+        analyzed.arities,
+        analyzed.rules,
+        analyzed,
+        ruleTranslator,
+      );
+      // createMutuallyRecursiveViews returns one view per stratum predicate,
+      // in stratum order.
+      sql.push(...mutualViews);
+      predicates.push(...stratum);
+    }
+  }
+  return { sql, predicates };
+}
+
+/** Variable binding: either a column reference or an SQL expression (from equality). */
+type Binding =
+  | { kind: "col"; alias: string; col: string; type: PrimitiveType | undefined }
+  | { kind: "expr"; sql: string; type: PrimitiveType | undefined };
+
+/**
+ * Translate a single rule to a SQL SELECT statement.
+ * @param renameMap - Optional map from predicate name to table/CTE name (for SQLite mutual recursion)
+ * @param tagMap - Optional map from predicate name to tag value (for SQLite combined CTE discrimination)
+ * @param dialect - SQL dialect for dialect-specific expressions
+ */
+function translateRule(
+  rule: Rule,
+  analyzed: TypedProgram,
+  renameMap: Map<string, string> | undefined,
+  tagMap: Map<string, string> | undefined,
+  dialect: SqlDialect,
+): string {
+  if (rule.body.length === 0) {
+    return translateFact(rule, analyzed, dialect);
+  }
+
+  // Categorize body elements and register bindings. Positive atoms are
+  // processed first so ranges and equalities can reference variables bound by
+  // atoms appearing later in the rule body (safety is order-independent).
+  const positiveAtoms: { atom: Literal; index: number }[] = [];
+  const negatedAtoms: { atom: Literal }[] = [];
+  const filters: Filter[] = [];
+  // Equalities that cannot bind a bare variable from a ready expression
+  // become null-aware constraints.
+  const equalityConstraints: Equality[] = [];
+  const bindingRanges: {
+    alias: string;
+    lowSql: string;
+    highSql: string;
+    node: BodyElement;
+  }[] = [];
+  const filterRanges: {
+    exprSql: string;
+    lowSql: string;
+    highSql: string;
+    node: BodyElement;
+  }[] = [];
+  // Built-in body atoms (object_entry / array_element). Like binding
+  // ranges, they emit a FROM source and bind synthetic expressions to
+  // their non-source argument variables; the source argument is an
+  // arbitrary expression whose vars must already be safe — resolved
+  // in the Pass 2 fixed-point.
+  const builtinIters: {
+    atom: Literal;
+    fromSql: string;
+    keySql: string;
+    valueSql: string;
+  }[] = [];
+
+  const aliases = rule.body.map((_, i) => `__b${i}`);
+  const bindings = new Map<string, Binding[]>();
+  const varTypes = new Map<string, PrimitiveType>();
+  const columnTypes = analyzed.columnTypes;
+  const functionOverloads = analyzed.functionOverloads;
+  let rangeCounter = 0;
+
+  // Pass 1: register bindings from positive atoms (and collect negated atoms).
+  for (let i = 0; i < rule.body.length; i++) {
+    const elem = rule.body[i]!;
+    if (elem.$type !== "Literal") continue;
+    if (elem.negated) {
+      negatedAtoms.push({ atom: elem });
+      continue;
+    }
+    // Built-in body atoms are deferred to Pass 2 — they need the
+    // source-argument expression's variables to all be bound before
+    // they can fire, exactly like a binding range.
+    if (BUILTIN_BODY_ATOMS.has(elem.predicate)) continue;
+    const alias = aliases[i]!;
+    const predTypes = columnTypes?.get(elem.predicate);
+    for (let j = 0; j < elem.args.length; j++) {
+      const term = elem.args[j]!;
+      if (term.$type === "Variable") {
+        const col = resolveColumnRef(elem.predicate, j, analyzed);
+        const list = bindings.get(term.name) ?? [];
+        const t = predTypes?.[j];
+        list.push({ kind: "col", alias, col, type: t });
+        bindings.set(term.name, list);
+        if (t && !varTypes.has(term.name)) {
+          varTypes.set(term.name, t);
+        }
+      }
+    }
+    positiveAtoms.push({ atom: elem, index: i });
+  }
+
+  // Pass 2: ranges and equalities. Iterate to a fixed point so elements can
+  // reference variables bound by later elements in source order (safety is
+  // order-independent). As we bind a variable via equality or range, we also
+  // propagate its type into varTypes so downstream ranges can decide whether
+  // they qualify as integer binding ranges.
+  const pending: number[] = [];
+  for (let i = 0; i < rule.body.length; i++) {
+    const elem = rule.body[i]!;
+    if (elem.$type === "RangeAtom") {
+      pending.push(i);
+    } else if (elem.$type === "Equality") {
+      // Equalities with a bare variable on either side may participate in
+      // the fixed-point. Constraint-only forms are emitted later as `=`.
+      if (elem.left.$type === "Variable" || elem.expr.$type === "Variable") {
+        pending.push(i);
+      } else {
+        equalityConstraints.push(elem);
+      }
+    } else if (elem.$type === "Filter") {
+      filters.push(elem);
+    } else if (
+      elem.$type === "Literal" &&
+      !elem.negated &&
+      BUILTIN_BODY_ATOMS.has(elem.predicate)
+    ) {
+      pending.push(i);
+    }
+  }
+
+  let progress = true;
+  while (progress && pending.length > 0) {
+    progress = false;
+    for (let p = 0; p < pending.length; ) {
+      const elem = rule.body[pending[p]!]!;
+      let processed = false;
+      if (elem.$type === "Equality") {
+        // Body equality is symmetric. Bind an unbound bare variable on
+        // either side when the other side is ready; once both sides are
+        // ready, emit a logical-equality constraint.
+        const binding = chooseEqualityBinding(elem, bindings);
+        if (binding) {
+          const sql = termToSql(
+            binding.expr,
+            bindings,
+            varTypes,
+            columnTypes,
+            functionOverloads,
+            dialect,
+          );
+          const exprType = inferTermType(binding.expr, varTypes, columnTypes);
+          const list = bindings.get(binding.variable) ?? [];
+          list.push({ kind: "expr", sql, type: exprType });
+          bindings.set(binding.variable, list);
+          if (!varTypes.has(binding.variable)) {
+            if (exprType) varTypes.set(binding.variable, exprType);
+          }
+          processed = true;
+        } else if (allVarsBound(elem.left, bindings) && allVarsBound(elem.expr, bindings)) {
+          equalityConstraints.push(elem);
+          processed = true;
+        }
+      } else if (elem.$type === "Literal" && BUILTIN_BODY_ATOMS.has(elem.predicate)) {
+        const spec = BUILTIN_BODY_ATOMS.get(elem.predicate)!;
+        const sourceTerm = elem.args[spec.sourceArg]!;
+        if (allVarsBound(sourceTerm, bindings)) {
+          const alias = aliases[pending[p]!]!;
+          const sourceSql = termToSql(
+            sourceTerm,
+            bindings,
+            varTypes,
+            columnTypes,
+            functionOverloads,
+            dialect,
+          );
+          const sourceType = inferTermType(sourceTerm, varTypes, columnTypes);
+          const sourceValueSql = liftToJsonIfNeeded(
+            sourceSql,
+            sourceType,
+            spec.sourceType,
+            dialect,
+          );
+          const iter = dialect.jsonIterate(spec.kind, sourceValueSql, alias);
+          // Bind the bound-arg Variables to the SQL expressions that
+          // `dialect.jsonIterate` returns for the key and value
+          // columns. The first bound position takes `keySql`, the
+          // second `valueSql`. Each is registered as an `expr`
+          // binding so the shared-variable join logic can compose
+          // them with other appearances of the same variable.
+          const slotSql = [iter.keySql, iter.valueSql];
+          for (let k = 0; k < spec.boundArgs.length; k++) {
+            const { index, type } = spec.boundArgs[k]!;
+            const arg = elem.args[index]!;
+            if (arg.$type === "Variable") {
+              const list = bindings.get(arg.name) ?? [];
+              list.push({ kind: "expr", sql: slotSql[k]!, type });
+              bindings.set(arg.name, list);
+              if (!varTypes.has(arg.name)) varTypes.set(arg.name, type);
+            }
+          }
+          builtinIters.push({
+            atom: elem,
+            fromSql: iter.fromSql,
+            keySql: iter.keySql,
+            valueSql: iter.valueSql,
+          });
+          processed = true;
+        }
+      } else if (elem.$type === "RangeAtom") {
+        const lowReady = allVarsBound(elem.low, bindings);
+        const highReady = allVarsBound(elem.high, bindings);
+        const freshVar =
+          elem.expr.$type === "Variable" && !bindings.has(elem.expr.name) ? elem.expr : undefined;
+        const exprReady = freshVar !== undefined || allVarsBound(elem.expr, bindings);
+        if (lowReady && highReady && exprReady) {
+          const lowSql = termToSql(
+            elem.low,
+            bindings,
+            varTypes,
+            columnTypes,
+            functionOverloads,
+            dialect,
+          );
+          const highSql = termToSql(
+            elem.high,
+            bindings,
+            varTypes,
+            columnTypes,
+            functionOverloads,
+            dialect,
+          );
+          if (
+            freshVar !== undefined &&
+            isIntegerTerm(elem.low, varTypes, columnTypes) &&
+            isIntegerTerm(elem.high, varTypes, columnTypes)
+          ) {
+            const rangeAlias = `__range_${rangeCounter++}`;
+            const list = bindings.get(freshVar.name) ?? [];
+            list.push({ kind: "col", alias: rangeAlias, col: "value", type: "integer" });
+            bindings.set(freshVar.name, list);
+            if (!varTypes.has(freshVar.name)) {
+              varTypes.set(freshVar.name, "integer");
+            }
+            bindingRanges.push({ alias: rangeAlias, lowSql, highSql, node: elem });
+          } else {
+            filterRanges.push({
+              exprSql: termToSql(
+                elem.expr,
+                bindings,
+                varTypes,
+                columnTypes,
+                functionOverloads,
+                dialect,
+              ),
+              lowSql,
+              highSql,
+              node: elem,
+            });
+          }
+          processed = true;
+        }
+      }
+      if (processed) {
+        pending.splice(p, 1);
+        progress = true;
+      } else {
+        p++;
+      }
+    }
+  }
+
+  // Helper: resolve a binding to SQL
+  function bindingToSql(b: Binding): string {
+    return b.kind === "col" ? `${b.alias}.${ident(b.col)}` : b.sql;
+  }
+
+  // SELECT clause (with GROUP BY support for aggregate rules)
+  const isAggregateRule = rule.head.args.some((a) => a.$type === "AggregateCall");
+  const selectParts: string[] = [];
+  const groupByExprs: string[] = [];
+
+  for (let i = 0; i < rule.head.args.length; i++) {
+    const term = rule.head.args[i]!;
+    const targetCol = `col${i + 1}`;
+    // If a sibling rule's head term contributed a `json` type at this
+    // column position (via `unifyColumnType`'s primitive→json
+    // promotion), this rule's primitive head term must be lifted so
+    // every UNION branch produces matching SQL types.
+    const headColType = columnTypes.get(rule.head.predicate)?.[i];
+    if (term.$type === "AggregateCall") {
+      const aggSql = translateAggregate(
+        term,
+        bindings,
+        varTypes,
+        columnTypes,
+        functionOverloads,
+        dialect,
+      );
+      selectParts.push(`${aggSql} AS ${targetCol}`);
+    } else if (term.$type === "Variable") {
+      const refs = bindings.get(term.name);
+      if (!refs || refs.length === 0) {
+        const cst = term.$cstNode;
+        throw new AnalyzerError(
+          `Unbound variable '${term.name}' in head of rule for '${rule.head.predicate}'`,
+          cst?.offset,
+          cst?.end,
+        );
+      }
+      const first = refs[0]!;
+      const rawExpr = bindingToSql(first);
+      const varType = varTypes.get(term.name);
+      const expr = liftToJsonIfNeeded(rawExpr, varType, headColType, dialect);
+      selectParts.push(`${expr} AS ${targetCol}`);
+      // Skip literal-valued bindings (e.g. `Y = 5` then `r(Y, count(X))`)
+      // for the same reason we skip literal head terms below: a bare integer
+      // in GROUP BY is interpreted positionally by Postgres.
+      if (isAggregateRule && !isLiteralBinding(first)) {
+        groupByExprs.push(expr);
+      }
+    } else {
+      const rawExpr = termToSql(term, bindings, varTypes, columnTypes, functionOverloads, dialect);
+      const termType = inferTermType(term, varTypes, columnTypes);
+      const expr = liftToJsonIfNeeded(rawExpr, termType, headColType, dialect);
+      selectParts.push(`${expr} AS ${targetCol}`);
+      // Skip literal constants in GROUP BY: an integer literal like `GROUP BY 2`
+      // is interpreted positionally by Postgres and would either alias
+      // an aggregate column (error) or point out of range. Constants don't
+      // vary per group and are permitted in the SELECT list without appearing
+      // in GROUP BY.
+      if (
+        isAggregateRule &&
+        term.$type !== "NumberLiteral" &&
+        term.$type !== "StringLiteral" &&
+        term.$type !== "BooleanLiteral"
+      ) {
+        groupByExprs.push(expr);
+      }
+    }
+  }
+
+  // FROM clause: positive atoms + binding ranges
+  const fromParts = positiveAtoms.map(({ atom, index }) =>
+    markSpan(
+      atom,
+      `${ident(renameMap?.get(atom.predicate) ?? atom.predicate)} AS ${aliases[index]}`,
+    ),
+  );
+  for (let r = 0; r < bindingRanges.length; r++) {
+    const { alias, lowSql, highSql, node } = bindingRanges[r]!;
+    fromParts.push(markSpan(node, dialect.rangeSource(alias, lowSql, highSql)));
+  }
+  for (const { atom, fromSql } of builtinIters) {
+    fromParts.push(markSpan(atom, fromSql));
+  }
+
+  // WHERE conditions
+  const conditions: string[] = [];
+
+  // Join conditions from shared variables
+  for (const [, refs] of bindings) {
+    if (refs.length < 2) continue;
+    const first = refs[0]!;
+    for (let i = 1; i < refs.length; i++) {
+      const other = refs[i]!;
+      conditions.push(
+        sqlEqWithJsonLift(
+          bindingToSql(first),
+          first.type,
+          bindingToSql(other),
+          other.type,
+          dialect,
+        ),
+      );
+    }
+  }
+
+  // Range bound conditions (dialect-specific: empty for Postgres, present for SQLite)
+  for (const { alias, lowSql, highSql, node } of bindingRanges) {
+    for (const cond of dialect.rangeConditions(alias, lowSql, highSql)) {
+      conditions.push(markSpan(node, cond));
+    }
+  }
+
+  // Tag filter conditions for combined mutual-recursion CTE
+  if (tagMap) {
+    for (const { atom, index } of positiveAtoms) {
+      const tag = tagMap.get(atom.predicate);
+      if (tag) {
+        conditions.push(`${aliases[index]}."__tag" = '${tag.replace(/'/g, "''")}'`);
+      }
+    }
+  }
+
+  // Non-variable argument conditions for positive atoms
+  for (const { atom, index } of positiveAtoms) {
+    const alias = aliases[index]!;
+    for (let j = 0; j < atom.args.length; j++) {
+      const term = atom.args[j]!;
+      if (term.$type !== "Variable") {
+        const col = resolveColumnRef(atom.predicate, j, analyzed);
+        const expectedType = columnTypes.get(atom.predicate)?.[j];
+        const termType = inferTermType(term, varTypes, columnTypes);
+        const termSql = termToSql(
+          term,
+          bindings,
+          varTypes,
+          columnTypes,
+          functionOverloads,
+          dialect,
+        );
+        const lifted = liftToJsonIfNeeded(termSql, termType, expectedType, dialect);
+        conditions.push(markSpan(atom, `${alias}.${ident(col)} = ${lifted}`));
+      }
+    }
+  }
+
+  // Non-Variable bound-position arguments on built-in body atoms become
+  // equality constraints against the iteration's emitted key/value SQL.
+  // Variable bound positions were already wired into `bindings` during
+  // Pass 2, so they're handled by the shared-variable join logic above.
+  for (const { atom, keySql, valueSql } of builtinIters) {
+    const spec = BUILTIN_BODY_ATOMS.get(atom.predicate)!;
+    const slotSql = [keySql, valueSql];
+    for (let k = 0; k < spec.boundArgs.length; k++) {
+      const { index, type: expectedType } = spec.boundArgs[k]!;
+      const arg = atom.args[index]!;
+      if (arg.$type === "Variable") continue;
+      const termType = inferTermType(arg, varTypes, columnTypes);
+      const termSql = termToSql(arg, bindings, varTypes, columnTypes, functionOverloads, dialect);
+      const lifted = liftToJsonIfNeeded(termSql, termType, expectedType, dialect);
+      conditions.push(markSpan(atom, `${slotSql[k]} = ${lifted}`));
+    }
+  }
+
+  // NOT EXISTS subqueries for negated atoms
+  for (const { atom } of negatedAtoms) {
+    const subConditions: string[] = [];
+    for (let j = 0; j < atom.args.length; j++) {
+      const term = atom.args[j]!;
+      const col = resolveColumnRef(atom.predicate, j, analyzed);
+      const expectedType = columnTypes.get(atom.predicate)?.[j];
+      if (term.$type === "Variable") {
+        const refs = bindings.get(term.name);
+        if (refs && refs.length > 0) {
+          const varType = varTypes.get(term.name);
+          const lifted = liftToJsonIfNeeded(bindingToSql(refs[0]!), varType, expectedType, dialect);
+          subConditions.push(`${ident(col)} = ${lifted}`);
+        }
+      } else {
+        const termType = inferTermType(term, varTypes, columnTypes);
+        const termSql = termToSql(
+          term,
+          bindings,
+          varTypes,
+          columnTypes,
+          functionOverloads,
+          dialect,
+        );
+        const lifted = liftToJsonIfNeeded(termSql, termType, expectedType, dialect);
+        subConditions.push(`${ident(col)} = ${lifted}`);
+      }
+    }
+    const tag = tagMap?.get(atom.predicate);
+    if (tag) {
+      subConditions.push(`"__tag" = '${tag.replace(/'/g, "''")}'`);
+    }
+    let subquery = `SELECT 1 FROM ${ident(renameMap?.get(atom.predicate) ?? atom.predicate)}`;
+    if (subConditions.length > 0) {
+      subquery += ` WHERE ${subConditions.join(" AND ")}`;
+    }
+    conditions.push(markSpan(atom, `NOT EXISTS (${subquery})`));
+  }
+
+  // Filter conditions: any boolean expression body element. The
+  // expression's translation already handles comparisons, &&/||, and
+  // mixed boolean-returning forms — we just emit it as a WHERE clause
+  // condition. termToSql wraps the result in parens for arithmetic
+  // ops, so explicit parens here are belt-and-braces for the few
+  // shapes that aren't already wrapped (a single boolean variable, a
+  // function call, etc.).
+  for (const f of filters) {
+    conditions.push(
+      markSpan(
+        f,
+        `(${termToSql(f.expr, bindings, varTypes, columnTypes, functionOverloads, dialect)})`,
+      ),
+    );
+  }
+
+  // Non-binding equality constraints (`X + 1 = Y`) use logical equality —
+  // null-aware on every dialect (`IS NOT DISTINCT FROM` / `IS`) so a body
+  // `X = Y` matches when both sides are NULL, agreeing with the native
+  // evaluator's `logicalEq`. When one side is `json` and the other a
+  // primitive, lift the primitive so the dialect's null-aware operator
+  // sees two compatible operands.
+  for (const eq of equalityConstraints) {
+    let lhs = termToSql(eq.left, bindings, varTypes, columnTypes, functionOverloads, dialect);
+    let rhs = termToSql(eq.expr, bindings, varTypes, columnTypes, functionOverloads, dialect);
+    const leftType = inferTermType(eq.left, varTypes, columnTypes);
+    const rightType = inferTermType(eq.expr, varTypes, columnTypes);
+    if (leftType === "value" && rightType !== undefined && rightType !== "value") {
+      rhs = primitiveToJsonSql(rhs, rightType, dialect);
+    } else if (rightType === "value" && leftType !== undefined && leftType !== "value") {
+      lhs = primitiveToJsonSql(lhs, leftType, dialect);
+    }
+    conditions.push(markSpan(eq, dialect.logicalEq(lhs, rhs)));
+  }
+
+  // Filter range conditions (non-binding ranges)
+  for (const { exprSql, lowSql, highSql, node } of filterRanges) {
+    conditions.push(markSpan(node, `${exprSql} BETWEEN ${lowSql} AND ${highSql}`));
+  }
+
+  // A nullary predicate has no columns, but SQL has no zero-column relation.
+  // Represent it as a single constant marker column: a row present means the
+  // proposition holds. `colList` / `emptyAnchor` use the same `col1` shape, and
+  // queries read it via the ground-query probe or NOT EXISTS, never project it.
+  const selectList = selectParts.length > 0 ? selectParts.join(", ") : "1 AS col1";
+  const selectClause = markSpan(rule.head, `SELECT ${selectList}`);
+  let sql = selectClause;
+  if (fromParts.length > 0) {
+    sql += ` FROM ${fromParts.join(", ")}`;
+  }
+  if (conditions.length > 0) {
+    sql += ` WHERE ${conditions.join(" AND ")}`;
+  }
+  if (groupByExprs.length > 0) {
+    sql += ` GROUP BY ${groupByExprs.join(", ")}`;
+  }
+  // Wrap the whole rule so hovering anywhere in the rule source still has a
+  // matching SQL span at the coarsest level.
+  return markSpan(rule, sql);
+}
+
+function translateFact(rule: Rule, analyzed: TypedProgram, dialect: SqlDialect): string {
+  const emptyBindings = new Map<string, Binding[]>();
+  const emptyVarTypes = new Map<string, PrimitiveType>();
+  const selectParts = rule.head.args.map((term, i) => {
+    if (term.$type === "AggregateCall") {
+      // The analyzer rejects aggregates in facts (empty rule bodies), so this
+      // should never fire; surface it clearly if it ever does.
+      throw new AnalyzerError(
+        `Fact for '${rule.head.predicate}' cannot contain an aggregate`,
+        term.$cstNode?.offset,
+        term.$cstNode?.end,
+      );
+    }
+    const rawSql = termToSql(
+      term,
+      emptyBindings,
+      emptyVarTypes,
+      analyzed.columnTypes,
+      analyzed.functionOverloads,
+      dialect,
+    );
+    const headColType = analyzed.columnTypes.get(rule.head.predicate)?.[i];
+    const termType = inferTermType(term, emptyVarTypes, analyzed.columnTypes);
+    const lifted = liftToJsonIfNeeded(rawSql, termType, headColType, dialect);
+    return `${lifted} AS col${i + 1}`;
+  });
+  // A nullary fact (empty head) becomes the constant marker column; see translateRule.
+  const selectList = selectParts.length > 0 ? selectParts.join(", ") : "1 AS col1";
+  const selectClause = markSpan(rule.head, `SELECT ${selectList}`);
+  return markSpan(rule, selectClause);
+}
+
+// --- Queries ---
+
+// Synthetic predicate name for the throwaway "rule" that translateRule
+// builds for each query. Never inserted into `analyzed.rules`, never
+// referenced by user predicates (the leading `__` already disqualifies
+// it from being parsed as an IDENT). Used only as a placeholder for
+// the rule shape translateRule expects.
+const QUERY_PRED = "__query__";
+
+/**
+ * Translate every query in the program. Each query is processed by
+ * synthesising a `Rule` whose head args are the projected variables
+ * (or a single literal `1` for ground queries) and whose body is the
+ * query body, then wrapping the rule's SELECT with an outer SELECT
+ * that exposes user-facing column names (or a single `__probe` column
+ * for ground queries — the executor projects it away).
+ */
+function translateQueries(
+  analyzed: TypedProgram,
+  dialect: SqlDialect,
+): { sql: string[]; predicates: string[]; columnTypes: Record<string, PrimitiveType>[] } {
+  const sql: string[] = [];
+  const predicates: string[] = [];
+  const columnTypes: Record<string, PrimitiveType>[] = [];
+  for (const query of analyzed.queries) {
+    const result = translateOneQuery(query, analyzed, dialect);
+    sql.push(result.sql);
+    predicates.push(result.predicate);
+    columnTypes.push(result.columnTypes);
+  }
+  return { sql, predicates, columnTypes };
+}
+
+function translateOneQuery(
+  query: Query,
+  analyzed: TypedProgram,
+  dialect: SqlDialect,
+): { sql: string; predicate: string; columnTypes: Record<string, PrimitiveType> } {
+  const projection = queryProjection(query);
+  const isGround = projection.length === 0;
+
+  // Build a synthetic Rule whose head args drive translateRule's
+  // SELECT clause. For ground queries the head is a single literal
+  // `1` (any column is fine — we just need *some* column so the rule
+  // SELECT is valid SQL). For non-ground queries the head args are
+  // the projection Variables themselves; translateRule emits them as
+  // `<binding> AS col1, <binding> AS col2, …` which the outer SELECT
+  // then re-aliases to the user-facing variable names.
+  const headArgs: HeadTerm[] = isGround
+    ? [{ $type: "NumberLiteral", value: 1, rawText: "1" } as NumberLiteral]
+    : projection.slice();
+  // The synthetic Rule isn't part of the real AST tree, so its
+  // `$container` pointers don't match Langium's expected types
+  // (HeadAtom.$container is normally a Rule). translateRule doesn't
+  // walk these pointers; only $cstNode (used for span tracking) and
+  // the head/body shape matter. Cast through `unknown` to bypass the
+  // structural check on container types.
+  const syntheticHead = {
+    $type: "HeadAtom",
+    predicate: QUERY_PRED,
+    args: headArgs,
+  } as unknown as HeadAtom;
+  const syntheticRule = {
+    $type: "Rule",
+    head: syntheticHead,
+    body: query.body,
+    $cstNode: query.$cstNode,
+  } as unknown as Rule;
+
+  const innerSql = translateRule(syntheticRule, analyzed, undefined, undefined, dialect);
+
+  // Compute the projected variable types for downstream coercion.
+  // `rebuildVarTypes` does the same fixed-point over the body the
+  // rule-side type inference does, so the result matches what
+  // sibling rules with the same body would produce.
+  const queryColTypes: Record<string, PrimitiveType> = {};
+  if (!isGround) {
+    const varTypes = rebuildVarTypes(query.body, analyzed.columnTypes);
+    for (const v of projection) {
+      if (v.$type === "Variable") {
+        const t = varTypes.get(v.name);
+        if (t) queryColTypes[v.name] = t;
+      }
+    }
+  }
+
+  // Wrap the synthetic rule's SELECT with an outer SELECT that
+  // exposes user-facing column names (or strips to a probe column
+  // for ground queries). `__q` is the obligatory derived-table
+  // alias both dialects require.
+  let outerSql: string;
+  if (isGround) {
+    outerSql = `SELECT DISTINCT 1 AS __probe FROM (${innerSql}) AS __q;`;
+  } else {
+    const aliases = projection
+      .map((v, i) => `${ident(`col${i + 1}`)} AS ${ident((v as Variable).name)}`)
+      .join(", ");
+    outerSql = `SELECT DISTINCT ${aliases} FROM (${innerSql}) AS __q;`;
+  }
+
+  return {
+    sql: markSpan(query, outerSql),
+    predicate: QUERY_PRED,
+    columnTypes: queryColTypes,
+  };
+}
+
+// --- Helpers ---
+
+function resolveColumnRef(predicate: string, argIndex: number, analyzed: TypedProgram): string {
+  const extDecl = analyzed.extDecls.get(predicate);
+  if (extDecl) {
+    return extDecl.columns[argIndex]!.name;
+  }
+  return `col${argIndex + 1}`;
+}
+
+/**
+ * Convert a Term AST node to a SQL expression string.
+ * @param varTypes    - Variable type map for type-aware operator selection (+ vs ||)
+ * @param columnTypes - Predicate column types (for inferTermType)
+ * @param dialect     - Dialect for dialect-specific constructs (group-concat, range sources, etc.)
+ */
+function termToSql(
+  term: Expression,
+  bindings: Map<string, Binding[]>,
+  varTypes: Map<string, PrimitiveType>,
+  columnTypes: ReadonlyMap<string, readonly PrimitiveType[]>,
+  functionOverloads: ReadonlyMap<FunctionCall, Overload>,
+  dialect: SqlDialect,
+  guardFloat = true,
+): string {
+  switch (term.$type) {
+    case "StringLiteral":
+      return `'${term.value.replace(/'/g, "''")}'`;
+    case "NumberLiteral":
+      // Preserve the original text so a float literal like `1.0` stays `1.0`
+      // in SQL (emitting `1` would silently turn floating-point division into
+      // integer division).
+      return term.rawText ?? String(term.value);
+    case "BooleanLiteral":
+      // `TRUE`/`FALSE` is the portable spelling: Postgres has
+      // a native BOOLEAN type, and SQLite ≥ 3.23 (which is what bun:sqlite
+      // and sql.js ship) accepts the keywords too, evaluating them as 1/0.
+      return term.value ? "TRUE" : "FALSE";
+    case "NullLiteral":
+      return "NULL";
+    case "Variable": {
+      const refs = bindings.get(term.name);
+      if (!refs || refs.length === 0) {
+        const cst = term.$cstNode;
+        throw new AnalyzerError(`Unbound variable '${term.name}'`, cst?.offset, cst?.end);
+      }
+      const b = refs[0]!;
+      return b.kind === "col" ? `${b.alias}.${ident(b.col)}` : b.sql;
+    }
+    case "BinaryExpr": {
+      const isStringConcat =
+        term.op === "+" &&
+        (isStringType(term.left, varTypes, columnTypes) ||
+          isStringType(term.right, varTypes, columnTypes));
+      const isNumericArithmetic =
+        !COMPARISON_OPS.has(term.op) && term.op !== "&&" && term.op !== "||" && !isStringConcat;
+      let leftSql = termToSql(
+        term.left,
+        bindings,
+        varTypes,
+        columnTypes,
+        functionOverloads,
+        dialect,
+        !isNumericArithmetic,
+      );
+      let rightSql = termToSql(
+        term.right,
+        bindings,
+        varTypes,
+        columnTypes,
+        functionOverloads,
+        dialect,
+        !isNumericArithmetic,
+      );
+      // Logical and/or: map the source's `&&`/`||` to SQL's `AND`/`OR`.
+      // Three-valued logic (NULL handling) is identical across all four
+      // SQL dialects and the native evaluator, so no extra wrapping is
+      // needed.
+      if (term.op === "&&") return `(${leftSql} AND ${rightSql})`;
+      if (term.op === "||") return `(${leftSql} OR ${rightSql})`;
+      // For equality variants, lift the primitive side when the other
+      // is json so SQL can compare across the type-tag boundary.
+      // Ordering ops (`<`, `<=`, `>`, `>=`) are rejected for json by
+      // the analyzer, so they don't need this. Arithmetic ops fall
+      // through unchanged — the analyzer already gates them to
+      // numeric operands.
+      if (term.op === "==" || term.op === "!=" || term.op === "=" || term.op === "<>") {
+        const leftType = inferTermType(term.left, varTypes, columnTypes);
+        const rightType = inferTermType(term.right, varTypes, columnTypes);
+        if (leftType === "value" && rightType !== undefined && rightType !== "value") {
+          rightSql = primitiveToJsonSql(rightSql, rightType, dialect);
+        } else if (rightType === "value" && leftType !== undefined && leftType !== "value") {
+          leftSql = primitiveToJsonSql(leftSql, leftType, dialect);
+        }
+      }
+      // Comparisons. `==`/`!=` are 3VL — map straight to SQL's `=`/`<>`,
+      // which already do 3VL. `=`/`<>` are logical (null-aware), so they
+      // route through the dialect-specific null-aware emitter (Postgres
+      // uses `IS NOT DISTINCT FROM`, SQLite / sql.js use `IS`).
+      // Orderings carry over verbatim and stay 3VL.
+      if (term.op === "==") return `(${leftSql} = ${rightSql})`;
+      if (term.op === "!=") return `(${leftSql} <> ${rightSql})`;
+      if (term.op === "=") return dialect.logicalEq(leftSql, rightSql);
+      if (term.op === "<>") return dialect.logicalNeq(leftSql, rightSql);
+      if (term.op === "<" || term.op === "<=" || term.op === ">" || term.op === ">=") {
+        const leftType = inferTermType(term.left, varTypes, columnTypes);
+        const rightType = inferTermType(term.right, varTypes, columnTypes);
+        if (leftType === "string" || rightType === "string") {
+          leftSql = dialect.stringOrder(leftSql);
+          rightSql = dialect.stringOrder(rightSql);
+        }
+        return `(${leftSql} ${term.op} ${rightSql})`;
+      }
+      // Bitwise / shift ops: each dialect owns the emission (XOR / `>>>`
+      // emulation, 32-bit wrapping). The analyzer has already gated the
+      // operands to integers; NULL propagates natively.
+      if (BITWISE_OPS.has(term.op)) {
+        return dialect.bitwise(term.op as BitwiseOp, leftSql, rightSql);
+      }
+      // Exponentiation: float-valued, with the same domain guards the
+      // `power` builtin had. The CASE returns NULL on overflow, so no
+      // extra finite-result guard is needed.
+      if (term.op === "**") {
+        return powerSql(leftSql, rightSql);
+      }
+      let op: string = term.op;
+      if (isStringConcat) {
+        op = "||";
+      }
+      const resultType = inferTermType(term, varTypes, columnTypes);
+      const guardFloatResult = (sql: string): string =>
+        guardFloat && resultType === "float" ? finiteFloatOrNullSql(sql) : sql;
+      // Division and modulo by zero: wrap the divisor with NULLIF so every
+      // backend returns NULL. Postgres would otherwise raise `division by
+      // zero`; SQLite already returns NULL. NULL ÷ anything and anything ÷
+      // NULL both yield NULL. Float-valued arithmetic also gets a
+      // finite-result guard so overflow becomes NULL instead of leaking
+      // Infinity / NaN.
+      if (op === "/" || op === "%") {
+        const safeRhs = `NULLIF(${rightSql}, 0)`;
+        if (
+          op === "%" &&
+          (!isIntegerTerm(term.left, varTypes, columnTypes) ||
+            !isIntegerTerm(term.right, varTypes, columnTypes))
+        ) {
+          return guardFloatResult(floatModuloSql(leftSql, safeRhs));
+        }
+        if (
+          op === "/" &&
+          dialect.divideIntegers &&
+          isIntegerTerm(term.left, varTypes, columnTypes) &&
+          isIntegerTerm(term.right, varTypes, columnTypes)
+        ) {
+          return dialect.divideIntegers(leftSql, safeRhs);
+        }
+        return guardFloatResult(`(${leftSql} ${op} ${safeRhs})`);
+      }
+      return guardFloatResult(`(${leftSql} ${op} ${rightSql})`);
+    }
+    case "UnaryExpr": {
+      const operandSql = termToSql(
+        term.operand,
+        bindings,
+        varTypes,
+        columnTypes,
+        functionOverloads,
+        dialect,
+        term.op === "!",
+      );
+      if (term.op === "!") return `(NOT ${operandSql})`;
+      const sql = `(-${operandSql})`;
+      return guardFloat && inferTermType(term, varTypes, columnTypes) === "float"
+        ? finiteFloatOrNullSql(sql)
+        : sql;
+    }
+    case "FunctionCall":
+      return translateCall(term, bindings, varTypes, columnTypes, functionOverloads, dialect);
+    case "Subscript": {
+      const obj = termToSql(
+        term.object,
+        bindings,
+        varTypes,
+        columnTypes,
+        functionOverloads,
+        dialect,
+      );
+      const idx = termToSql(
+        term.index,
+        bindings,
+        varTypes,
+        columnTypes,
+        functionOverloads,
+        dialect,
+      );
+      const objType = inferTermType(term.object, varTypes, columnTypes);
+      if (objType === "value") {
+        const idxType = inferTermType(term.index, varTypes, columnTypes);
+        const inner = dialect.jsonSubscript(obj, idx, idxType === "string");
+        // Object-keyed (string) subscript has no notion of "negative" —
+        // pass through. For array-keyed (integer) subscript, the
+        // SQLite dialect builds the JSON path by concatenating the
+        // index (`'$[' || CAST(idx AS TEXT) || ']'`), so a runtime
+        // `-1` produces the literal path `$[-1]`, which SQLite rejects
+        // with `bad JSON path`. Postgres's `jsonb -> -1` doesn't throw
+        // but returns the last array element, also diverging from the
+        // native evaluator (which returns NULL at `values.ts:161` for
+        // any negative array index). Wrap the integer-keyed case in
+        // the same `< 0 → NULL` shape the string-subscript path uses
+        // a few lines below so every backend agrees on NULL.
+        if (idxType === "string") return inner;
+        return `(CASE WHEN (${idx}) < 0 THEN NULL ELSE ${inner} END)`;
+      }
+      // Guard against negative indices: SQLite's SUBSTR counts from the
+      // right when the start position is negative (so `S[-2]` on
+      // "hello" returns "o"), while the native backend returns '' for any
+      // negative index. Force every backend to '' so cross-backend results
+      // agree. Out-of-range positive indices already produce '' on every
+      // SQL dialect, so no additional guard is needed there.
+      // The leading IS NULL branch keeps NULL propagating through to NULL
+      // (per §5.4) — without it, `NULL >= 0` is NULL and SQL's CASE falls
+      // through to ELSE '', diverging from the native evaluator.
+      return `CASE WHEN (${obj}) IS NULL OR (${idx}) IS NULL THEN NULL WHEN (${idx}) >= 0 THEN SUBSTR(${obj}, (${idx}) + 1, 1) ELSE '' END`;
+    }
+    case "Slice": {
+      const obj = termToSql(
+        term.object,
+        bindings,
+        varTypes,
+        columnTypes,
+        functionOverloads,
+        dialect,
+      );
+      const objType = inferTermType(term.object, varTypes, columnTypes);
+      if (objType === "value") {
+        const s = term.start
+          ? termToSql(term.start, bindings, varTypes, columnTypes, functionOverloads, dialect)
+          : null;
+        const e = term.end
+          ? termToSql(term.end, bindings, varTypes, columnTypes, functionOverloads, dialect)
+          : null;
+        // Both dialect implementations build the result by feeding the
+        // receiver into `jsonb_array_elements(...)` / `json_each(...)`
+        // and reaggregating with `COALESCE(..., '[]')`; a NULL receiver
+        // therefore unfolds into the empty array, disagreeing with the
+        // native evaluator (which returns NULL on a NULL receiver per
+        // §5.4 NULL propagation). Wrap the dispatch with an explicit
+        // IS NULL guard so every backend agrees: NULL receiver → NULL.
+        // Bound-NULLs are similarly defended — the dialects' WHERE
+        // clauses use `>=`/`<` which would silently coerce a NULL bound
+        // into "row excluded" and produce `[]`.
+        const guards: string[] = [`(${obj}) IS NULL`];
+        if (s !== null) guards.push(`(${s}) IS NULL`);
+        if (e !== null) guards.push(`(${e}) IS NULL`);
+        // Native (values.ts:193) short-circuits to `[]` for any
+        // negative bound. The dialects' WHERE filters compare against
+        // 0-based array keys, so a runtime `start = -1` matches every
+        // key and returns the whole array — a cross-backend
+        // divergence. Force `[]` on negative bounds via an empty
+        // `jsonSlice(obj, 0, 0)` call so the dialect's empty-array
+        // shape is reused (Postgres `'[]'::jsonb`, SQLite `'[]'`).
+        const negChecks: string[] = [];
+        if (s !== null) negChecks.push(`(${s}) < 0`);
+        if (e !== null) negChecks.push(`(${e}) < 0`);
+        const inner = dialect.jsonSlice(obj, s, e);
+        if (negChecks.length === 0) {
+          return `CASE WHEN ${guards.join(" OR ")} THEN NULL ELSE ${inner} END`;
+        }
+        const empty = dialect.jsonSlice(obj, "0", "0");
+        return `CASE WHEN ${guards.join(" OR ")} THEN NULL WHEN ${negChecks.join(" OR ")} THEN ${empty} ELSE ${inner} END`;
+      }
+      // Python-style slices return '' when start >= end, when either bound
+      // is negative, or when out-of-range bounds would make SUBSTR walk
+      // backwards / error. SQLite reinterprets `SUBSTR(s, N, K)` for N <= 0
+      // (taking K-(1-N) chars from position 1 rather than returning '');
+      // Postgres raises on negative length; the native backend returns ''.
+      // Guard each form explicitly so the cross-backend invariant holds.
+      // Each CASE also has a leading IS NULL branch so NULL operands
+      // propagate to NULL rather than falling through to ELSE ''.
+      if (term.start && term.end) {
+        const s = termToSql(
+          term.start,
+          bindings,
+          varTypes,
+          columnTypes,
+          functionOverloads,
+          dialect,
+        );
+        const e = termToSql(term.end, bindings, varTypes, columnTypes, functionOverloads, dialect);
+        return `CASE WHEN (${obj}) IS NULL OR (${s}) IS NULL OR (${e}) IS NULL THEN NULL WHEN (${s}) >= 0 AND (${e}) > (${s}) THEN SUBSTR(${obj}, (${s}) + 1, (${e}) - (${s})) ELSE '' END`;
+      }
+      if (term.start) {
+        const s = termToSql(
+          term.start,
+          bindings,
+          varTypes,
+          columnTypes,
+          functionOverloads,
+          dialect,
+        );
+        return `CASE WHEN (${obj}) IS NULL OR (${s}) IS NULL THEN NULL WHEN (${s}) >= 0 THEN SUBSTR(${obj}, (${s}) + 1) ELSE '' END`;
+      }
+      if (term.end) {
+        const e = termToSql(term.end, bindings, varTypes, columnTypes, functionOverloads, dialect);
+        return `CASE WHEN (${obj}) IS NULL OR (${e}) IS NULL THEN NULL WHEN (${e}) > 0 THEN SUBSTR(${obj}, 1, (${e})) ELSE '' END`;
+      }
+      return obj;
+    }
+    case "ArrayLiteral": {
+      const elements = term.elements.map((elem) => ({
+        sql: termToSql(elem, bindings, varTypes, columnTypes, functionOverloads, dialect),
+        type: inferTermType(elem, varTypes, columnTypes),
+      }));
+      return dialect.jsonArray(elements);
+    }
+    case "ObjectLiteral": {
+      const entries = term.entries.map((entry) => ({
+        key: entry.key,
+        valueSql: termToSql(
+          entry.value,
+          bindings,
+          varTypes,
+          columnTypes,
+          functionOverloads,
+          dialect,
+        ),
+        valueType: inferTermType(entry.value, varTypes, columnTypes),
+      }));
+      return dialect.jsonObject(entries);
+    }
+    case "BracketAccess":
+      // Post-processing rewrites every BracketAccess into Subscript or Slice,
+      // so this case is unreachable at runtime.
+      throw new Error(`BracketAccess survived post-processing at ${term.$cstNode?.offset ?? "?"}`);
+    case "Wildcard":
+      // `count(*)` short-circuits in translateAggregate, so a Wildcard never
+      // reaches expression codegen.
+      throw new Error("'*' may only appear as the argument of count(*)");
+  }
+  assertNever(term, "term type");
+}
+
+/** True if `rule`'s body contains a non-negated atom referring to `predicate`. */
+function isSelfRecursive(rule: Rule, predicate: string): boolean {
+  return rule.body.some(
+    (elem) => elem.$type === "Literal" && !elem.negated && elem.predicate === predicate,
+  );
+}
+
+/** True if a binding resolves to a pure SQL literal (number or quoted string). */
+function isLiteralBinding(b: Binding): boolean {
+  if (b.kind === "col") return false;
+  // Accept the parenthesised `(-N)` / `(-N.M)` form that termToSql emits
+  // for UnaryExpr(NumberLiteral) so a variable bound to a negative literal
+  // is still recognised as a constant and omitted from GROUP BY.
+  return /^\s*(-?\d+(?:\.\d+)?|\(-\d+(?:\.\d+)?\)|'(?:[^']|'')*')\s*$/.test(b.sql);
+}
+
+function chooseEqualityBinding(
+  eq: Equality,
+  bindings: Map<string, Binding[]>,
+): { variable: string; expr: Expression } | undefined {
+  if (
+    eq.left.$type === "Variable" &&
+    !bindings.has(eq.left.name) &&
+    allVarsBound(eq.expr, bindings)
+  ) {
+    return { variable: eq.left.name, expr: eq.expr };
+  }
+  if (
+    eq.expr.$type === "Variable" &&
+    !bindings.has(eq.expr.name) &&
+    allVarsBound(eq.left, bindings)
+  ) {
+    return { variable: eq.expr.name, expr: eq.left };
+  }
+  return undefined;
+}
+
+/** Return true if every Variable reference in `term` has a binding. */
+function allVarsBound(term: Expression, bindings: Map<string, Binding[]>): boolean {
+  switch (term.$type) {
+    case "Variable":
+      return bindings.has(term.name);
+    case "StringLiteral":
+    case "NumberLiteral":
+    case "BooleanLiteral":
+    case "NullLiteral":
+      return true;
+    case "BinaryExpr":
+      return allVarsBound(term.left, bindings) && allVarsBound(term.right, bindings);
+    case "UnaryExpr":
+      return allVarsBound(term.operand, bindings);
+    case "FunctionCall":
+      return term.args.every((a) => allVarsBound(a, bindings));
+    case "Subscript":
+      return allVarsBound(term.object, bindings) && allVarsBound(term.index, bindings);
+    case "Slice":
+      return (
+        allVarsBound(term.object, bindings) &&
+        (!term.start || allVarsBound(term.start, bindings)) &&
+        (!term.end || allVarsBound(term.end, bindings))
+      );
+    case "ArrayLiteral":
+      return term.elements.every((e) => allVarsBound(e, bindings));
+    case "ObjectLiteral":
+      return term.entries.every((entry) => allVarsBound(entry.value, bindings));
+  }
+  return false;
+}
+
+/** Check whether a term has integer type. */
+function isIntegerTerm(
+  term: Expression,
+  varTypes: Map<string, PrimitiveType>,
+  columnTypes: ReadonlyMap<string, readonly PrimitiveType[]>,
+): boolean {
+  return inferTermType(term, varTypes, columnTypes) === "integer";
+}
+
+/** Check whether a term has string type (for choosing || over +). */
+function isStringType(
+  term: Expression,
+  varTypes: Map<string, PrimitiveType>,
+  columnTypes: ReadonlyMap<string, readonly PrimitiveType[]>,
+): boolean {
+  return inferTermType(term, varTypes, columnTypes) === "string";
+}
+
+/**
+ * Portable floating-point remainder. SQLite's `%` operator coerces operands
+ * to integers before computing the remainder, while native uses JS's floating
+ * remainder. Use `x - y * trunc(x/y)` for any modulo expression that has a
+ * float-typed side; the caller has already wrapped `y` in `NULLIF(y, 0)`.
+ */
+function floatModuloSql(leftSql: string, rightSql: string): string {
+  const quotient = `(${leftSql} / ${rightSql})`;
+  const truncated = `(CASE WHEN ${quotient} < 0 THEN CEIL(${quotient}) ELSE FLOOR(${quotient}) END)`;
+  return `(${leftSql} - ${rightSql} * ${truncated})`;
+}
+
+function asciiFoldSql(sql: string, from: string, to: string): string {
+  let out = sql;
+  for (let i = 0; i < from.length; i++) {
+    out = `REPLACE(${out}, '${from[i]}', '${to[i]}')`;
+  }
+  return out;
+}
+
+/**
+ * Wrap `sql` with `dialect.toJson` when the expression is primitive
+ * but the slot it's flowing into demands `json`. The type system
+ * (`joinTypesWithJsonLift` in `core/types.ts`) accepts this mismatch
+ * by promising the lift; this helper is the runtime side of that
+ * promise.
+ *
+ * No-op when `expectedType` is anything other than `json`, when
+ * `exprType` is already `json` (no double-wrap), or when either type
+ * is undefined (the analyzer either resolved them or already
+ * rejected the program).
+ */
+function liftToJsonIfNeeded(
+  sql: string,
+  exprType: PrimitiveType | undefined,
+  expectedType: PrimitiveType | undefined,
+  dialect: SqlDialect,
+): string {
+  if (expectedType !== "value") return sql;
+  if (exprType === undefined || exprType === "value") return sql;
+  return primitiveToJsonSql(sql, exprType, dialect);
+}
+
+function primitiveToJsonSql(sql: string, exprType: PrimitiveType, dialect: SqlDialect): string {
+  const liftedSql = exprType === "float" ? finiteFloatOrNullSql(sql) : sql;
+  return dialect.toJson(liftedSql, exprType);
+}
+
+function sqlEqWithJsonLift(
+  leftSql: string,
+  leftType: PrimitiveType | undefined,
+  rightSql: string,
+  rightType: PrimitiveType | undefined,
+  dialect: SqlDialect,
+): string {
+  let lhs = leftSql;
+  let rhs = rightSql;
+  if (leftType === "value" && rightType !== undefined && rightType !== "value") {
+    rhs = primitiveToJsonSql(rhs, rightType, dialect);
+  } else if (rightType === "value" && leftType !== undefined && leftType !== "value") {
+    lhs = primitiveToJsonSql(lhs, leftType, dialect);
+  }
+  return `${lhs} = ${rhs}`;
+}
+
+/** Translate an aggregate function call to SQL. */
+function translateAggregate(
+  agg: AggregateCall,
+  bindings: Map<string, Binding[]>,
+  varTypes: Map<string, PrimitiveType>,
+  columnTypes: ReadonlyMap<string, readonly PrimitiveType[]>,
+  functionOverloads: ReadonlyMap<FunctionCall, Overload>,
+  dialect: SqlDialect,
+): string {
+  // count(*) → COUNT(*): counts rows, not values.
+  if (agg.func === "count" && agg.arg.$type === "Wildcard") {
+    return "COUNT(*)";
+  }
+
+  const argSql = termToSql(agg.arg, bindings, varTypes, columnTypes, functionOverloads, dialect);
+  const argType = inferTermType(agg.arg, varTypes, columnTypes);
+  const orderArgSql = argType === "string" ? dialect.stringOrder(argSql) : argSql;
+
+  switch (agg.func) {
+    case "count":
+      return `COUNT(${argSql})`;
+    case "sum":
+      return `SUM(${argSql})`;
+    case "avg":
+      return `AVG(${argSql})`;
+    case "min":
+      return `MIN(${orderArgSql})`;
+    case "max":
+      return `MAX(${orderArgSql})`;
+    case "concat": {
+      // Native `concat` calls `String(v)` on each value, which
+      // renders booleans as `"true"` / `"false"` (see
+      // `packages/backend/native/src/planner.ts:411`). SQL backends
+      // would otherwise emit a backend-specific cast — sqlite stores
+      // booleans as integers and renders them as `"0"` / `"1"`,
+      // postgres as `"t"` / `"f"` — diverging from native and from
+      // each other. Wrap boolean args with a CASE that produces the
+      // same `'true'` / `'false'` strings the native side does.
+      //
+      // Value-typed args have their own divergence: Postgres jsonb's
+      // `::TEXT` serialiser inserts a space after `:` and `,`
+      // outside strings (`{"a": 1}, {"b": 2}`), while SQLite
+      // (canonical-TEXT storage) and native (`canonicalizeJson`)
+      // produce no-whitespace canonical text. Route value args
+      // through `jsonStringify` (the same regex-strip used by
+      // `to_json`) before the aggregate, so every backend emits the
+      // same per-element text. §6's "deterministic and identical
+      // across every backend" promise holds for both wrappings.
+      let wrapped: string;
+      if (argType === "boolean") {
+        wrapped = `(CASE WHEN ${argSql} THEN 'true' WHEN NOT (${argSql}) THEN 'false' END)`;
+      } else if (argType === "value") {
+        wrapped = dialect.stringOrder(dialect.jsonStringify(argSql));
+      } else if (argType === "string") {
+        wrapped = orderArgSql;
+      } else {
+        wrapped = argSql;
+      }
+      return dialect.concat(wrapped);
+    }
+    case "list": {
+      // Primitive arguments are auto-lifted to JSON via `dialect.toJson`
+      // (Postgres collapses to `to_jsonb`; SQLite per-type — strings via
+      // `json_quote`, booleans via a `'true'`/`'false'` CASE, numbers
+      // via `CAST(... AS TEXT)` so `1` and `1.0` survive as canonical
+      // JSON numbers). Already-`json` values pass through unchanged so
+      // we don't double-wrap. Undefined argType (e.g. an under-determined
+      // expression) falls through unwrapped.
+      //
+      // The dialect receives both the lifted value and the raw arg —
+      // the lifted form is the array element, and the raw arg drives
+      // the NULL filter (so `json_quote(NULL) = 'null'` doesn't sneak
+      // a JSON `null` into the array) and the ORDER BY (so primitive
+      // columns sort by their natural SQL value rather than by the
+      // lifted text).
+      const argIsJson = argType === "value";
+      const valueSql =
+        argType === undefined || argIsJson ? argSql : primitiveToJsonSql(argSql, argType, dialect);
+      return dialect.jsonAgg(valueSql, orderArgSql, argIsJson);
+    }
+    default:
+      return `${agg.func.toUpperCase()}(${argSql})`;
+  }
+}
+
+/**
+ * Per-overload SQL emitters. Backends extend the language by adding
+ * entries here, keyed by the registry's overload key. Generic-shaped
+ * math built-ins (`ABS`, `ROUND`) emit a straight function call;
+ * domain-error guards (`SQRT`, `LN`, `POWER`) wrap the inputs in a CASE
+ * so every backend returns NULL on out-of-domain values; JSON built-ins
+ * forward to per-dialect hooks since each engine has its own shape
+ * (`json_extract`, `jsonb_typeof`, `STRING_AGG` casts, etc.).
+ */
+type SqlEmit = (sqlArgs: string[], dialect: SqlDialect) => string;
+
+const MAX_FLOAT_SQL = "1.7976931348623157e308";
+const LOG_MAX_FLOAT_SQL = `LN(${MAX_FLOAT_SQL})`;
+
+function finiteFloatOrNullSql(floatSql: string): string {
+  return `(CASE WHEN ABS(${floatSql}) > ${MAX_FLOAT_SQL} OR ${floatSql} <> ${floatSql} THEN NULL ELSE ${floatSql} END)`;
+}
+
+/**
+ * SQL for the `**` (exponentiation) operator. Three out-of-domain cases
+ * return NULL rather than raising (Postgres) or yielding a non-finite
+ * value:
+ *   - base < 0 and exp is non-integer → imaginary result
+ *   - base = 0 and exp < 0 → division by zero inside POWER
+ *   - result overflows IEEE float range → +Infinity
+ * `exp - FLOOR(exp) <> 0` is the portable non-integrality test; the
+ * overflow branch checks `exp * ln(abs base) > ln(MAX_FLOAT)` so Postgres
+ * can decide the branch before evaluating an overflowing POWER call.
+ */
+function powerSql(baseSql: string, expSql: string): string {
+  return `(CASE
+      WHEN (${baseSql}) < 0 AND (${expSql}) - FLOOR(${expSql}) <> 0 THEN NULL
+      WHEN (${baseSql}) = 0 AND (${expSql}) < 0 THEN NULL
+      WHEN ((${expSql}) * LN(NULLIF(ABS(${baseSql}), 0))) > ${LOG_MAX_FLOAT_SQL} THEN NULL
+      ELSE POWER(${baseSql}, ${expSql})
+    END)`;
+}
+
+const SQL_EMIT: ReadonlyMap<string, SqlEmit> = new Map<string, SqlEmit>([
+  // String functions
+  [
+    "upper.string",
+    (a) => asciiFoldSql(a[0]!, "abcdefghijklmnopqrstuvwxyz", "ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
+  ],
+  [
+    "lower.string",
+    (a) => asciiFoldSql(a[0]!, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz"),
+  ],
+  ["trim.string", (a) => `TRIM(${a[0]})`],
+  ["replace.string_string_string", (a) => `REPLACE(${a[0]}, ${a[1]}, ${a[2]})`],
+
+  // Math (straight emission)
+  ["abs.integer", (a) => `ABS(${a[0]})`],
+  ["abs.float", (a) => `ABS(${a[0]})`],
+  ["round.float", (a) => `ROUND(${a[0]})`],
+  ["round.integer_integer", (a, d) => d.roundToScale(a[0]!, a[1]!, "integer")],
+  ["round.float_integer", (a, d) => d.roundToScale(a[0]!, a[1]!, "float")],
+  ["floor.float", (a) => `FLOOR(${a[0]})`],
+  ["ceil.float", (a) => `CEIL(${a[0]})`],
+  // `exp(x)` overflows to +Infinity for x > log(Number.MAX_VALUE).
+  // Postgres raises on EXP overflow instead of returning Infinity, so
+  // guard on the input before calling EXP. Use LN(MAX_FLOAT) in SQL
+  // rather than a rounded decimal threshold; `exp(709.781)` remains
+  // finite, matching native at the IEEE boundary.
+  [
+    "exp.float",
+    (a) => `(CASE WHEN (${a[0]}) > ${LOG_MAX_FLOAT_SQL} THEN NULL ELSE EXP(${a[0]}) END)`,
+  ],
+
+  // Math with domain-error guards: Postgres raises `Out of Range` for
+  // these cases; SQLite returns NULL. Wrap the inputs in CASE so every
+  // backend yields NULL. `fn(NULL)` is NULL across all dialects, so
+  // replacing the out-of-domain input with NULL propagates correctly.
+  ["sqrt.float", (a) => `SQRT(CASE WHEN (${a[0]}) < 0 THEN NULL ELSE ${a[0]} END)`],
+  ["ln.float", (a) => `LN(CASE WHEN (${a[0]}) <= 0 THEN NULL ELSE ${a[0]} END)`],
+
+  // JSON: dialect-dispatched (each engine uses different primitives)
+  ["as_string.value", (a, d) => d.jsonAsString(a[0]!)],
+  ["as_integer.value", (a, d) => d.jsonAsInteger(a[0]!)],
+  ["as_float.value", (a, d) => d.jsonAsFloat(a[0]!)],
+  ["as_boolean.value", (a, d) => d.jsonAsBoolean(a[0]!)],
+  ["length.value", (a, d) => d.jsonLength(a[0]!)],
+  ["length.string", (a) => `LENGTH(${a[0]})`],
+  ["type_of.value", (a, d) => d.jsonTypeOf(a[0]!)],
+  ["has_key.value_string", (a, d) => d.jsonHasKey(a[0]!, a[1]!)],
+  ["keys.value", (a, d) => d.jsonKeys(a[0]!)],
+  ["values.value", (a, d) => d.jsonValues(a[0]!)],
+  ["to_json.value", (a, d) => d.jsonStringify(a[0]!)],
+
+  // Primitive conversions. CAST AS TEXT works portably for numbers; for
+  // booleans we route through CASE because SQLite has no native boolean
+  // type and would render `TRUE`/`FALSE` as `'1'`/`'0'`. The CASE form
+  // keeps NULL → NULL by leaving both branches unmet for NULL inputs.
+  // Note: integer-valued reals format slightly differently across
+  // backends — Postgres `CAST(1.0::float8 AS TEXT)` returns `'1'` and
+  // matches the native `String(1.0)`, while SQLite returns `'1.0'`.
+  // Documented as a v1 cross-backend variance.
+  ["to_string.integer", (a) => `CAST(${a[0]} AS TEXT)`],
+  ["to_string.float", (a) => `CAST(${a[0]} AS TEXT)`],
+  [
+    "to_string.boolean",
+    (a) => `(CASE WHEN ${a[0]} THEN 'true' WHEN NOT (${a[0]}) THEN 'false' END)`,
+  ],
+  ["to_integer.string", (a, d) => d.parseStringAsInteger(a[0]!)],
+  ["to_float.string", (a, d) => d.parseStringAsFloat(a[0]!)],
+  [
+    "to_boolean.string",
+    // Strict: only the literal canonical strings `'true'` and
+    // `'false'` accepted. Anything else (including case variants) is
+    // NULL. NULL input falls through to the implicit ELSE NULL.
+    (a) => `(CASE ${a[0]} WHEN 'true' THEN TRUE WHEN 'false' THEN FALSE ELSE NULL END)`,
+  ],
+
+  // Parse a string as JSON; NULL on malformed input. Dispatched to
+  // each dialect — Postgres uses `pg_input_is_valid` + `::jsonb`,
+  // SQLite uses `json_valid` + `json()`.
+  ["parse_json.string", (a, d) => d.parseJson(a[0]!)],
+]);
+
+// Module-load coverage check: every overload key in the core registry
+// must have a SQL emitter, and every emitter must correspond to a
+// registered overload. Mismatches fail loudly at startup rather than
+// surfacing as a missing-emit error on a user's first call.
+for (const key of BUILTIN_KEYS) {
+  if (!SQL_EMIT.has(key)) throw new Error(`SQL emit not registered for built-in '${key}'`);
+}
+for (const key of SQL_EMIT.keys()) {
+  if (!BUILTIN_KEYS.has(key)) throw new Error(`SQL emit registered for unknown built-in '${key}'`);
+}
+
+/**
+ * Translate a built-in function call to SQL by looking up the resolved
+ * overload from the typed program and dispatching through the emit
+ * table.
+ *
+ * Most calls are pre-resolved during type inference. The fallback path
+ * triggers only when an argument is an explicit `null` literal (no
+ * static type) and overloads disagree on result type — both
+ * (integer/float) overloads of `abs`, `round`, etc. emit the same SQL,
+ * so any arity-matching overload yields semantically-equivalent SQL.
+ */
+function translateCall(
+  call: FunctionCall,
+  bindings: Map<string, Binding[]>,
+  varTypes: Map<string, PrimitiveType>,
+  columnTypes: ReadonlyMap<string, readonly PrimitiveType[]>,
+  functionOverloads: ReadonlyMap<FunctionCall, Overload>,
+  dialect: SqlDialect,
+): string {
+  let overload = functionOverloads.get(call);
+  if (!overload) {
+    const builtin = BUILTINS.get(call.name);
+    overload = builtin?.overloads.find((o) => o.params.length === call.args.length);
+    if (!overload) {
+      throw new Error(
+        `Internal error: no overload available for '${call.name}' at translation time`,
+      );
+    }
+  }
+  const sqlArgs = call.args.map((a, i) => {
+    const rawSql = termToSql(a, bindings, varTypes, columnTypes, functionOverloads, dialect);
+    const argType = inferTermType(a, varTypes, columnTypes);
+    return liftToJsonIfNeeded(rawSql, argType, overload.params[i], dialect);
+  });
+  const emit = SQL_EMIT.get(overload.key);
+  if (!emit) {
+    throw new Error(`Internal error: SQL emit missing for built-in '${overload.key}'`);
+  }
+  return emit(sqlArgs, dialect);
+}

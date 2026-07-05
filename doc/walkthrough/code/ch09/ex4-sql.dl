@@ -1,0 +1,17 @@
+# Exercise 9.4 — SQL-reading drill.
+#
+# Run with --dry-run on your chosen backend (try each of
+# sqlite, sqljs, postgres) and answer the three questions from
+# the chapter.
+
+extensional scores(student: string, subject: string, score: integer).
+
+total(count(*)) :- scores(_, _, _).
+student_subjects(Student, concat(Subject)) :-
+    scores(Student, Subject, _).
+avg_by_subject(Subject, avg(Score)) :-
+    scores(_, Subject, Score).
+
+?- total(T).
+?- student_subjects(S, Subs).
+?- avg_by_subject(Sub, A).

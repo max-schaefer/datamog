@@ -1,0 +1,19 @@
+# Tutorial, chapter 4 — recursion and transitive closure.
+#
+# The canonical example. Two rules:
+#
+#   - A parent is an ancestor (base case).
+#   - A parent of an ancestor is also an ancestor (recursive step).
+#
+# Datalog evaluates the pair to a fixed point, giving every ancestor
+# relationship reachable through any chain of `parent` facts.
+
+extensional parent(parent_name: string, child_name: string).
+
+ancestor(X, Y) :- parent(X, Y).
+ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
+
+?- ancestor("alice", X).        # who are Alice's descendants?
+?- ancestor(X, "greg").         # who are Greg's ancestors?
+?- ancestor("alice", "greg").   # is Alice an ancestor of Greg?
+?- ancestor(X, Y).              # every ancestor-descendant pair

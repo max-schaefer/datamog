@@ -1,0 +1,65 @@
+# Chromium hammers /tmp; backing it with tmpfs keeps write churn off the host
+# disk and avoids leaving residue between sessions.
+#
+# seccomp=unconfined lets chromium's user-namespace sandbox initialise — the
+# default docker seccomp profile blocks the clone() namespace flags it needs.
+
+services:
+  claude:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    security_opt:
+      - seccomp=unconfined
+    tmpfs:
+      - /tmp:size=2g
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://app:app@postgres:5432/app
+      # Authenticate gh inside the container. gh reads GH_TOKEN before any
+      # config file, so this works even when the host stores its token in the
+      # OS keyring (macOS Keychain, gnome-keyring) rather than in hosts.yml.
+      # Compose substitutes it from the launching shell's env or .devcontainer/.env;
+      # see README. Empty when unset, which gh treats as "no token".
+      GH_TOKEN: ${GH_TOKEN:-}
+      # Pass the host's Anthropic API key through to the container, same
+      # mechanism as GH_TOKEN: Compose substitutes it from the launching shell's
+      # env or .devcontainer/.env. Empty when unset.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes:
+      - ..:/work:cached
+      # Share the host's ~/.claude so login, global agents/skills/CLAUDE.md,
+      # memory, and conversation history persist across container rebuilds.
+      # ~/.claude must exist on the host with your ownership before the
+      # container is created — otherwise Docker auto-creates the source path,
+      # and on Linux with rootful Docker it ends up root-owned, blocking the
+      # container's node user from writing. Running claude on the host once is
+      # enough to create it.
+      - ${HOME}/.claude:/home/node/.claude:cached
+      # Share the host's gh config (preferences in config.yml; host entries in
+      # hosts.yml). On a keyring host the token is NOT in these files — auth
+      # comes from GH_TOKEN above — but the mount still carries your gh prefs.
+      # Same host-dir-must-exist caveat as ~/.claude.
+      - ${HOME}/.config/gh:/home/node/.config/gh:cached
+    # VS Code's Dev Containers extension attaches via `compose up`, so the
+    # container needs to stay alive for it to exec into.
+    command: sleep infinity
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  pgdata:

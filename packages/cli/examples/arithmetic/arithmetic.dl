@@ -1,0 +1,8 @@
+# Arithmetic example
+# Compute doubled scores and find high scorers.
+
+extensional scores(name: string, score: integer).
+
+doubled(X, D) :- scores(X, S), D = S * 2.
+
+?- doubled(X, D).

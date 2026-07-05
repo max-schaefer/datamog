@@ -1,0 +1,33 @@
+# Comparisons and boolean operators compose freely in expression
+# position. A body element that's just an expression is a filter:
+# the rule fires when the expression evaluates to `true`.
+#
+# Equivalent to a SQL `WHERE (score > 80) AND (score < 95) AND
+# (year >= 2020) AND (year != 2022)`. Datamog parses each operator
+# with its standard precedence — so `&&` binds tighter than `||` and
+# comparisons bind tighter than both — and the SQL translator emits
+# the WHERE clause directly from the boolean expression.
+
+grade("alice", 85, 2020).
+grade("bob",   78, 2021).
+grade("carol", 92, 2021).
+grade("dave",  88, 2022).
+grade("eve",   95, 2023).
+grade("frank", 81, 2023).
+grade("greg",  80, 2023).
+grade("helen", 94, 2024).
+
+# Honours: distinction range, recent enough, but skip the cohort with
+# the broken grade scale.
+honours(N) :-
+    grade(N, S, Y),
+    (S > 80) && (S < 95) && (Y >= 2020) && (Y != 2022).
+
+# Edge cases: a learner is borderline if they were either right at the
+# lower threshold (==) or just one off the upper one.
+borderline(N) :-
+    grade(N, S, _),
+    (S == 80) || (S == 94).
+
+?- honours(N).
+?- borderline(N).

@@ -1,0 +1,9 @@
+# Exercise 11.2 — Sum of three cubes.
+
+# TODO: define triple(A, B, C) with A,B,C in [1..10] and
+# A*A*A + B*B*B + C*C*C = 99.
+
+# Placeholder so the file parses.
+triple(A, B, C) :- A in [1..10], B = A, C = A, A = 0.
+
+?- triple(A, B, C).

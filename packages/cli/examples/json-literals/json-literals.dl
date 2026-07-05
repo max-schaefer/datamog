@@ -1,0 +1,33 @@
+# Array and object literals — construct `value`s directly inside a
+# rule body. Each `[...]` is an array `value`; each `{"k": v, ...}` an
+# object `value`. Element / value expressions of any primitive type
+# are auto-lifted, so a single literal can mix integers, strings,
+# booleans, and already-`value`-typed expressions without explicit
+# lifts.
+#
+# The same shapes were already expressible via string concatenation
+# + `parse_json`, but at a high cost in readability and canonicalisation
+# noise; the literals are the direct path.
+
+extensional employee(id: integer, name: string, salary: integer).
+
+# Pack each row into an object `value` whose keys are sorted on the
+# native and Postgres backends; the SQLite/sql.js path preserves source
+# order (documented as v1 cross-backend variance, spec §2.9).
+employee_record(Id, J) :-
+    employee(Id, Name, Salary),
+    J = {"id": Id, "name": Name, "salary": Salary}.
+
+# Mix a primitive with an already-`value`-typed expression: the inner
+# array literal is itself a `value` and passes through to the outer
+# object.
+employee_tagged(Id, J) :-
+    employee(Id, Name, _),
+    J = {"name": Name, "tags": ["employee", Name]}.
+
+# An empty array literal is a perfectly fine `value`.
+nothing(J) :- J = [].
+
+?- employee_record(Id, J).
+?- employee_tagged(Id, J).
+?- nothing(J).

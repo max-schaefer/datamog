@@ -1,0 +1,30 @@
+{
+  "name": "datamog",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "claude",
+  "workspaceFolder": "/work",
+  "remoteUser": "node",
+  "updateRemoteUserUID": true,
+  "shutdownAction": "stopCompose",
+  "forwardPorts": [8888],
+  "portsAttributes": {
+    "8888": {
+      "label": "Jupyter",
+      "onAutoForward": "silent"
+    }
+  },
+  "remoteEnv": {
+    "EDITOR": "code --wait"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anthropic.claude-code",
+        "biomejs.biome",
+        "ms-python.python",
+        "ms-toolsai.jupyter"
+      ]
+    }
+  },
+  "postCreateCommand": "/opt/datamog-venv/bin/pip install --no-cache-dir -e /work/python/datamog-magic"
+}

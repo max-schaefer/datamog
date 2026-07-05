@@ -1,0 +1,17 @@
+# Exercise 4.3 — Non-linear recursion is rejected by SQL backends.
+#
+# Uncomment the second recursive rule and try to run the program
+# under a SQL backend (`--backend sqlite`, `--backend postgres`):
+# Datamog will reject it. Then try `--backend seminaive`: the pure
+# in-memory evaluator accepts the rule and computes the closure
+# correctly.
+
+extensional edge(src: string, dst: string).
+
+tc(X, Y) :- edge(X, Y).
+tc(X, Z) :- edge(X, Y), tc(Y, Z).
+
+# TODO: uncomment the next line and run with --dry-run.
+# tc(X, Z) :- tc(X, Y), tc(Y, Z).
+
+?- tc(X, Y).

@@ -1,0 +1,12 @@
+# Exercise 8.1 solution.
+
+extensional edge(src: string, dst: string).
+
+node(X) :- edge(X, _).
+node(X) :- edge(_, X).
+
+has_outgoing(X) :- edge(X, _).
+
+leaf(X) :- node(X), not has_outgoing(X).
+
+?- leaf(X).

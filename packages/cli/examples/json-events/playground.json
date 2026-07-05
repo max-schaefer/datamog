@@ -1,0 +1,5 @@
+{
+  "name": "JSON Events",
+  "description": "Destructure heterogeneous JSON event records loaded from JSONL",
+  "order": 110
+}

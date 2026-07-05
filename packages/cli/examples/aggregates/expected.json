@@ -1,0 +1,193 @@
+[
+  [
+    {
+      "Student": "alice",
+      "Avg": 91.66666666666667
+    },
+    {
+      "Student": "bob",
+      "Avg": 78.33333333333333
+    },
+    {
+      "Student": "carol",
+      "Avg": 92
+    },
+    {
+      "Student": "dave",
+      "Avg": 71.66666666666667
+    }
+  ],
+  [
+    {
+      "Student": "alice",
+      "N": 3
+    },
+    {
+      "Student": "bob",
+      "N": 3
+    },
+    {
+      "Student": "carol",
+      "N": 3
+    },
+    {
+      "Student": "dave",
+      "N": 3
+    }
+  ],
+  [
+    {
+      "Student": "alice",
+      "Total": 275
+    },
+    {
+      "Student": "bob",
+      "Total": 235
+    },
+    {
+      "Student": "carol",
+      "Total": 276
+    },
+    {
+      "Student": "dave",
+      "Total": 215
+    }
+  ],
+  [
+    {
+      "Student": "alice",
+      "Best": 95
+    },
+    {
+      "Student": "bob",
+      "Best": 85
+    },
+    {
+      "Student": "carol",
+      "Best": 96
+    },
+    {
+      "Student": "dave",
+      "Best": 80
+    }
+  ],
+  [
+    {
+      "Student": "alice",
+      "Worst": 88
+    },
+    {
+      "Student": "bob",
+      "Worst": 72
+    },
+    {
+      "Student": "carol",
+      "Worst": 89
+    },
+    {
+      "Student": "dave",
+      "Worst": 65
+    }
+  ],
+  [
+    {
+      "N": 12
+    }
+  ],
+  [
+    {
+      "Student": "alice"
+    },
+    {
+      "Student": "carol"
+    }
+  ],
+  [
+    {
+      "Student": "alice",
+      "S": "english,math,science"
+    },
+    {
+      "Student": "bob",
+      "S": "english,math,science"
+    },
+    {
+      "Student": "carol",
+      "S": "english,math,science"
+    },
+    {
+      "Student": "dave",
+      "S": "english,math,science"
+    }
+  ],
+  [
+    {
+      "Student": "alice",
+      "R": [
+        {
+          "score": 88,
+          "subject": "science"
+        },
+        {
+          "score": 92,
+          "subject": "math"
+        },
+        {
+          "score": 95,
+          "subject": "english"
+        }
+      ]
+    },
+    {
+      "Student": "bob",
+      "R": [
+        {
+          "score": 72,
+          "subject": "english"
+        },
+        {
+          "score": 78,
+          "subject": "math"
+        },
+        {
+          "score": 85,
+          "subject": "science"
+        }
+      ]
+    },
+    {
+      "Student": "carol",
+      "R": [
+        {
+          "score": 89,
+          "subject": "english"
+        },
+        {
+          "score": 91,
+          "subject": "science"
+        },
+        {
+          "score": 96,
+          "subject": "math"
+        }
+      ]
+    },
+    {
+      "Student": "dave",
+      "R": [
+        {
+          "score": 65,
+          "subject": "math"
+        },
+        {
+          "score": 70,
+          "subject": "science"
+        },
+        {
+          "score": 80,
+          "subject": "english"
+        }
+      ]
+    }
+  ]
+]

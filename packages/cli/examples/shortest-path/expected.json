@@ -1,0 +1,104 @@
+[
+  [
+    {
+      "X": "castle",
+      "Y": "bridge",
+      "C": 6
+    },
+    {
+      "X": "castle",
+      "Y": "castle",
+      "C": 5
+    },
+    {
+      "X": "castle",
+      "Y": "forest",
+      "C": 5
+    },
+    {
+      "X": "castle",
+      "Y": "river",
+      "C": 8
+    },
+    {
+      "X": "castle",
+      "Y": "village",
+      "C": 2
+    },
+    {
+      "X": "forest",
+      "Y": "bridge",
+      "C": 5
+    },
+    {
+      "X": "forest",
+      "Y": "castle",
+      "C": 7
+    },
+    {
+      "X": "forest",
+      "Y": "forest",
+      "C": 12
+    },
+    {
+      "X": "forest",
+      "Y": "river",
+      "C": 3
+    },
+    {
+      "X": "forest",
+      "Y": "village",
+      "C": 4
+    },
+    {
+      "X": "river",
+      "Y": "bridge",
+      "C": 2
+    },
+    {
+      "X": "river",
+      "Y": "castle",
+      "C": 4
+    },
+    {
+      "X": "river",
+      "Y": "forest",
+      "C": 9
+    },
+    {
+      "X": "river",
+      "Y": "river",
+      "C": 12
+    },
+    {
+      "X": "river",
+      "Y": "village",
+      "C": 1
+    },
+    {
+      "X": "village",
+      "Y": "bridge",
+      "C": 4
+    },
+    {
+      "X": "village",
+      "Y": "castle",
+      "C": 3
+    },
+    {
+      "X": "village",
+      "Y": "forest",
+      "C": 8
+    },
+    {
+      "X": "village",
+      "Y": "river",
+      "C": 11
+    },
+    {
+      "X": "village",
+      "Y": "village",
+      "C": 5
+    }
+  ]
+]

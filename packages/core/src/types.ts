@@ -1,0 +1,1180 @@
+import { AnalyzerError, BUILTIN_BODY_ATOMS } from "./analyzer.ts";
+import type { AnalyzedProgram, BuiltinBodyAtomSpec } from "./analyzer.ts";
+import type {
+  BodyElement,
+  Equality,
+  FunctionCall,
+  HeadTerm,
+  PrimitiveType,
+  RangeAtom,
+  Rule,
+} from "./ast.ts";
+import { BITWISE_OPS, COMPARISON_OPS, isFloatLiteral } from "./ast.ts";
+import { type Overload, type ResolutionError, resolveCall } from "./builtins.ts";
+
+export interface TypedProgram extends AnalyzedProgram {
+  /** Column types for every predicate (EDB and IDB). */
+  columnTypes: Map<string, PrimitiveType[]>;
+  /**
+   * Resolved overload for each `FunctionCall` AST node in the program.
+   * Backends key their SQL-emit / native-impl tables on `Overload.key`,
+   * so this map is the single hand-off from type inference to backend
+   * dispatch — no name-based switches downstream.
+   */
+  functionOverloads: Map<FunctionCall, Overload>;
+}
+
+/**
+ * Infer column types for all predicates.
+ *
+ * EDB types are known from declarations. IDB types are inferred by tracing
+ * rule head arguments back to their sources via variable bindings and
+ * expression type rules. Uses a fixed-point iteration for recursive predicates.
+ */
+export function inferTypes(analyzed: AnalyzedProgram): TypedProgram {
+  // Internal representation allows undefined for unknown positions
+  const types = new Map<string, (PrimitiveType | undefined)[]>();
+
+  // Seed EDB types from declarations
+  for (const [predicate, decl] of analyzed.extDecls) {
+    types.set(
+      predicate,
+      decl.columns.map((c) => c.type),
+    );
+  }
+
+  // Initialize IDB types — seed from facts (empty body rules) where possible
+  for (const [predicate, rules] of analyzed.rules) {
+    const arity = analyzed.arities.get(predicate)!;
+    const seedTypes: (PrimitiveType | undefined)[] = new Array(arity).fill(undefined);
+
+    for (const rule of rules) {
+      if (rule.body.length === 0) {
+        for (const [i, arg] of rule.head.args.entries()) {
+          const pos: [number, number] | undefined = arg.$cstNode && [
+            arg.$cstNode.offset,
+            arg.$cstNode.end,
+          ];
+          if (arg.$type === "StringLiteral") {
+            seedTypes[i] = unifyColumnType(seedTypes[i], "string", predicate, i, pos);
+          } else if (arg.$type === "NumberLiteral") {
+            const t = isFloatLiteral(arg) || !Number.isInteger(arg.value) ? "float" : "integer";
+            seedTypes[i] = unifyColumnType(seedTypes[i], t, predicate, i, pos);
+          } else if (arg.$type === "BooleanLiteral") {
+            seedTypes[i] = unifyColumnType(seedTypes[i], "boolean", predicate, i, pos);
+          }
+        }
+      }
+    }
+
+    types.set(predicate, seedTypes);
+  }
+
+  // Fixed-point iteration: infer types from rules until stable
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const stratum of analyzed.sortedStrata) {
+      for (const predicate of stratum) {
+        const rules = analyzed.rules.get(predicate);
+        if (!rules) continue;
+
+        const arity = analyzed.arities.get(predicate)!;
+        const newTypes: (PrimitiveType | undefined)[] = new Array(arity).fill(undefined);
+
+        for (const rule of rules) {
+          const varTypes = rebuildVarTypes(rule.body, types);
+
+          // Infer head argument types
+          for (let i = 0; i < rule.head.args.length; i++) {
+            const arg = rule.head.args[i]!;
+            const argType = inferTermType(arg, varTypes, types);
+            if (argType) {
+              const pos = arg.$cstNode
+                ? ([arg.$cstNode.offset, arg.$cstNode.end] as [number, number])
+                : undefined;
+              newTypes[i] = unifyColumnType(newTypes[i], argType, predicate, i, pos);
+            }
+          }
+        }
+
+        // Merge new types with old, check for changes
+        const oldTypes = types.get(predicate)!;
+        for (let i = 0; i < arity; i++) {
+          const merged = newTypes[i] ?? oldTypes[i];
+          if (merged !== oldTypes[i]) {
+            changed = true;
+          }
+          oldTypes[i] = merged;
+        }
+      }
+    }
+  }
+
+  // Validate types (ranges, operators, function args). Validation also
+  // resolves each FunctionCall to a specific overload — populated into
+  // this map during the walk and threaded back out via TypedProgram.
+  const functionOverloads = new Map<FunctionCall, Overload>();
+  validateTypes(analyzed, types, functionOverloads);
+
+  // Finalize: reject unconstrained column types
+  const columnTypes = new Map<string, PrimitiveType[]>();
+  for (const [pred, predTypes] of types) {
+    const finalTypes: PrimitiveType[] = [];
+    for (let i = 0; i < predTypes.length; i++) {
+      const t = predTypes[i];
+      if (t === undefined) {
+        // EDB column types are seeded from declarations and never
+        // undefined here, so this only fires for IDBs. Pick the first
+        // rule's head argument at position `i` as the offending
+        // location — that's where the user would write the term whose
+        // type would have constrained the column. Without a position,
+        // the playground lint squiggly defaults to offset 0 and the
+        // error message reads as if it's about the whole program.
+        const headArg = analyzed.rules.get(pred)?.[0]?.head.args[i];
+        const cst = headArg?.$cstNode;
+        throw new AnalyzerError(
+          `Cannot infer type of column ${i + 1} of predicate '${pred}'`,
+          cst?.offset,
+          cst?.end,
+        );
+      }
+      finalTypes.push(t);
+    }
+    columnTypes.set(pred, finalTypes);
+  }
+
+  return { ...analyzed, columnTypes, functionOverloads };
+}
+
+function isNumericType(t: PrimitiveType | undefined): boolean {
+  return t === "integer" || t === "float";
+}
+
+/**
+ * Build a per-position type list for a built-in body atom (used by
+ * `rebuildVarTypes` to seed Variable types from positional arg types).
+ * The source position carries no type for the variable being read — its
+ * type comes from wherever else the variable appears — so we leave it
+ * undefined; the bound positions get their declared types.
+ */
+function buildBuiltinTypeList(spec: BuiltinBodyAtomSpec): (PrimitiveType | undefined)[] {
+  const out: (PrimitiveType | undefined)[] = new Array(spec.arity).fill(undefined);
+  for (const { index, type } of spec.boundArgs) out[index] = type;
+  return out;
+}
+
+/**
+ * Same as `buildBuiltinTypeList`, but additionally pins the source
+ * position to its required type. Used in `validateTypes` to check
+ * that the source argument is `json`-typed; `rebuildVarTypes` does
+ * not use this form because typing the source variable from the
+ * built-in atom would create a redundant constraint that gets
+ * checked properly here anyway.
+ */
+function buildBuiltinSourceAndBoundTypes(spec: BuiltinBodyAtomSpec): (PrimitiveType | undefined)[] {
+  const out = buildBuiltinTypeList(spec);
+  out[spec.sourceArg] = spec.sourceType;
+  return out;
+}
+
+/** Rebuild the variable type environment for a rule. */
+/**
+ * Build a per-variable type map for a body. Shared between rules
+ * (whose `body` is the rule body) and queries (whose `body` is the
+ * query body). Exported so the translator can attach types to the
+ * projected variables of a query.
+ */
+export function rebuildVarTypes(
+  body: BodyElement[],
+  types: Map<string, (PrimitiveType | undefined)[]>,
+): Map<string, PrimitiveType> {
+  const varTypes = new Map<string, PrimitiveType>();
+
+  // Atom-derived types don't depend on other body elements, so seed them first
+  // in a single pass. Equalities and ranges can reference variables bound by
+  // atoms appearing anywhere in the body, so defer them to the fixed-point
+  // loop below (mirroring the safety check and translator Pass 2, which also
+  // iterate until nothing new is learned).
+  //
+  // When a variable appears in multiple atoms we UNIFY the column types via
+  // `joinTypesWithJsonLift` (integer/float widen to float, primitive/value
+  // widens to value, same-type is a no-op, anything else throws). First-wins
+  // would silently pick one type and hide the conflict — e.g.
+  // `r(X) :- p(X), q(X)` with `p: integer` and `q: string` would end up as
+  // integer and leak through.
+  for (const elem of body) {
+    if (elem.$type === "Literal" && !elem.negated) {
+      const builtin = BUILTIN_BODY_ATOMS.get(elem.predicate);
+      const predTypes = builtin
+        ? // Synthesise a per-position type list for built-in body
+          // atoms: bound positions get their declared types, the source
+          // position is whatever shape the iteration accepts.
+          buildBuiltinTypeList(builtin)
+        : types.get(elem.predicate);
+      if (!predTypes) continue;
+      for (let j = 0; j < elem.args.length; j++) {
+        const arg = elem.args[j]!;
+        if (arg.$type !== "Variable") continue;
+        const colType = predTypes[j];
+        if (!colType) continue;
+        const existing = varTypes.get(arg.name);
+        const joined = joinTypesWithJsonLift(existing, colType);
+        if (joined === null) {
+          const cst = arg.$cstNode;
+          throw new AnalyzerError(
+            `Variable '${arg.name}' has conflicting types '${existing}' and '${colType}'`,
+            cst?.offset,
+            cst?.end,
+          );
+        }
+        varTypes.set(arg.name, joined);
+      }
+    }
+  }
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const elem of body) {
+      if (elem.$type === "Equality") {
+        for (const binding of equalityBindingCandidates(elem)) {
+          if (varTypes.has(binding.variable)) continue;
+          if (!allVarsTyped(binding.expr, varTypes)) continue;
+          const exprType = inferTermType(binding.expr, varTypes, types);
+          if (!exprType) continue;
+          varTypes.set(binding.variable, exprType);
+          changed = true;
+        }
+      } else if (elem.$type === "RangeAtom") {
+        if (elem.expr.$type !== "Variable" || varTypes.has(elem.expr.name)) continue;
+        const lowType = inferTermType(elem.low, varTypes, types);
+        const highType = inferTermType(elem.high, varTypes, types);
+        const rangeType =
+          lowType && highType ? joinTypes(lowType, highType) : (lowType ?? highType);
+        if (rangeType) {
+          varTypes.set(elem.expr.name, rangeType);
+          changed = true;
+        }
+      }
+    }
+  }
+  return varTypes;
+}
+
+function equalityBindingCandidates(eq: Equality): { variable: string; expr: HeadTerm }[] {
+  const candidates: { variable: string; expr: HeadTerm }[] = [];
+  if (eq.left.$type === "Variable") {
+    candidates.push({ variable: eq.left.name, expr: eq.expr });
+  }
+  if (eq.expr.$type === "Variable") {
+    candidates.push({ variable: eq.expr.name, expr: eq.left });
+  }
+  return candidates;
+}
+
+function allVarsTyped(term: HeadTerm, varTypes: Map<string, PrimitiveType>): boolean {
+  switch (term.$type) {
+    case "Variable":
+      return varTypes.has(term.name);
+    case "StringLiteral":
+    case "NumberLiteral":
+    case "BooleanLiteral":
+    case "NullLiteral":
+      return true;
+    case "UnaryExpr":
+      return allVarsTyped(term.operand, varTypes);
+    case "BinaryExpr":
+      return allVarsTyped(term.left, varTypes) && allVarsTyped(term.right, varTypes);
+    case "FunctionCall":
+      return term.args.every((a) => allVarsTyped(a, varTypes));
+    case "AggregateCall":
+      return allVarsTyped(term.arg, varTypes);
+    case "Subscript":
+      return allVarsTyped(term.object, varTypes) && allVarsTyped(term.index, varTypes);
+    case "Slice":
+      return (
+        allVarsTyped(term.object, varTypes) &&
+        (term.start === undefined || allVarsTyped(term.start, varTypes)) &&
+        (term.end === undefined || allVarsTyped(term.end, varTypes))
+      );
+    case "ArrayLiteral":
+      return term.elements.every((e) => allVarsTyped(e, varTypes));
+    case "ObjectLiteral":
+      return term.entries.every((entry) => allVarsTyped(entry.value, varTypes));
+    case "Wildcard":
+      // The `count(*)` wildcard carries no variables.
+      return true;
+    case "BracketAccess":
+      return false;
+  }
+}
+
+/** Validate types across all expressions in a rule (ranges, operators, function args). */
+function validateTypes(
+  analyzed: AnalyzedProgram,
+  types: Map<string, (PrimitiveType | undefined)[]>,
+  functionOverloads: Map<FunctionCall, Overload>,
+): void {
+  for (const [, predicateRules] of analyzed.rules) {
+    for (const rule of predicateRules) {
+      const varTypes = rebuildVarTypes(rule.body, types);
+
+      // Validate head expressions
+      for (const arg of rule.head.args) {
+        validateExpr(arg, varTypes, types, functionOverloads);
+      }
+
+      // Validate body expressions
+      for (const elem of rule.body) {
+        switch (elem.$type) {
+          case "Literal": {
+            const builtin = BUILTIN_BODY_ATOMS.get(elem.predicate);
+            const expectedTypes: (PrimitiveType | undefined)[] = builtin
+              ? buildBuiltinSourceAndBoundTypes(builtin)
+              : (types.get(elem.predicate) ?? []);
+            for (let j = 0; j < elem.args.length; j++) {
+              const arg = elem.args[j]!;
+              validateExpr(arg, varTypes, types, functionOverloads);
+              // Each arg must unify with the predicate's declared column type
+              // — otherwise `t("hello")` against `extensional t(x: integer)`
+              // passes silently and only surfaces as a database error at
+              // runtime (if it surfaces at all; SQLite would coerce).
+              const expected = expectedTypes[j];
+              if (!expected) continue;
+              const actual = inferTermType(arg, varTypes, types);
+              // Built-in body atoms (`object_entry` / `array_element`)
+              // have strict key/index slots, but their `value`-typed slots
+              // behave like every other value slot: primitive expressions
+              // embed automatically as JSON leaves. That includes the source
+              // argument; iterating a primitive leaf simply produces zero
+              // rows at runtime.
+              const join =
+                builtin !== undefined && expected !== "value" ? joinTypes : joinTypesWithJsonLift;
+              if (actual && join(actual, expected) === null) {
+                const cst = arg.$cstNode;
+                throw new AnalyzerError(
+                  `Argument ${j + 1} of '${elem.predicate}(...)' has type '${actual}' but ${
+                    builtin ? "the position requires" : "column is declared as"
+                  } '${expected}'`,
+                  cst?.offset,
+                  cst?.end,
+                );
+              }
+            }
+            break;
+          }
+          case "Equality":
+            validateExpr(elem.left, varTypes, types, functionOverloads);
+            validateExpr(elem.expr, varTypes, types, functionOverloads);
+            checkComparableTypes(
+              inferTermType(elem.left, varTypes, types),
+              inferTermType(elem.expr, varTypes, types),
+              elem,
+              "equality",
+            );
+            break;
+          case "Filter": {
+            validateExpr(elem.expr, varTypes, types, functionOverloads);
+            const t = inferTermType(elem.expr, varTypes, types);
+            if (t && t !== "boolean") {
+              const cst = elem.expr.$cstNode ?? elem.$cstNode;
+              throw new AnalyzerError(
+                `Filter expression must be boolean, got '${t}'`,
+                cst?.offset,
+                cst?.end,
+              );
+            }
+            break;
+          }
+          case "RangeAtom":
+            validateExpr(elem.expr, varTypes, types, functionOverloads);
+            validateExpr(elem.low, varTypes, types, functionOverloads);
+            validateExpr(elem.high, varTypes, types, functionOverloads);
+            checkRangeExprTypes(elem, rule, varTypes, types);
+            break;
+        }
+      }
+    }
+  }
+
+  // Query bodies follow the same body-element type rules as rule
+  // bodies: each positive/negated literal's args must be
+  // type-compatible with the predicate's declared columns; equality
+  // and filter expressions get a full type-check; range bounds must
+  // be numeric. We reuse the per-body-element validation by walking
+  // the query body here. Variable types are computed per query via
+  // a small fixed-point over the body's atoms and bindings, mirroring
+  // the rule-body inference above.
+  for (const query of analyzed.queries) {
+    const varTypes = rebuildVarTypes(query.body, types);
+    for (const elem of query.body) {
+      switch (elem.$type) {
+        case "Literal": {
+          const predTypes = types.get(elem.predicate);
+          for (let j = 0; j < elem.args.length; j++) {
+            const arg = elem.args[j]!;
+            validateExpr(arg, varTypes, types, functionOverloads);
+            if (!predTypes) continue;
+            const expected = predTypes[j];
+            if (!expected) continue;
+            const actual = inferTermType(arg, varTypes, types);
+            if (actual && joinTypesWithJsonLift(actual, expected) === null) {
+              const cst = arg.$cstNode;
+              throw new AnalyzerError(
+                `Argument ${j + 1} of '${elem.predicate}(...)' has type '${actual}' but column is declared as '${expected}'`,
+                cst?.offset,
+                cst?.end,
+              );
+            }
+          }
+          break;
+        }
+        case "Equality":
+          validateExpr(elem.left, varTypes, types, functionOverloads);
+          validateExpr(elem.expr, varTypes, types, functionOverloads);
+          // Mirror the rule-body `Equality` case: the operands must be
+          // type-compatible. Without this the query body silently
+          // accepted conflicts the equivalent rule rejects.
+          checkComparableTypes(
+            inferTermType(elem.left, varTypes, types),
+            inferTermType(elem.expr, varTypes, types),
+            elem,
+            "equality",
+          );
+          break;
+        case "Filter": {
+          validateExpr(elem.expr, varTypes, types, functionOverloads);
+          const t = inferTermType(elem.expr, varTypes, types);
+          // Mirror the rule-body `Filter` case exactly: only `boolean`
+          // is permitted. The extra `value` exemption here let a bare
+          // value-typed filter through in a query but not in a rule.
+          if (t && t !== "boolean") {
+            const cst = elem.expr.$cstNode;
+            throw new AnalyzerError(
+              `Filter expression must be boolean, got '${t}'`,
+              cst?.offset,
+              cst?.end,
+            );
+          }
+          break;
+        }
+        case "RangeAtom": {
+          validateExpr(elem.expr, varTypes, types, functionOverloads);
+          validateExpr(elem.low, varTypes, types, functionOverloads);
+          validateExpr(elem.high, varTypes, types, functionOverloads);
+          const lt = inferTermType(elem.low, varTypes, types);
+          const ht = inferTermType(elem.high, varTypes, types);
+          if (lt && lt !== "integer" && lt !== "float" && lt !== "value") {
+            const cst = elem.low.$cstNode;
+            throw new AnalyzerError(
+              `Range lower bound has non-numeric type '${lt}'`,
+              cst?.offset,
+              cst?.end,
+            );
+          }
+          if (ht && ht !== "integer" && ht !== "float" && ht !== "value") {
+            const cst = elem.high.$cstNode;
+            throw new AnalyzerError(
+              `Range upper bound has non-numeric type '${ht}'`,
+              cst?.offset,
+              cst?.end,
+            );
+          }
+          break;
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Reject negative integer literals (`W[-1]`, `W[1:-1]`) as subscript or
+ * slice bounds. The spec flags negative and out-of-range indices as
+ * backend-defined, so catching the statically-obvious cases gives the
+ * user an error at analyse time instead of a silently backend-specific
+ * result. Variable-valued indices pass through — we can't prove them
+ * non-negative without running the query.
+ */
+function rejectNegativeLiteralIndex(term: HeadTerm, context: string): void {
+  if (term.$type === "UnaryExpr" && term.op === "-" && term.operand.$type === "NumberLiteral") {
+    const cst = term.$cstNode;
+    throw new AnalyzerError(
+      `Negative ${context} is not supported; indices must be non-negative`,
+      cst?.offset,
+      cst?.end,
+    );
+  }
+}
+
+/**
+ * Reject comparisons / non-binding equalities between values whose types
+ * can't be unified (e.g. `X > "5"` where X is integer). Skip the check
+ * when either side is of unknown type — other passes will surface that
+ * as a "cannot infer type" error if it matters.
+ */
+function checkComparableTypes(
+  leftType: PrimitiveType | undefined,
+  rightType: PrimitiveType | undefined,
+  node: { $cstNode?: { offset: number; end: number } },
+  context: string,
+): void {
+  if (!leftType || !rightType) return;
+  if (joinTypesWithJsonLift(leftType, rightType) === null) {
+    const cst = node.$cstNode;
+    throw new AnalyzerError(
+      `Cannot compare '${leftType}' and '${rightType}' in ${context}`,
+      cst?.offset,
+      cst?.end,
+    );
+  }
+}
+
+/** Recursively validate expression types. */
+function validateExpr(
+  term: HeadTerm,
+  varTypes: Map<string, PrimitiveType>,
+  types: Map<string, (PrimitiveType | undefined)[]>,
+  functionOverloads: Map<FunctionCall, Overload>,
+): void {
+  switch (term.$type) {
+    case "UnaryExpr": {
+      const opType = inferTermType(term.operand, varTypes, types);
+      if (term.op === "!") {
+        if (opType && opType !== "boolean") {
+          const cst = term.$cstNode;
+          throw new AnalyzerError(
+            `Logical '!' requires a boolean operand, got '${opType}'`,
+            cst?.offset,
+            cst?.end,
+          );
+        }
+      } else if (opType && !isNumericType(opType)) {
+        const cst = term.$cstNode;
+        throw new AnalyzerError(
+          `Unary minus requires a numeric operand, got '${opType}'`,
+          cst?.offset,
+          cst?.end,
+        );
+      }
+      validateExpr(term.operand, varTypes, types, functionOverloads);
+      break;
+    }
+    case "Subscript": {
+      const objType = inferTermType(term.object, varTypes, types);
+      if (objType && objType !== "string" && objType !== "value") {
+        const cst = term.$cstNode;
+        throw new AnalyzerError(
+          `Subscript requires a string or value operand, got '${objType}'`,
+          cst?.offset,
+          cst?.end,
+        );
+      }
+      rejectNegativeLiteralIndex(term.index, "subscript index");
+      // String subscripts: "Indices are zero-based integers." JSON subscripts:
+      // integer for array index, string for object key. Reject other types
+      // statically rather than letting them reach SUBSTR / json_extract.
+      const idxType = inferTermType(term.index, varTypes, types);
+      if (idxType) {
+        if (objType === "value") {
+          if (idxType !== "integer" && idxType !== "string") {
+            const cst = term.index.$cstNode;
+            throw new AnalyzerError(
+              `JSON subscript index must have integer or string type, got '${idxType}'`,
+              cst?.offset,
+              cst?.end,
+            );
+          }
+        } else if (idxType !== "integer") {
+          const cst = term.index.$cstNode;
+          throw new AnalyzerError(
+            `Subscript index must have integer type, got '${idxType}'`,
+            cst?.offset,
+            cst?.end,
+          );
+        }
+      }
+      validateExpr(term.object, varTypes, types, functionOverloads);
+      validateExpr(term.index, varTypes, types, functionOverloads);
+      break;
+    }
+    case "Slice": {
+      const objType = inferTermType(term.object, varTypes, types);
+      if (objType && objType !== "string" && objType !== "value") {
+        const cst = term.$cstNode;
+        throw new AnalyzerError(
+          `Slice requires a string or value operand, got '${objType}'`,
+          cst?.offset,
+          cst?.end,
+        );
+      }
+      if (term.start) rejectNegativeLiteralIndex(term.start, "slice start");
+      if (term.end) rejectNegativeLiteralIndex(term.end, "slice end");
+      // Slice bounds must be integers regardless of receiver type (string or
+      // json array — both are zero-based integer-indexed).
+      if (term.start) {
+        const startType = inferTermType(term.start, varTypes, types);
+        if (startType && startType !== "integer") {
+          const cst = term.start.$cstNode;
+          throw new AnalyzerError(
+            `Slice start must have integer type, got '${startType}'`,
+            cst?.offset,
+            cst?.end,
+          );
+        }
+      }
+      if (term.end) {
+        const endType = inferTermType(term.end, varTypes, types);
+        if (endType && endType !== "integer") {
+          const cst = term.end.$cstNode;
+          throw new AnalyzerError(
+            `Slice end must have integer type, got '${endType}'`,
+            cst?.offset,
+            cst?.end,
+          );
+        }
+      }
+      validateExpr(term.object, varTypes, types, functionOverloads);
+      if (term.start) validateExpr(term.start, varTypes, types, functionOverloads);
+      if (term.end) validateExpr(term.end, varTypes, types, functionOverloads);
+      break;
+    }
+    case "FunctionCall": {
+      resolveAndRecordCall(term, varTypes, types, functionOverloads);
+      for (const arg of term.args) validateExpr(arg, varTypes, types, functionOverloads);
+      break;
+    }
+    case "BinaryExpr": {
+      validateBinaryExprTypes(term, varTypes, types);
+      validateExpr(term.left, varTypes, types, functionOverloads);
+      validateExpr(term.right, varTypes, types, functionOverloads);
+      break;
+    }
+    case "AggregateCall":
+      validateAggregateArgType(term, varTypes, types);
+      validateExpr(term.arg, varTypes, types, functionOverloads);
+      break;
+    case "ArrayLiteral":
+      // Each element is auto-lifted to JSON at translation time, so any
+      // primitive type is fine. Recurse so nested expressions still get
+      // type-checked. The `null` literal is allowed (becomes JSON null).
+      for (const e of term.elements) validateExpr(e, varTypes, types, functionOverloads);
+      break;
+    case "ObjectLiteral":
+      // Same lift policy as ArrayLiteral; keys are STRING tokens by the
+      // grammar, so no key-type check is needed here.
+      for (const entry of term.entries) {
+        validateExpr(entry.value, varTypes, types, functionOverloads);
+      }
+      break;
+  }
+}
+
+/**
+ * Check that a BinaryExpr's operands have compatible types for the
+ * operator. Arithmetic operators (`-`, `*`, `/`, `%`) require both
+ * sides numeric. `+` is overloaded: numeric-numeric does addition,
+ * string-anything does concatenation — anything else is nonsense.
+ */
+function validateBinaryExprTypes(
+  term: { op: string; left: HeadTerm; right: HeadTerm; $cstNode?: { offset: number; end: number } },
+  varTypes: Map<string, PrimitiveType>,
+  types: Map<string, (PrimitiveType | undefined)[]>,
+): void {
+  const leftType = inferTermType(term.left, varTypes, types);
+  const rightType = inferTermType(term.right, varTypes, types);
+  const cst = term.$cstNode;
+  const complain = (context: string, badType: PrimitiveType) => {
+    throw new AnalyzerError(
+      `Operator '${term.op}' ${context}; got '${badType}'`,
+      cst?.offset,
+      cst?.end,
+    );
+  };
+  if (term.op === "+") {
+    // Concatenation is valid when at least one side is string, and addition
+    // when both are numeric. Anything else (boolean, mixed boolean/string,
+    // ...) has no defined meaning. `string + json` and `string + boolean`
+    // specifically have no defined cross-backend behaviour: SQLite stores
+    // booleans as 0/1 INTEGER and emits `value`s as canonical TEXT, so
+    // `||` concat shows `'1'` for booleans and the JSON text for objects;
+    // the native evaluator's `${l}${r}` template produces `'true'`/`'false'`
+    // for booleans, `[object Object]` for objects, and comma-joined
+    // elements for arrays. Reject json and boolean alongside the existing
+    // post-string-anything check so the user gets a position-bearing
+    // error instead of cross-backend divergence.
+    if (leftType === "string" || rightType === "string") {
+      const other = leftType === "string" ? rightType : leftType;
+      if (other === "value" || other === "boolean") {
+        complain("requires numeric or string operands", other);
+      }
+      return;
+    }
+    if (leftType && !isNumericType(leftType))
+      complain("requires numeric or string operands", leftType);
+    if (rightType && !isNumericType(rightType))
+      complain("requires numeric or string operands", rightType);
+    return;
+  }
+  if (term.op === "&&" || term.op === "||") {
+    // Logical and/or: both operands must be boolean. Three-valued
+    // logic (NULL handling) is enforced at runtime by SQL natively
+    // and by the native evaluator's value layer.
+    if (leftType && leftType !== "boolean") complain("requires boolean operands", leftType);
+    if (rightType && rightType !== "boolean") complain("requires boolean operands", rightType);
+    return;
+  }
+  if (COMPARISON_OPS.has(term.op)) {
+    // Comparison expressions: operands must be type-compatible.
+    // Equality variants (`==`, `!=`) accept booleans (set equality is
+    // well-defined); ordering ops do not (Datalog has no order on
+    // booleans, SQL backends would silently coerce to 0/1).
+    checkComparableTypes(leftType, rightType, term, "comparison");
+    if (
+      term.op !== "==" &&
+      term.op !== "!=" &&
+      (leftType === "boolean" || rightType === "boolean")
+    ) {
+      throw new AnalyzerError(
+        `Operator '${term.op}' does not order booleans`,
+        cst?.offset,
+        cst?.end,
+      );
+    }
+    // Ordering on json is rejected because cross-backend ordering
+    // semantics disagree (Postgres jsonb has a defined order;
+    // SQLite/sql.js do not). Equality (`=`/`<>`/`==`/`!=`) is allowed
+    // — structural on Postgres jsonb, textual-after-canonicalisation
+    // on the SQLite-family backends.
+    if (
+      term.op !== "==" &&
+      term.op !== "!=" &&
+      term.op !== "=" &&
+      term.op !== "<>" &&
+      (leftType === "value" || rightType === "value")
+    ) {
+      throw new AnalyzerError(
+        `Operator '${term.op}' is not defined on value — values have no cross-backend ordering`,
+        cst?.offset,
+        cst?.end,
+      );
+    }
+    return;
+  }
+  if (BITWISE_OPS.has(term.op)) {
+    // Bitwise / shift ops are defined only on integers (32-bit signed,
+    // Java/JS semantics). Floats, strings, booleans, and values have no
+    // bitwise meaning. A NULL operand (undefined type) is allowed and
+    // propagates to NULL at runtime.
+    if (leftType && leftType !== "integer") complain("requires integer operands", leftType);
+    if (rightType && rightType !== "integer") complain("requires integer operands", rightType);
+    return;
+  }
+  if (leftType && !isNumericType(leftType)) complain("requires numeric operands", leftType);
+  if (rightType && !isNumericType(rightType)) complain("requires numeric operands", rightType);
+}
+
+/**
+ * Check that an aggregate's argument type is sensible for the function.
+ * `sum`/`avg` require numeric; `concat` accepts anything (coerced
+ * to string); `count` accepts anything; `min`/`max` accept any orderable
+ * type.
+ */
+function validateAggregateArgType(
+  agg: { func: string; arg: HeadTerm; $cstNode?: { offset: number; end: number } },
+  varTypes: Map<string, PrimitiveType>,
+  types: Map<string, (PrimitiveType | undefined)[]>,
+): void {
+  const argType = inferTermType(agg.arg, varTypes, types);
+  if (!argType) return;
+  const cst = agg.$cstNode;
+  if ((agg.func === "sum" || agg.func === "avg") && !isNumericType(argType)) {
+    throw new AnalyzerError(
+      `Aggregate '${agg.func}' requires a numeric argument, got '${argType}'`,
+      cst?.offset,
+      cst?.end,
+    );
+  }
+  // `min` / `max` accept any *orderable* type — integer, float, or
+  // string. Booleans and `value`s aren't orderable in the spec
+  // sense: the native evaluator's `compareOp` throws on them
+  // (`values.ts:557`), and SQL backends each use a different ordering
+  // (Postgres jsonb has a "natural" ordering, SQLite stores TEXT and
+  // compares lexicographically), so accepting them would produce
+  // cross-backend disagreement.
+  if (
+    (agg.func === "min" || agg.func === "max") &&
+    argType !== "integer" &&
+    argType !== "float" &&
+    argType !== "string"
+  ) {
+    throw new AnalyzerError(
+      `Aggregate '${agg.func}' requires an orderable (integer / float / string) argument, got '${argType}'`,
+      cst?.offset,
+      cst?.end,
+    );
+  }
+  // `list` collects values into a JSON array. Primitive arguments are
+  // auto-lifted to JSON (`integer` / `float` → JSON number, `string` →
+  // JSON string, `boolean` → JSON `true` / `false`); already-`json`
+  // values pass through. The translator wraps with `dialect.toJson`
+  // for the SQL backends, and the native evaluator treats JS
+  // primitives as valid `JsonValue`s directly.
+}
+
+/**
+ * Resolve a `FunctionCall` against the overload registry, validate
+ * argument types as a side-effect of the resolution, and record the
+ * chosen overload on the program-level map for backend dispatch.
+ *
+ * No-match and ambiguous outcomes throw a position-bearing
+ * `AnalyzerError`. Unknown-name and arity-mismatch are already caught
+ * earlier in `analyze` (`checkFunctionCalls`), so we don't repeat those
+ * messages here. If args are still under-determined at validation time
+ * — the only realistic case is a `null` literal in arg position — we
+ * leave the overload unrecorded and let the runtime three-valued
+ * evaluation produce NULL; the type system has already accepted a
+ * non-undefined result type via `agreedResultType`.
+ */
+function resolveAndRecordCall(
+  term: FunctionCall,
+  varTypes: Map<string, PrimitiveType>,
+  types: Map<string, (PrimitiveType | undefined)[]>,
+  functionOverloads: Map<FunctionCall, Overload>,
+): void {
+  const argTypes = term.args.map((a) => inferTermType(a, varTypes, types));
+  const r = resolveCall(term.name, argTypes);
+  if (r.error) raiseResolutionError(term, r.error);
+  if (r.overload) functionOverloads.set(term, r.overload);
+}
+
+function raiseResolutionError(term: FunctionCall, err: ResolutionError): never {
+  const cst = term.$cstNode;
+  if (err.kind === "no-match") {
+    // Find the first argument whose type isn't accepted by any
+    // arity-matching overload. The "accepted set" for position i is
+    // the union of params[i] across overloads, expanded by integer
+    // when float is permitted (integer → float promotion).
+    for (let i = 0; i < err.argTypes.length; i++) {
+      const a = err.argTypes[i];
+      if (!a) continue;
+      const accepted = new Set<PrimitiveType>();
+      for (const o of err.overloads) {
+        const p = o.params[i]!;
+        accepted.add(p);
+        if (p === "float") accepted.add("integer");
+      }
+      if (accepted.has(a)) continue;
+      const acceptedList = [...accepted].sort().join(" or ");
+      throw new AnalyzerError(
+        `Function '${term.name}' expects argument ${i + 1} to have type ${acceptedList}; got '${a}'`,
+        cst?.offset,
+        cst?.end,
+      );
+    }
+    // Fallback when no single argument is the unique culprit (e.g. a
+    // multi-arg combination not covered by any overload). Show the
+    // candidate list so the user can spot which overload they meant.
+    const argList = err.argTypes.map((t) => t ?? "?").join(", ");
+    const overloadList = err.overloads
+      .map((o) => `${term.name}(${o.params.join(", ")})`)
+      .join(", ");
+    throw new AnalyzerError(
+      `Function '${term.name}' has no overload matching argument types (${argList}); known overloads: ${overloadList}`,
+      cst?.offset,
+      cst?.end,
+    );
+  }
+  if (err.kind === "ambiguous") {
+    const argList = err.argTypes.map((t) => t ?? "?").join(", ");
+    const candidateList = err.candidates
+      .map((o) => `${term.name}(${o.params.join(", ")})`)
+      .join(", ");
+    throw new AnalyzerError(
+      `Function '${term.name}' call with argument types (${argList}) is ambiguous between: ${candidateList}`,
+      cst?.offset,
+      cst?.end,
+    );
+  }
+  // unknown-name and arity-mismatch are caught by the analyzer's
+  // pre-typing pass; reaching here would be a bug.
+  throw new AnalyzerError(
+    `Internal error: unexpected resolution error '${err.kind}' for function '${term.name}'`,
+    cst?.offset,
+    cst?.end,
+  );
+}
+
+function checkRangeExprTypes(
+  range: RangeAtom,
+  rule: Rule,
+  varTypes: Map<string, PrimitiveType>,
+  types: Map<string, (PrimitiveType | undefined)[]>,
+): void {
+  const lowType = inferTermType(range.low, varTypes, types);
+  const highType = inferTermType(range.high, varTypes, types);
+  const exprType = inferTermType(range.expr, varTypes, types);
+
+  if (lowType && !isNumericType(lowType)) {
+    const cst = range.low.$cstNode;
+    throw new AnalyzerError(
+      `Range lower bound has non-numeric type '${lowType}'`,
+      cst?.offset,
+      cst?.end,
+    );
+  }
+  if (highType && !isNumericType(highType)) {
+    const cst = range.high.$cstNode;
+    throw new AnalyzerError(
+      `Range upper bound has non-numeric type '${highType}'`,
+      cst?.offset,
+      cst?.end,
+    );
+  }
+  if (exprType && !isNumericType(exprType)) {
+    const cst = range.expr.$cstNode;
+    throw new AnalyzerError(
+      `Range expression has non-numeric type '${exprType}'`,
+      cst?.offset,
+      cst?.end,
+    );
+  }
+  // Per the spec, binding ranges enumerate integers. When the LHS is a
+  // bare variable *and* nothing else in the rule body binds it, this
+  // range is the variable's only source — the translator can only
+  // synthesise an integer series, so float-typed bounds would surface
+  // downstream as an "Unbound variable" crash. Reject that here with a
+  // position-bearing error. Filter ranges (LHS already bound elsewhere,
+  // or LHS a complex expression) are still allowed to have float bounds.
+  if (range.expr.$type === "Variable" && !isBoundElsewhere(range, range.expr.name, rule)) {
+    if (lowType && lowType !== "integer") {
+      const cst = range.low.$cstNode;
+      throw new AnalyzerError(
+        `Binding range '${range.expr.name} in [...]' requires integer bounds; got '${lowType}' for the lower bound`,
+        cst?.offset,
+        cst?.end,
+      );
+    }
+    if (highType && highType !== "integer") {
+      const cst = range.high.$cstNode;
+      throw new AnalyzerError(
+        `Binding range '${range.expr.name} in [...]' requires integer bounds; got '${highType}' for the upper bound`,
+        cst?.offset,
+        cst?.end,
+      );
+    }
+  }
+}
+
+/**
+ * True if `name` is bound by something other than `self` in `rule`'s body:
+ * a positive atom's Variable arg, either bare-variable side of an equality,
+ * or the LHS of another RangeAtom. Used to decide whether a range is the sole
+ * binding site for its expr variable (binding range) or an additional
+ * constraint on a variable already bound elsewhere (filter range).
+ */
+function isBoundElsewhere(self: RangeAtom, name: string, rule: Rule): boolean {
+  for (const elem of rule.body) {
+    if (elem === self) continue;
+    if (elem.$type === "Literal" && !elem.negated) {
+      for (const arg of elem.args) {
+        if (arg.$type === "Variable" && arg.name === name) return true;
+      }
+    } else if (elem.$type === "Equality") {
+      if (
+        (elem.left.$type === "Variable" && elem.left.name === name) ||
+        (elem.expr.$type === "Variable" && elem.expr.name === name)
+      ) {
+        return true;
+      }
+    } else if (
+      elem.$type === "RangeAtom" &&
+      elem.expr.$type === "Variable" &&
+      elem.expr.name === name
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Infer the type of a term expression given variable types and predicate column types. */
+export function inferTermType(
+  term: HeadTerm,
+  varTypes: Map<string, PrimitiveType>,
+  types: ReadonlyMap<string, ReadonlyArray<PrimitiveType | undefined>>,
+): PrimitiveType | undefined {
+  switch (term.$type) {
+    case "StringLiteral":
+      return "string";
+    case "NumberLiteral":
+      return isFloatLiteral(term) || !Number.isInteger(term.value) ? "float" : "integer";
+    case "BooleanLiteral":
+      return "boolean";
+    case "NullLiteral":
+      // Polymorphic: null doesn't anchor a type. Treated by downstream
+      // checks the same way as a variable whose type couldn't yet be
+      // inferred — it composes with anything via `=`/`<>`, propagates
+      // through arithmetic and other comparisons, and (per §5.4) makes
+      // its expression NULL at runtime.
+      return undefined;
+    case "Variable":
+      return varTypes.get(term.name);
+    case "BinaryExpr": {
+      if (term.op === "&&" || term.op === "||") return "boolean";
+      if (COMPARISON_OPS.has(term.op)) return "boolean";
+      // Bitwise / shift ops always yield an integer (32-bit signed),
+      // regardless of whether an operand is an unresolved null.
+      if (BITWISE_OPS.has(term.op)) return "integer";
+      // Exponentiation is always float (like the `power` builtin it
+      // replaces), even for integer operands: `2 ** 3` is `8.0`.
+      if (term.op === "**") return "float";
+      const leftType = inferTermType(term.left, varTypes, types);
+      const rightType = inferTermType(term.right, varTypes, types);
+      if (term.op === "+" && (leftType === "string" || rightType === "string")) {
+        return "string";
+      }
+      return numericResultType(leftType, rightType, term.op);
+    }
+    case "UnaryExpr":
+      if (term.op === "!") return "boolean";
+      return inferTermType(term.operand, varTypes, types);
+    case "FunctionCall":
+      return inferCallType(term.name, term.args, varTypes, types);
+    case "AggregateCall":
+      return inferAggregateType(term.func, term.arg, varTypes, types);
+    case "Subscript": {
+      const objType = inferTermType(term.object, varTypes, types);
+      if (!objType) return undefined;
+      return objType === "value" ? "value" : "string";
+    }
+    case "Slice": {
+      const objType = inferTermType(term.object, varTypes, types);
+      if (!objType) return undefined;
+      return objType === "value" ? "value" : "string";
+    }
+    case "ArrayLiteral":
+    case "ObjectLiteral":
+      return "value";
+  }
+}
+
+/**
+ * Return type of a built-in function call. Defers to the overload
+ * registry: `resolveCall` returns a `resultType` whenever every viable
+ * overload agrees on it (so single-overload built-ins resolve eagerly,
+ * and multi-overload sets converge once arg types narrow).
+ */
+function inferCallType(
+  name: string,
+  args: HeadTerm[],
+  varTypes: Map<string, PrimitiveType>,
+  types: ReadonlyMap<string, ReadonlyArray<PrimitiveType | undefined>>,
+): PrimitiveType | undefined {
+  const argTypes = args.map((a) => inferTermType(a, varTypes, types));
+  return resolveCall(name, argTypes).resultType;
+}
+
+/** Return type of an aggregate function call. */
+function inferAggregateType(
+  func: string,
+  arg: HeadTerm,
+  varTypes: Map<string, PrimitiveType>,
+  types: ReadonlyMap<string, ReadonlyArray<PrimitiveType | undefined>>,
+): PrimitiveType | undefined {
+  switch (func) {
+    case "count":
+      return "integer";
+    case "sum": {
+      const argType = inferTermType(arg, varTypes, types);
+      return argType === "float" ? "float" : "integer";
+    }
+    case "avg":
+      return "float";
+    case "min":
+    case "max":
+      return inferTermType(arg, varTypes, types);
+    case "concat":
+      return "string";
+    case "list":
+      return "value";
+    default:
+      return undefined;
+  }
+}
+
+/** Determine the result type of an arithmetic operation. */
+function numericResultType(
+  left: PrimitiveType | undefined,
+  right: PrimitiveType | undefined,
+  op: string,
+): PrimitiveType | undefined {
+  if (op === "/" || op === "%") {
+    if (left === "float" || right === "float") return "float";
+    if (left === "integer" && right === "integer") return "integer";
+    return left ?? right;
+  }
+  if (left === "float" || right === "float") return "float";
+  if (left === "integer" || right === "integer") return "integer";
+  return left ?? right;
+}
+
+/**
+ * Join two types across multiple rules: widen `integer`/`float` to `float`,
+ * leave same-type joins unchanged, and return `null` on any other pair
+ * (e.g. `integer` and `string`, or `boolean` and `float`). Callers that work
+ * across rule heads turn a `null` into an `AnalyzerError`; callers inside
+ * range-bound inference pass it through as "unknown" and let the separate
+ * range-bound validation report the mismatch with its own location.
+ */
+function joinTypes(a: PrimitiveType | undefined, b: PrimitiveType): PrimitiveType | null {
+  if (!a) return b;
+  if (a === b) return a;
+  if ((a === "float" && b === "integer") || (a === "integer" && b === "float")) return "float";
+  return null;
+}
+
+/**
+ * Like `joinTypes`, but additionally accepts a primitive ↔ value
+ * pair by lifting the primitive side to `value`. Used at every site
+ * where an expression appears in a position that demands a specific
+ * type (atom args, equalities, comparisons, function args, iteration
+ * sources, IDB column unification): a `string` / `integer` / `float` /
+ * `boolean` can stand in for a `value` slot, and the translator emits
+ * the appropriate `dialect.toJson` lift at SQL-generation time.
+ *
+ * `joinTypes` itself is left strict so arithmetic and range-bound
+ * type rules don't silently accept nonsense like `5 + value`.
+ */
+function joinTypesWithJsonLift(
+  a: PrimitiveType | undefined,
+  b: PrimitiveType,
+): PrimitiveType | null {
+  const direct = joinTypes(a, b);
+  if (direct !== null) return direct;
+  if (a === "value" && b !== "value") return "value";
+  if (b === "value" && a !== undefined && a !== "value") return "value";
+  return null;
+}
+
+/**
+ * Widen `current` with `next` for column `i` of `predicate`, throwing a
+ * useful `AnalyzerError` if the two can't be unified. Used wherever the
+ * join comes from stacking multiple rule heads onto the same IDB column.
+ */
+function unifyColumnType(
+  current: PrimitiveType | undefined,
+  next: PrimitiveType,
+  predicate: string,
+  columnIndex: number,
+  pos?: [number, number],
+): PrimitiveType {
+  const joined = joinTypesWithJsonLift(current, next);
+  if (joined === null) {
+    throw new AnalyzerError(
+      `Column ${columnIndex + 1} of predicate '${predicate}' has conflicting types '${current}' and '${next}'`,
+      ...(pos ?? []),
+    );
+  }
+  return joined;
+}

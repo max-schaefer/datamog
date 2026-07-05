@@ -1,0 +1,5 @@
+{
+  "name": "Array / object literals",
+  "description": "Construct `value`s inline with array `[...]` and object `{\"k\": v}` literals",
+  "order": 120
+}

@@ -1,0 +1,23 @@
+# Exercise 1.3 sample solution.
+#
+# Any three sensibly-typed additions would do. The second query
+# pins the third column to a specific year — here, 1927, to
+# demonstrate that `john_mccarthy` is matched.
+
+person("ada_lovelace",    "uk", 1815).
+person("alan_turing",     "uk", 1912).
+person("grace_hopper",    "us", 1906).
+person("edsger_dijkstra", "nl", 1930).
+person("john_mccarthy",   "us", 1927).
+person("tony_hoare",      "uk", 1934).
+person("barbara_liskov",  "us", 1939).
+person("niklaus_wirth",   "ch", 1934).
+
+# Added rows.
+person("donald_knuth",    "us", 1938).
+person("leslie_lamport",  "us", 1941).
+person("margaret_hamilton", "us", 1936).
+
+?- person(Name, Country, Year).
+
+?- person(Name, Country, 1927).

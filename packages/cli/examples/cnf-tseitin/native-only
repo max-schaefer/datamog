@@ -1,0 +1,8 @@
+Unlike cnf-from-ast, the SQL backends do not *reject* this example: the
+Tseitin encoding has no non-linear recursion, so it translates to valid SQL
+(see `--dry-run`). It is marked native-only because the shared truth-table
+enumeration is impractically slow on SQLite once the variable count is
+computed rather than a literal: SQLite regenerates the unmaterialized
+assignment view inside the engine's correlated subqueries. The examples test
+therefore skips the sqlite backend here and uses seminaive as the canonical
+source for expected.json.

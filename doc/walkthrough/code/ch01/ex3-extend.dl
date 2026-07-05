@@ -1,0 +1,20 @@
+# Exercise 1.3 — Extend the data.
+#
+# This starter uses inline facts (no CSV). Add three more scientists
+# of your choosing — fill in all three columns. Then add a second
+# query that asks about a specific birth year.
+
+person("ada_lovelace",    "uk", 1815).
+person("alan_turing",     "uk", 1912).
+person("grace_hopper",    "us", 1906).
+person("edsger_dijkstra", "nl", 1930).
+person("john_mccarthy",   "us", 1927).
+person("tony_hoare",      "uk", 1934).
+person("barbara_liskov",  "us", 1939).
+person("niklaus_wirth",   "ch", 1934).
+
+# TODO: add three more `person(...)` facts.
+
+?- person(Name, Country, Year).
+
+# TODO: add a second query about a specific year.

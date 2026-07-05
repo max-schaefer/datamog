@@ -1,0 +1,5 @@
+{
+  "name": "Transitive Closure",
+  "description": "Linear vs quadratic formulation — why SQL only handles one",
+  "order": 80
+}

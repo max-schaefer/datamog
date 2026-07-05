@@ -1,0 +1,128 @@
+# Pokedex tutorial - a Datalog view over nested JSON documents.
+#
+# This program carves flat relations out of five live JSON sources. The
+# first two are the community pokedex.json / types.json from
+#   https://github.com/Purukitto/pokemon-data.json
+# and the rest are Pokemon Showdown's battle data
+#   https://play.pokemonshowdown.com/data/
+# (pokedex.json has no move data, so learns / move_* come from Showdown).
+#
+# Each source is a single JSON document, so the JSON loader ingests it as
+# ONE row whose column holds the whole value; rules then iterate it with
+# array_element / object_entry to expose one fact per Pokemon / move / etc.
+#
+# Showdown keys Pokemon by string id ("bulbasaur"); we key on the
+# national-dex Id everywhere, bridging the two via Showdown's own pokedex
+# `num` field (see showdown_key / learns below).
+#
+# Run it (all five sources fetched live over HTTPS). The two GitHub
+# sources use the `gh:OWNER/REPO/PATH` shorthand (ref defaults to HEAD):
+#
+#   bun run datamog \
+#     --extensional pokedex=gh:Purukitto/pokemon-data.json/pokedex.json \
+#     --extensional types=gh:Purukitto/pokemon-data.json/types.json \
+#     --extensional moves=https://play.pokemonshowdown.com/data/moves.json \
+#     --extensional learnsets=https://play.pokemonshowdown.com/data/learnsets.json \
+#     --extensional showdex=https://play.pokemonshowdown.com/data/pokedex.json \
+#     doc/pokedex/pokedex.dl
+
+extensional pokedex(data: value).     # array of Pokemon species
+extensional types(data: value).       # array of 18 types + effectiveness
+extensional moves(data: value).       # object keyed by move id (Showdown)
+extensional learnsets(data: value).   # object keyed by Pokemon id (Showdown)
+extensional showdex(data: value).     # Showdown pokedex: id -> {num, ...}
+
+# --- From pokedex.json (keyed by national-dex Id) --------------------
+
+# One fact per Pokemon: numeric id, English name, and base HP.
+# `P["name"]["english"]` chains subscripts through the nested objects;
+# `as_integer` / `as_string` coerce the `value` leaves to primitives.
+pokemon(Id, Name, HP) :-
+    pokedex(D),
+    array_element(D, _, P),
+    Id   = as_integer(P["id"]),
+    Name = as_string(P["name"]["english"]),
+    HP   = as_integer(P["base"]["HP"]).
+
+# `type` is a JSON array on each Pokemon, so iterating it with a second
+# `array_element` yields one (id, type) fact per type the Pokemon has.
+type(Id, Type) :-
+    pokedex(D),
+    array_element(D, _, P),
+    Id   = as_integer(P["id"]),
+    array_element(P["type"], _, T),
+    Type = as_string(T).
+
+# Base Special Attack stat (the `base` object key is "Sp. Attack").
+pokemon_spa(Id, SpA) :-
+    pokedex(D),
+    array_element(D, _, P),
+    Id  = as_integer(P["id"]),
+    SpA = as_integer(P["base"]["Sp. Attack"]).
+
+# `profile.ability` is an array of [name, hidden-flag] pairs, e.g.
+# [["Overgrow", "false"], ["Chlorophyll", "true"]]; project the names.
+pokemon_ability(Id, Ability) :-
+    pokedex(D),
+    array_element(D, _, P),
+    Id      = as_integer(P["id"]),
+    array_element(P["profile"]["ability"], _, A),
+    Ability = as_string(A[0]).
+
+# --- From types.json (keyed by type name, joins to `type`) -----------
+
+# Each type entry lists the types it hits super-effectively in its
+# `effective` array. One fact per (attacking type, defending type).
+super_effective(Attacker, Defender) :-
+    types(D),
+    array_element(D, _, T),
+    Attacker = as_string(T["english"]),
+    array_element(T["effective"], _, E),
+    Defender = as_string(E).
+
+# --- From Showdown moves.json (keyed by move id) ---------------------
+
+# Move id -> "Physical" / "Special" / "Status".
+move_category(Move, Category) :-
+    moves(D),
+    object_entry(D, Move, M),
+    Category = as_string(M["category"]).
+
+# Move id -> integer priority (most moves are 0; e.g. quickattack is 1).
+move_priority(Move, Priority) :-
+    moves(D),
+    object_entry(D, Move, M),
+    Priority = as_integer(M["priority"]).
+
+# --- Bridge: Showdown id <-> national-dex Id -------------------------
+
+# Showdown's own pokedex carries each entry's national-dex number in
+# `num`, so translating its string ids to our `Id` is a plain join, no
+# fragile name munging. Alternate forms (mega, regional) share their base
+# species' `num`, so their learnsets fold into the base species below.
+showdown_key(Id, Key) :-
+    showdex(D),
+    object_entry(D, Key, E),
+    Id = as_integer(E["num"]).
+
+# --- From Showdown learnsets.json, keyed on the national-dex Id ------
+
+# One fact per (national-dex Id, move id) the Pokemon can learn. The
+# inner `learnset` object maps move id -> array of source codes; we only
+# need the keys, so the value is a don't-care. `showdown_key` rewrites
+# the learnset's string id to our numeric Id.
+learns(Id, Move) :-
+    learnsets(L),
+    object_entry(L, Key, E),
+    showdown_key(Id, Key),
+    object_entry(E["learnset"], Move, _).
+
+# --- Targeted, deterministic demo queries ----------------------------
+# (Bulbasaur is #1: Grass / Poison, Sp. Attack 65, ability Overgrow.)
+?- pokemon(1, Name, HP).
+?- type(1, Type).
+?- pokemon_spa(1, SpA).
+?- super_effective("Fighting", Defender).
+?- move_category("absorb", Category).
+?- move_priority("quickattack", Priority).
+?- showdown_key(1, ShowdownId).

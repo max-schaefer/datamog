@@ -1,0 +1,59 @@
+---
+import { getCollection } from "astro:content";
+import { DECKS, baseName, deckSequence } from "../decks";
+
+interface Props {
+  /** Part number of the deck this overview is shown in; highlights "you are here". */
+  currentPart?: number;
+  /**
+   * Progress mode: the last part completed. Parts up to and including this one
+   * are marked "done"; the next part is marked "next up".
+   */
+  completedThrough?: number;
+}
+
+const { currentPart, completedThrough } = Astro.props;
+const base = import.meta.env.BASE_URL;
+const all = await getCollection("slides");
+
+// The roadmap lists the course parts; each row links to that deck's first
+// slide (its title slide), base-aware so it survives a sub-path deploy.
+const parts = DECKS.filter((d) => d.part !== undefined);
+const href = (deck: (typeof parts)[number]) =>
+  `${base}${deck.slug}/${baseName(deckSequence(deck, all)[0].id)}/`;
+
+// One state per row. Progress mode (end-of-part roadmap): parts up to the
+// completed one are "done", the next is "next up". Current mode (opening
+// overview): earlier parts are "done", the current part is "you are here".
+const stateOf = (part: number): string | undefined => {
+  if (completedThrough !== undefined) {
+    if (part <= completedThrough) return "done";
+    if (part === completedThrough + 1) return "next";
+    return undefined;
+  }
+  if (currentPart === undefined) return undefined;
+  if (part < currentPart) return "done";
+  if (part === currentPart) return "current";
+  return undefined;
+};
+---
+
+<div class="roadmap">
+  {
+    parts.map((d) => {
+      const state = stateOf(d.part!);
+      return (
+        <a
+          class:list={["roadmap__item", state && `roadmap__item--${state}`]}
+          href={href(d)}
+        >
+          <span class="roadmap__n">Part {d.part}</span>
+          <span class="roadmap__text">
+            <span class="roadmap__t">{d.title}</span>
+            <span class="roadmap__d">{d.tagline ?? d.blurb}</span>
+          </span>
+        </a>
+      );
+    })
+  }
+</div>

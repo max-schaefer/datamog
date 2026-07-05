@@ -1,0 +1,110 @@
+# Parse an arithmetic expression, evaluate it, and find the fewest operator
+# changes that make it equal a target. The whole pipeline runs in Datalog:
+# string -> syntax tree -> value -> minimal repair.
+#
+# The language is single-digit numbers with +, -, * and parentheses; * binds
+# tighter than + and -, and all three operators are left-associative.
+#
+# This is non-linear (parentheses close the grammar's cycle, and the evaluator
+# reads two children) and impure (the search ranges over labellings), so run it
+# on an in-memory backend:
+#
+#     bun run datamog --backend seminaive expression-fixer.dl
+#
+# The input 1 + 2 * 3 evaluates to 7; the target is 6. Two single changes reach
+# it: turn the * into + (1+2+3) or the + into * (1*2*3).
+
+input("1+2*3").
+target(6).
+
+# === Parse: string -> syntax tree =========================================
+#
+# char(I, C) is the character at position I. A node's id is the position of its
+# operator character, or of its digit for a leaf. That id is unique only for
+# the final tree (a chart records the same operator in several partial parses),
+# so we walk the tree top-down with want(F, T) and record each node once.
+
+char(I, C) :- input(S), I in [0 .. length(S) - 1], C = S[I].
+len(N) :- input(S), N = length(S).
+addop("+").
+addop("-").
+
+factor(F, F + 1, F) :- char(F, C), C >= "0", C <= "9".
+factor(F, T, Id) :- char(F, "("), expr(F + 1, M, Id), char(M, ")"), T = M + 1.
+term(F, T, Id) :- factor(F, T, Id).
+term(F, T, M) :- term(F, M, _), char(M, "*"), factor(M + 1, T, _).
+expr(F, T, Id) :- term(F, T, Id).
+expr(F, T, M) :- expr(F, M, _), char(M, C), addop(C), term(M + 1, T, _).
+
+split_add(F, T, M) :- char(M, C), addop(C), expr(F, M, _), term(M + 1, T, _).
+split_mul(F, T, M) :- char(M, "*"), term(F, M, _), factor(M + 1, T, _).
+paren(F, T, M) :- char(F, "("), expr(F + 1, M, _), char(M, ")"), T = M + 1.
+leaf(F, F + 1) :- char(F, C), C >= "0", C <= "9".
+
+want(0, N) :- len(N).
+want(F, M)     :- want(F, T), split_add(F, T, M).
+want(M + 1, T) :- want(F, T), split_add(F, T, M).
+want(F, M)     :- want(F, T), split_mul(F, T, M).
+want(M + 1, T) :- want(F, T), split_mul(F, T, M).
+want(F + 1, M) :- want(F, T), paren(F, T, M).
+
+num(F, V) :- want(F, T), leaf(F, T), char(F, C), V = to_integer(C).
+binop(M, C, LId, RId) :- want(F, T), split_add(F, T, M), char(M, C), expr(F, M, LId), term(M + 1, T, RId).
+binop(M, "*", LId, RId) :- want(F, T), split_mul(F, T, M), term(F, M, LId), factor(M + 1, T, RId).
+root(Id) :- len(N), expr(0, N, Id).
+
+# === Evaluate the original expression =====================================
+
+eval(Id, V) :- num(Id, V).
+eval(Id, A + B) :- binop(Id, "+", L, R), eval(L, A), eval(R, B).
+eval(Id, A - B) :- binop(Id, "-", L, R), eval(L, A), eval(R, B).
+eval(Id, A * B) :- binop(Id, "*", L, R), eval(L, A), eval(R, B).
+original(V) :- root(Id), eval(Id, V).
+
+# === Search: relabel operators to hit the target ==========================
+#
+# The tree shape is fixed; only operator labels change. With k operator nodes
+# there are 3^k labellings, encoded as a base-3 number A: the operator of rank
+# r reads digit r, (A / 3^r) % 3, mapped 0->"+", 1->"-", 2->"*". Ranks are dense
+# (0..k-1) via a count, so the sparse position ids do not matter for the search.
+
+opnode(Id) :- binop(Id, _, _, _).
+oprank_raw(Id, count(Other)) :- opnode(Id), opnode(Other), Other <= Id.
+oprank(Id, K - 1) :- oprank_raw(Id, K).
+nops(count(Id)) :- opnode(Id).
+
+pow3(0, 1).
+pow3(R + 1, 3 * P) :- pow3(R, P), nops(K), R < K.
+
+assignment(A) :- nops(K), pow3(K, Total), A in [0 .. Total - 1].
+op_of(0, "+").
+op_of(1, "-").
+op_of(2, "*").
+assigned_op(A, Id, Op) :-
+    assignment(A), oprank(Id, R), pow3(R, P), D = (A / P) % 3, op_of(D, Op).
+
+eval_as(A, Id, V) :- assignment(A), num(Id, V).
+eval_as(A, Id, X + Y) :- assigned_op(A, Id, "+"), binop(Id, _, L, R), eval_as(A, L, X), eval_as(A, R, Y).
+eval_as(A, Id, X - Y) :- assigned_op(A, Id, "-"), binop(Id, _, L, R), eval_as(A, L, X), eval_as(A, R, Y).
+eval_as(A, Id, X * Y) :- assigned_op(A, Id, "*"), binop(Id, _, L, R), eval_as(A, L, X), eval_as(A, R, Y).
+
+fix(A) :- root(Id), target(T), eval_as(A, Id, V), V = T.
+
+# === Fewest changes =======================================================
+#
+# Per fix, flag each operator 1 (changed) or 0 (unchanged) and sum. Summing
+# flags keeps a row even for a fix that changes none or all of the operators.
+
+change_flag(A, Id, 1) :- fix(A), opnode(Id), assigned_op(A, Id, New), binop(Id, Old, _, _), New != Old.
+change_flag(A, Id, 0) :- fix(A), opnode(Id), assigned_op(A, Id, New), binop(Id, Old, _, _), New = Old.
+change_count(A, sum(F)) :- change_flag(A, Id, F).
+min_changes(min(N)) :- change_count(_, N).
+best_fix(A) :- change_count(A, N), min_changes(N).
+
+# Each best fix as the edits it makes: in fix A, at character position Pos,
+# change operator Old to New.
+edit(A, Pos, Old, New) :- best_fix(A), opnode(Pos), assigned_op(A, Pos, New), binop(Pos, Old, _, _), New != Old.
+
+?- original(V).
+?- min_changes(N).
+?- edit(A, Pos, Old, New).

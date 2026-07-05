@@ -1,0 +1,276 @@
+grammar Datamog
+
+// =============================================================================
+// Datamog — an educational Datalog dialect
+//
+// Extensional declarations define table-backed predicates.
+// Rules compile to SQL views (including recursive views).
+// Queries execute SELECT statements against the generated views.
+// =============================================================================
+
+entry Program:
+    statements+=Statement*;
+
+// --- Statements --------------------------------------------------------------
+
+Statement:
+    ExtDecl | Rule | Query;
+
+ExtDecl:
+    'extensional' predicate=Identifier '(' columns+=ColumnDecl (',' columns+=ColumnDecl)* ')' '.';
+
+ColumnDecl:
+    name=Identifier ':' type=PrimitiveType (nullable?='?')?;
+
+PrimitiveType returns string:
+    'string' | 'integer' | 'float' | 'boolean' | 'value';
+
+// Using `':' '-'` as two tokens instead of the composite `:-` keyword so
+// that the lexer doesn't greedily munch the `:` in a slice like
+// `W[0:-1]` together with its leading `-`.
+Rule:
+    head=HeadAtom (':' '-' body+=BodyElement (',' body+=BodyElement)*)? '.';
+
+// Queries are syntactically (almost) the same as rule bodies — a
+// conjunction of literals / equalities / range atoms / filters — so the
+// same conjunctive shape that defines rules also expresses ad-hoc
+// joins, filters, and computations at the top level. The projection
+// is implicit: every distinct non-anonymous Variable that appears in
+// the body becomes one output column, in first-mention source order.
+Query:
+    '?-' body+=BodyElement (',' body+=BodyElement)* '.';
+
+// --- Head (allows aggregates) ------------------------------------------------
+
+HeadAtom:
+    predicate=Identifier '(' (args+=HeadTerm (',' args+=HeadTerm)*)? ')';
+
+// HeadTerm parses as a plain Expression — aggregate calls (`count(X)`,
+// `sum(X)`, ...) look syntactically identical to FunctionCall and
+// would otherwise make HeadTerm ambiguous. Post-processing rewrites
+// FunctionCall nodes whose name is an aggregate into AggregateCall
+// when they appear at the top level of a head.
+HeadTerm:
+    Expression;
+
+// Not referenced directly by the grammar — synthesised by post-processing
+// so downstream stages (analyzer, translator) can rely on the AggregateCall
+// AST type.
+AggregateCall:
+    func=IDENT '(' arg=Expression ')';
+
+// --- Body elements -----------------------------------------------------------
+//
+// Three shapes share a leading `Expression` and differ only in the
+// trailing operator: Equality (`=`), RangeAtom (`in`), and Filter
+// (catch-all — the expression itself is a boolean filter). The parser
+// commits based on the token that follows the leading expression.
+//
+// Comparisons (`X > 0`) used to be a body-level construct of their own.
+// They're now part of the expression hierarchy, so `X > 0` reaches the
+// body as a Filter whose expression is a comparison BinaryExpr.
+
+BodyElement:
+    Literal | Equality | RangeAtom | Filter;
+
+// A body literal: a positive or negated atom. An "atom" by itself is the
+// positive form `p(...)`; prefixing `not` produces a negated literal.
+// (The AST stays flat — `negated`/`predicate`/`args` — for ergonomics;
+// see the spec BNF for the formal two-rule structure.)
+Literal:
+    (negated?='not')? predicate=Identifier '(' (args+=Expression (',' args+=Expression)*)? ')';
+
+// Equality covers both binding (`X = expr`, left side is a bare variable
+// or other unbound shape) and non-binding constraints (`X + 1 = Y`).
+//
+// The LHS is parsed at `Addition` level — *below* Cmp's `=`/`<>`
+// operators — so a body element like `D = X * 2` reliably parses as
+// body Equality (left=`D`, expr=`X * 2`) rather than as a Filter whose
+// expression is the Cmp `D = (X * 2)`. Anything that wants the LHS
+// to involve a comparison can wrap it in parentheses, but no realistic
+// LHS shape today (variable, function call, arithmetic, subscript) is
+// at the Cmp level anyway.
+//
+// The RHS is the full Expression so a logical-equality test can appear
+// on the right (`B = (X = null)`).
+Equality:
+    left=Addition '=' expr=Expression;
+
+RangeAtom:
+    expr=Expression 'in' '[' low=Expression '..' high=Expression ']';
+
+// A boolean Expression used as a filter on the rule's body. Catch-all
+// for any body shape that isn't a Literal, Equality, or RangeAtom — the
+// analyser checks the expression's type is `boolean`.
+//
+// A leading `not` negates a built-in atom (`not X = Y`, `not Age < 18`):
+// any atom can be negated, not just predicate calls. Post-processing
+// desugars the `negated` flag into a logical `!(...)` over `expr`, so
+// downstream stages see an ordinary boolean filter. (Predicate calls
+// still take the `not` on Literal — that alternative is tried first, so
+// `not p(X)` stays a negated literal, never a negated filter.)
+Filter:
+    (negated?='not')? expr=Expression;
+
+// --- Expressions (precedence climbing) ---------------------------------------
+//
+// Precedence (lowest binding to highest):
+//   ||  (logical or)
+//   &&  (logical and)
+//   |   (bitwise or)
+//   ^   (bitwise xor)
+//   &   (bitwise and)
+//   <  <=  >  >=  ==  !=  =  <>   (comparison, non-associative)
+//   << >> >>> (bit shifts)
+//   +/- (additive)
+//   * / % (multiplicative — `%` is modulo)
+//   ! / - (unary)
+//   ** (exponentiation, right-associative — binds tighter than * / %)
+//
+// `&&`/`||`/`!` are *logical*, not bitwise — operands and result must
+// be boolean. Three-valued logic with NULL matches SQL semantics
+// (`NULL && false = false`, `NULL || true = true`, `!NULL = NULL`),
+// so the same expression behaves identically across all four backends
+// and the native evaluator. Comparisons return boolean.
+//
+// `&`/`|`/`^`/`<<`/`>>`/`>>>` are *bitwise*, operating on 32-bit signed
+// two's-complement integers (Java/JS `int` semantics): operands and
+// result are `integer`, `>>` is arithmetic (sign-extending), `>>>` is
+// logical (zero-fill), and the shift count is taken mod 32. NULL
+// propagates. The 32-bit width matches the integer column type so the
+// result is identical on every backend (see spec §5.9).
+//
+// Two equality families: `=`/`<>` are *logical* equality (null-aware —
+// `null = null` is true, `null = X` is false), and `==`/`!=` are
+// *computational* equality (3VL — `null == X` is null). Body-level
+// Equality (`X = expr`) reuses the logical operator and additionally
+// binds an unbound LHS.
+
+Expression:
+    Or;
+
+Or infers Expression:
+    And ({infer BinaryExpr.left=current} op='||' right=And)*;
+
+And infers Expression:
+    BitOr ({infer BinaryExpr.left=current} op='&&' right=BitOr)*;
+
+BitOr infers Expression:
+    BitXor ({infer BinaryExpr.left=current} op='|' right=BitXor)*;
+
+BitXor infers Expression:
+    BitAnd ({infer BinaryExpr.left=current} op='^' right=BitAnd)*;
+
+BitAnd infers Expression:
+    Cmp ({infer BinaryExpr.left=current} op='&' right=Cmp)*;
+
+// Non-associative: `?` rather than `*` so `X > Y > Z` is a parse
+// error rather than a misleading `(X > Y) > Z`.
+Cmp infers Expression:
+    Shift ({infer BinaryExpr.left=current} op=('<' | '<=' | '>' | '>=' | '==' | '!=' | '=' | '<>') right=Shift)?;
+
+Shift infers Expression:
+    Addition ({infer BinaryExpr.left=current} op=('<<' | '>>' | '>>>') right=Addition)*;
+
+Addition infers Expression:
+    Multiplication ({infer BinaryExpr.left=current} op=('+' | '-') right=Multiplication)*;
+
+Multiplication infers Expression:
+    Exponent ({infer BinaryExpr.left=current} op=('*' | '/' | '%') right=Exponent)*;
+
+// Exponentiation `**` binds tighter than the multiplicative operators and
+// is right-associative (`2 ** 3 ** 2` is `2 ** (3 ** 2)`), matching JS. The
+// left operand is a UnaryExpr, so `-2 ** 2` is `(-2) ** 2`. The result is
+// always `float`, with the same domain guards the old `power` builtin had.
+Exponent infers Expression:
+    UnaryExpr ({infer BinaryExpr.left=current} op='**' right=Exponent)?;
+
+UnaryExpr infers Expression:
+    {infer UnaryExpr} op=('-' | '!') operand=UnaryExpr
+    | Postfix;
+
+// Both Subscript (`W[i]`) and Slice (`W[i:j]`) start with `[ Expression`,
+// and Chevrotain can't decide between them with fixed lookahead once the
+// first Expression is non-trivial (e.g. `W[0:-1]` — the parser has to
+// scan past the entire first Expression before it sees the disambiguating
+// token). We parse a unified `BracketAccess` form and let the
+// post-processing pass split it into Subscript or Slice based on whether
+// a `:` was present.
+Postfix infers Expression:
+    Primary
+    (
+        {infer BracketAccess.object=current} '['
+        (start=Expression)?
+        (sliceColon?=':' (end=Expression)?)?
+        ']'
+    )*;
+
+// Not referenced from any parse rule — kept so Langium still generates
+// the `Subscript` and `Slice` AST types that post-processing synthesises
+// from `BracketAccess`.
+Subscript:
+    object=Expression '[' index=Expression ']';
+
+Slice:
+    object=Expression '[' start=Expression? ':' end=Expression? ']';
+
+Primary infers Expression:
+    '(' Expression ')'
+    | FunctionCall
+    | {infer Variable} name=Identifier
+    | {infer StringLiteral} value=STRING
+    | {infer NumberLiteral} value=NUMBER
+    | {infer BooleanLiteral} (value?='true' | 'false')
+    | {infer NullLiteral} 'null'
+    | ArrayLiteral
+    | ObjectLiteral
+    // A bare `*` is the row-count wildcard. It parses as a Primary anywhere
+    // (like the don't-care `_`), but the analyzer restricts it to the single
+    // argument of `count(*)`.
+    | {infer Wildcard} '*';
+
+FunctionCall:
+    name=IDENT '(' args+=Expression (',' args+=Expression)* ')';
+
+// A single identifier surface shared by predicates, variables, function
+// names, column names. Case is a stylistic convention (uppercase =
+// variable, lowercase = predicate, mirroring Prolog) but the grammar no
+// longer enforces it — `Foo(X)` is a predicate, `foo` is a variable.
+// FunctionCall vs Variable in Primary, and Literal vs Filter in body
+// position, are disambiguated by whether `(` follows the identifier.
+Identifier returns string:
+    IDENT | QUOTED_IDENT;
+
+// JSON-style construction. Both literals produce a `value` (an array
+// or object). Element expressions of any primitive type are auto-lifted
+// (the translator wraps them via the dialect's primitive-to-value
+// conversion); already-`value` elements pass through unchanged. Keys in
+// object literals must be string literals, the same shape JSON object
+// keys take.
+ArrayLiteral:
+    {infer ArrayLiteral} '[' (elements+=Expression (',' elements+=Expression)*)? ']';
+
+ObjectLiteral:
+    {infer ObjectLiteral} '{' (entries+=ObjectEntry (',' entries+=ObjectEntry)*)? '}';
+
+ObjectEntry:
+    key=STRING ':' value=Expression;
+
+// --- Terminals ---------------------------------------------------------------
+
+// A single identifier surface: any identifier can be a predicate, a
+// function name, or a variable; the role is determined by syntactic
+// context (an identifier followed by `(` is a predicate or function
+// call; otherwise it's a variable). Backticks are a pure escape
+// mechanism for names that contain characters the bare IDENT pattern
+// wouldn't accept (or that collide with keywords).
+terminal IDENT: /[a-zA-Z_][a-zA-Z0-9_]*/;
+terminal QUOTED_IDENT: /`(\\.|[^`\\\n\r])+`/;
+terminal STRING: /"(\\.|[^"\\])*"/;
+// Binary integer literals (`0b1010`) match first so the `0b` prefix is not
+// split into `0` and an identifier; post-processing converts them to their
+// decimal value. Otherwise: decimal integers and floats.
+terminal NUMBER returns number: /0[bB][01]+|[0-9]+(\.[0-9]+)?/;
+
+hidden terminal WS: /[\t\r\n ]+/;
+hidden terminal COMMENT: /#[^\n\r]*/;

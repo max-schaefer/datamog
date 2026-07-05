@@ -1,0 +1,18 @@
+# Same generation (cousin) problem
+# Based on [Fitting & Doets, 1992]
+#
+# Finds pairs of individuals who have a common ancestor and are the same
+# number of generations away from that ancestor.
+#
+# The "over" relation links nodes at the same depth (the base case).
+# The "up" relation goes from child to parent; "down" from parent to child.
+# Two trees are connected at their roots via "over".
+
+extensional over(x: string, y: string).
+extensional up(child: string, parent: string).
+extensional down(parent: string, child: string).
+
+sg(X, Y) :- over(X, Y).
+sg(X, Y) :- up(X, X1), sg(X1, Y1), down(Y1, Y).
+
+?- sg(X, Y).

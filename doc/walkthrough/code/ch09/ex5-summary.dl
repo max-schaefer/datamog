@@ -1,0 +1,11 @@
+# Exercise 9.5 — Multiple aggregates in one head.
+
+extensional scores(student: string, subject: string, score: integer).
+
+# TODO: define subject_stats with three aggregates in one head.
+
+# Placeholder so the file parses.
+subject_stats(Sub, Min, Avg, Max) :-
+    scores(_, Sub, Min), Avg = Min, Max = Min, Sub = "__never_matches__".
+
+?- subject_stats(S, Min, Avg, Max).

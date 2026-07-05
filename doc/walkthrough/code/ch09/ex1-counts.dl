@@ -1,0 +1,14 @@
+# Exercise 9.1 — Simple counts.
+
+extensional scores(student: string, subject: string, score: integer).
+
+# TODO: three aggregate rules.
+
+# Placeholders so the file parses.
+subject_count(Subject, count(*)) :- scores(_, Subject, _).
+total_students(count(Student)) :- scores(Student, _, _).
+perfect_scores(count(*)) :- scores(_, _, S), S = 999.
+
+?- subject_count(Subject, N).
+?- total_students(N).
+?- perfect_scores(N).

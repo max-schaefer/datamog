@@ -1,0 +1,34 @@
+{
+  "name": "datamog-repl",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Incremental REPL session engine for Datamog",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "bun": ">=1.3.0"
+  },
+  "files": ["src"],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/max-schaefer/datamog",
+    "directory": "packages/repl"
+  },
+  "keywords": ["datalog", "repl", "incremental", "bun", "datamog"],
+  "author": "Max Schaefer",
+  "homepage": "https://github.com/max-schaefer/datamog/tree/main/packages/repl",
+  "bugs": {
+    "url": "https://github.com/max-schaefer/datamog/issues"
+  },
+  "dependencies": {
+    "datamog-core": "workspace:*",
+    "datamog-engine": "workspace:*",
+    "datamog-parser": "workspace:*"
+  },
+  "devDependencies": {
+    "datamog-backend-sqlite": "workspace:*"
+  }
+}

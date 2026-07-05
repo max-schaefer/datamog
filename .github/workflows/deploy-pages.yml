@@ -1,0 +1,62 @@
+name: Deploy to Pages
+
+# GitHub Pages serves a single site per repo, so one workflow builds everything
+# that lives under it: the playground at the site root (/datamog/) and the
+# FLOLAC slide deck at /datamog/slides/, combined into one artifact.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.11
+
+      - run: bun install --frozen-lockfile
+
+      # Playground → site root (vite bases it at /datamog/ under GITHUB_ACTIONS).
+      - run: bun run playground:build
+
+      # Slides → /datamog/slides/ (the deck is a standalone project with its own
+      # lockfile; build:embed bundles the embed from the workspace packages).
+      - name: Build the slide deck
+        working-directory: doc/courses/flolac-26/slides
+        run: |
+          bun install --frozen-lockfile
+          DECK_BASE=/datamog/slides/ bun run build
+
+      - name: Stage the slides under /slides
+        run: |
+          mkdir -p packages/playground/dist/slides
+          cp -r doc/courses/flolac-26/slides/dist/. packages/playground/dist/slides/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: packages/playground/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

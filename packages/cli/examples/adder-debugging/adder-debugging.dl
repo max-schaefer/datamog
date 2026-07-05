@@ -1,0 +1,66 @@
+# Finding mis-wired gates in an adder, in the style of Advent of Code 2024
+# day 24 part 2.
+#
+# A correct ripple-carry adder has a rigid local structure, so a swapped output
+# wire shows up as a gate playing an impossible role. We find every swap by
+# STRUCTURE alone, pattern-matching over the gate graph, without ever running
+# the circuit. This is the program-analysis style of CodeQL and Souffle: code
+# (here, hardware) as data, bugs as query results.
+#
+# The gates are a 5-bit ripple-carry adder (sum bits z00..z04, final carry z05)
+# with TWO output-wire swaps injected: z03 with prop3, and hs2 with and2. Four
+# structural patterns flag exactly those four wires, and `concat` prints them
+# sorted and comma-joined, the day-24 answer format. There is no recursion, so
+# it runs on every backend:
+#
+#     bun run datamog adder-debugging.dl
+#
+# This is a heuristic, not a proof: it assumes each swap breaks a LOCAL adder
+# rule. Real day-24 inputs may need a few more patterns (and a dataflow check
+# for swaps that preserve local structure), but the shape is exactly this.
+
+extensional gate(wire: string, kind: string, a: string, b: string).
+
+# --- how each wire is used ---
+wire_used(W) :- gate(_, _, W, _).
+wire_used(W) :- gate(_, _, _, W).
+primary(W) :- wire_used(W), W[0:1] = "x".   # x.. and y.. are the input bits
+primary(W) :- wire_used(W), W[0:1] = "y".
+
+feeds_or(W)  :- gate(_, "OR",  W, _).
+feeds_or(W)  :- gate(_, "OR",  _, W).
+feeds_and(W) :- gate(_, "AND", W, _).
+feeds_and(W) :- gate(_, "AND", _, W).
+
+# z.. wires are sum outputs; the highest-named one is the final carry (an OR),
+# legitimately not an XOR, so we exclude it below. z.. names sort in bit order.
+zgate(W) :- gate(W, _, _, _), W[0:1] = "z".
+top_z(max(W)) :- zgate(W).
+
+# In a correct adder an XOR is exactly a half-sum (x XOR y) or a sum bit
+# (an XOR driving a z wire); an AND feeds an OR (the carry) unless it is the
+# very first carry, x00 AND y00.
+half_sum(W) :- gate(W, "XOR", A, B), primary(A), primary(B).
+sum_bit(W)  :- gate(W, "XOR", _, _), W[0:1] = "z".
+bit0_primary(W) :- primary(W), W[1:3] = "00".
+first_carry(W)  :- gate(W, "AND", A, B), bit0_primary(A), bit0_primary(B).
+
+# --- four structural faults, one per swapped wire ---
+suspect(W, "a sum bit z.. not produced by an XOR") :-
+    zgate(W), top_z(T), W != T, gate(W, K, _, _), K != "XOR".
+
+suspect(W, "an XOR that is neither a half-sum nor a sum bit") :-
+    gate(W, "XOR", _, _), not half_sum(W), not sum_bit(W).
+
+suspect(W, "an AND whose output does not feed an OR") :-
+    gate(W, "AND", _, _), not feeds_or(W), not first_carry(W), not zgate(W).
+
+suspect(W, "a half-sum x XOR y that does not feed an AND") :-
+    half_sum(W), not feeds_and(W), not zgate(W).
+
+# --- the answer: the swapped wires, distinct, sorted and comma-joined ---
+swapped(W) :- suspect(W, _).
+answer(concat(W)) :- swapped(W).
+
+?- suspect(W, Why).
+?- answer(Names).
