@@ -6,6 +6,7 @@ Language support for the [Datamog](../../README.md) Datalog dialect.
 
 - **Syntax highlighting** for `.dl` files — keywords, predicates, variables, aggregates, types, strings, numbers, and comments
 - **Live diagnostics** — parse errors from the Langium parser and semantic errors from the Datamog analyzer (arity mismatches, unsafe variables, unstratifiable negation, aggregate validation)
+- **Smart auto-complete** — context-aware completions for predicate names, built-in functions, and keywords
 - **Bracket matching** and auto-closing for `()`, `[]`, `""`
 - **Comment toggling** with `#`
 - **Run File** — evaluate the active `.dl` buffer in-process (seminaive backend) and show query results in the "Datamog" Output channel. Invoke via the editor title-bar play button, the `Datamog: Run File` command, or `Ctrl/Cmd+Enter`.

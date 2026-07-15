@@ -18,7 +18,7 @@ bounds, integer-vs-float division) match the other backends.
 import { DatamogExecutor } from "datamog-engine";
 import { create } from "datamog-backend-seminaive";
 
-const backend = create();
+const backend = await create();
 const executor = new DatamogExecutor(backend);
 const results = await executor.execute(source);
 await backend.close();

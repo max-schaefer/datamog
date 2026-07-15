@@ -158,6 +158,7 @@ abs    round    floor    ceil    sqrt    ln    exp
 as_string    as_integer    as_float    as_boolean    length    type_of
 has_key    keys    values    to_json    parse_json
 to_string    to_integer    to_float    to_boolean
+count    sum    avg    min    max    concat    list
 ```
 
 ### 1.7 Operators and Punctuation
@@ -205,7 +206,7 @@ PrimitiveType ::= 'string' | 'integer' | 'float' | 'boolean' | 'value'
 An extensional declaration introduces a **table-backed predicate** (EDB).
 Each column has a name and a SQL type. At execution time, the corresponding
 table is created and populated from an external data source (CSV, JSONL,
-Google Sheets, or Mermaid diagram) via a loader plugin.
+JSON, Google Sheets, or Mermaid diagram) via a loader plugin.
 
 ```
 extensional scores(student: string, subject: string, score: integer).
@@ -836,8 +837,7 @@ primitive leaf) yields zero rows.
 
 Built-in body-atom names (`object_entry`, `array_element`) are
 reserved: they cannot be declared as `extensional` or defined
-as IDB. Negation of a built-in body atom and using one in query
-position are both rejected.
+as IDB. Negation of a built-in body atom is rejected.
 
 #### Coercion and introspection
 
@@ -853,7 +853,7 @@ raising.
 | Datamog          | Returns   | Behaviour                                                          |
 |------------------|-----------|--------------------------------------------------------------------|
 | `as_string(V)`   | `string`  | string-leaf → string content; anything else → `NULL`.              |
-| `as_integer(V)`  | `integer` | Integer-valued numeric leaf in 64-bit signed range → integer; anything else (including a numeric leaf with a fractional part) → `NULL`. |
+| `as_integer(V)`  | `integer` | Integer-valued numeric leaf in JS safe-integer range (±(2^53−1)) → integer; anything else (including a numeric leaf with a fractional part) → `NULL`. |
 | `as_float(V)`    | `float`   | Numeric leaf → float; anything else → `NULL`.                      |
 | `as_boolean(V)`  | `boolean` | Boolean leaf → boolean; anything else → `NULL`.                    |
 | `length(V)`      | `integer` | Array length / object key count / string length; non-collection → `NULL`. |
@@ -965,7 +965,7 @@ Literal        ::= ('not')? Atom
 Atom           ::= Identifier '(' (Expression (',' Expression)*)? ')'
 Equality       ::= Addition '=' Expression
 RangeAtom      ::= Expression 'in' '[' Expression '..' Expression ']'
-Filter         ::= Expression
+Filter         ::= ('not')? Expression
 
 Expression     ::= Or
 Or             ::= And ('||' And)*
@@ -1007,7 +1007,7 @@ expression must have boolean type (checked post-parse).
 IDENT           ::= /[a-zA-Z_][a-zA-Z0-9_]*/
 QUOTED_IDENT    ::= /`(\\.|[^`\\\n\r])+`/
 STRING    ::= /"(\\.|[^"\\])*"/
-NUMBER    ::= /[0-9]+(\.[0-9]+)?/
+NUMBER    ::= /0[bB][01]+|[0-9]+(\.[0-9]+)?/
 COMMENT   ::= /#[^\n\r]*/          (ignored)
 WS        ::= /[\t\r\n ]+/         (ignored)
 ```
@@ -1118,7 +1118,7 @@ are compiled together into a shared recursive CTE block.
    embedded in arithmetic expressions.
 4. **No nesting:** Aggregate calls may not contain other aggregate calls.
 5. **Name conflict:** A predicate name cannot be the same as an aggregate
-   function name (`count`, `sum`, `avg`, `min`, `max`, `concat`).
+   function name (`count`, `sum`, `avg`, `min`, `max`, `concat`, `list`).
 
 ### 4.6 Predicate Uniqueness
 
@@ -1378,6 +1378,7 @@ equalities).
 | `min(expr)`        | same as `expr`       |
 | `max(expr)`        | same as `expr`       |
 | `concat(expr)` | `string`            |
+| `list(expr)`   | `value` (array)     |
 
 ### 5.6 Type Widening
 
@@ -1417,9 +1418,9 @@ The following type constraints are enforced after type inference:
   `as_float`, `as_boolean`, `length`, `type_of`, `has_key`, `keys`,
   `values`, `to_json`): the inspected value argument must have type
   `value`, except that `length` also accepts strings as an alias for
-  string length. `has_key`'s second argument must be `string`. Auto-lift does
-  **not** apply to any of these — passing another primitive is almost
-  always a mistake.
+  string length. `has_key`'s second argument must be `string`. As with any
+  `value`-typed parameter, a primitive argument auto-lifts into the `value`
+  slot (Section 2.9).
 - **Primitive conversions** (`to_string`, `to_integer`, `to_float`,
   `to_boolean`, `parse_json`): `to_string` accepts any of
   `integer`/`float`/`boolean` and rejects `string` (no identity

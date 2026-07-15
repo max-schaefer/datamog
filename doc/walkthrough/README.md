@@ -89,7 +89,7 @@ the browser.
 - [Chapter 11. Search and puzzles](11-puzzles.md)
 - [Chapter 12. Case study — program analysis](12-program-analysis.md)
 - [Chapter 13. Case study — graph algorithms](13-graphs.md)
-- [Chapter 14. Working with JSON](14-json.md)
+- [Chapter 14. Working with values](14-json.md)
 
 ### Companion tutorials
 

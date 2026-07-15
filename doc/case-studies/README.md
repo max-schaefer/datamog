@@ -31,9 +31,9 @@ bun run datamog <file.dl>
 bun run datamog --dry-run <file.dl>   # print generated SQL instead
 ```
 
-Case study 8 spans four example directories (`cnf-falsifiability`,
-`cnf-from-ast`, `cnf-tseitin`, `parse-to-cnf`) and uses non-linear recursion,
-so run its later parts on an in-memory backend:
+Case study 8 spans five example directories (`cnf-falsifiability`,
+`cnf-from-ast`, `cnf-tseitin`, `parse-to-cnf`, `sequent-prover`) and uses
+non-linear recursion, so run its later parts on an in-memory backend:
 
 ```bash
 bun run datamog --backend seminaive <file.dl>

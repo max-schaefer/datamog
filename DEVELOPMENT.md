@@ -211,5 +211,6 @@ python/datamog-magic` for notebook magic changes.
   Bun installed for subprocess-backed CLI tests.
 - `Playground E2E`: runs Playwright against the playground and uploads the
   report/test-results artifacts on failure.
-- `Deploy Playground`: builds and deploys the playground to GitHub Pages from
-  `main` or manual dispatch.
+- `Deploy to Pages`: builds and deploys the playground (site root) and the
+  FLOLAC slide deck (under `/slides/`) to GitHub Pages from `main` or manual
+  dispatch.

@@ -6,7 +6,7 @@ AST type definitions, semantic analyzer, and type inference for the Datamog Data
 
 The core AST re-exports Langium-generated types from `datamog-parser`. A Datamog program is a list of statements:
 
-- **`Expression`** (aliased as `Term`) — `Variable`, `StringLiteral`, `NumberLiteral`, `BooleanLiteral`, `NullLiteral`, `BinaryExpr`, `UnaryExpr`, `FunctionCall`, `Subscript`, `Slice`. The `HeadTerm` union additionally includes the synthesised `AggregateCall` shape for aggregate-position rule heads
+- **`Expression`** (aliased as `Term`) — `Variable`, `StringLiteral`, `NumberLiteral`, `BooleanLiteral`, `NullLiteral`, `ArrayLiteral`, `ObjectLiteral`, `BinaryExpr`, `UnaryExpr`, `FunctionCall`, `Subscript`, `Slice`, and `Wildcard` (the bare `*` argument of `count(*)`). The `HeadTerm` union additionally includes the synthesised `AggregateCall` shape for aggregate-position rule heads
 - **`Atom`** — a predicate applied to expressions, optionally negated, e.g. `ancestor(X, Y)`, `not composite(X)`
 - **`ExtDecl`** — extensional predicate declaration with typed columns
 - **`Rule`** — a Horn clause with a head atom and body elements (empty body = fact)

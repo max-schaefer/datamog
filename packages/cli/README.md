@@ -48,7 +48,7 @@ bun run datamog --dry-run program.dl
 
 ## Loading data
 
-By default, the CLI looks for data files in the data directory (the directory containing the `.dl` file, or an explicit second argument). You can override this for individual predicates with `--extensional name=source`, where `source` is a local path, an HTTP(S) URL ending in a supported extension, or a Google Sheets share URL.
+By default, the CLI looks for data files in the data directory (the directory containing the `.dl` file, or an explicit second argument). You can override this for individual predicates with `--extensional name=source`, where `source` is a local path, an HTTP(S) URL ending in a supported extension, a Google Sheets share URL, or a GitHub shorthand (`github:OWNER/REPO/PATH[#REF]`, `gh:` alias; `REF` defaults to `HEAD`).
 
 Five formats are supported:
 
@@ -103,10 +103,12 @@ The sheet must have a header row with column names matching the `extensional` de
 
 | Option | Description |
 |--------|-------------|
-| `--extensional name=source` | Map a predicate to a local file or HTTP(S) URL (`.csv`, `.jsonl`, `.json`, `.mmd`), or a Google Sheets URL |
+| `--extensional name=source` | Map a predicate to a local file or HTTP(S) URL (`.csv`, `.jsonl`, `.json`, `.mmd`), a Google Sheets URL, or a GitHub shorthand `github:OWNER/REPO/PATH[#REF]` (`gh:` alias) |
+| `--data-dir <path>` | Directory loaders read from in `--repl` mode (defaults to the current working directory) |
 | `--output-format <format>` | Output format: `table` (default), `csv`, `jsonl`, `jsonl-flat`, `mermaid`, or `ascii-graph` |
 | `--csv-no-header` | CSV files have no header row (columns are matched by position) |
 | `--dry-run` | Print generated SQL without executing |
+| `--warn-finiteness` | Print a warning for each predicate column whose values may grow unboundedly across iterations |
 | `--repl` | Start the REPL explicitly (this is the default when no `program.dl` is given) |
 | `--json` | In REPL mode, emit one ndjson event per declaration, rule, query, or command |
 | `--backend <postgres\|sqlite\|sqljs\|native\|seminaive>` | Backend (default: auto-detected from `DATABASE_URL`) |

@@ -239,7 +239,11 @@ For development, open the `packages/vscode-extension` folder in VS Code and pres
 ## Documentation
 
 - [Language specification](doc/spec.md) — detailed reference covering syntax, semantics, type system, and SQL translation
+- [Language walkthrough](doc/walkthrough/README.md) — the long-form, feature-by-feature tutorial (chapters 00–14 plus appendices), with runnable code and exercises
+- [Case studies](doc/case-studies/README.md) — a puzzle-driven companion tutorial that builds up end-to-end solutions to bigger problems
+- [Jupyter notebook tutorial](doc/jupyter/README.md) — runnable `%%datamog` cells driven by the `datamog-magic` IPython magic, with pandas DataFrame binding
 - [Embed tutorials](doc/embed-tutorials/README.md) — Markdown tutorials whose code blocks render as live, editable mini-playgrounds (deployed alongside the playground at `<site>/tutorial.html`)
+- [FLOLAC 2026 course slides](https://max-schaefer.github.io/datamog/slides/) — *Introduction to Logic Programming with Datalog*, a full-page slide deck (Introduction plus four parts) deployed alongside the playground; source and handout/exam materials in [`doc/courses/flolac-26/`](doc/courses/flolac-26/)
 
 ## Development
 

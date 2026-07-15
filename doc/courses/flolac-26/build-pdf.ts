@@ -14,7 +14,7 @@
 
 import { chromium } from "@playwright/test";
 
-const input = process.argv[2] ?? new URL("./handout.md", import.meta.url).pathname;
+const input = process.argv[2] ?? new URL("./handout/handout.md", import.meta.url).pathname;
 const output = process.argv[3] ?? input.replace(/\.md$/, ".pdf");
 
 // A4 with equal margins. The content column is sized to the printable width so

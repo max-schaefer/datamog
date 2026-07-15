@@ -9,10 +9,10 @@ import { DatamogExecutor } from "datamog-engine";
 import { create } from "datamog-backend-sqlite";
 
 // In-memory (default)
-const backend = create();
+const backend = await create();
 
 // Or with a file path
-const backend = create("./my-database.sqlite");
+const backend = await create("./my-database.sqlite");
 
 const executor = new DatamogExecutor(backend);
 const results = await executor.execute(source);
