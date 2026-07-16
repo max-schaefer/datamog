@@ -147,6 +147,38 @@ reach(X, Z)[Step]   :- edge(X, Y), _ : reach(Y, Z).
 A `Step` proof now records only the intermediate node, not the
 whole sub-derivation, so `reach` stays finite over any graph.
 
+## Taking proof terms apart
+
+Capturing gives you a whole proof term; often you want to look *inside* one. Put
+a constructor on one side of an equality and it becomes a **pattern**:
+
+```prolog
+opt_value(V) :- P : num_opt(), P = Some(V).
+```
+
+`P = Some(V)` matches `P` against the `Some` constructor and binds `V` to its
+argument; the `None` proofs simply don't match, so `opt_value` collects the
+values that were wrapped in `Some`. In a pattern a variable binds, a literal has
+to match, `_` ignores a position, and a nested pattern like `Cons(_, Cons(X, _))`
+reaches deeper in.
+
+Because each rule matches one constructor, ordinary rule disjunction gives you
+case analysis, and recursion gives you folds. Summing a list proof term:
+
+```prolog
+list_sum(P, 0) :- P : num_list(_), P = Nil().
+list_sum(P, S) :- P : num_list(_), P = Cons(H, T), list_sum(T, S0),
+                  S = as_integer(H) + S0.
+```
+
+The `Nil` rule is the base case; the `Cons` rule peels off the head `H`, sums
+the tail `T` recursively, and adds them. Two things to note: the value being
+matched must already be bound (here `P` comes from the `P : num_list(_)`
+capture), and a destructured component comes out as a `value`, so `H` needs an
+explicit `as_integer` before the arithmetic. Under the hood a pattern is just
+sugar for the JSON accessors of Chapter 14: `P["$proof"]` for the tag and
+`P["args"][i]` for the components.
+
 ## A few rules of the road
 
 - Naming is all-or-nothing: name every rule for a predicate, or
@@ -185,6 +217,13 @@ with the recursive sub-proof *included* and `--warn-finiteness`,
 and observe the warning. Then suppress it with `_ :` and compare.
 What does each `Step` proof term tell you, and what does it leave
 out?
+
+### Exercise 15.4 — Length by folding ★★
+
+Building on the `num_list` datatype, define `list_len(P, N)` that computes the
+length `N` of a list proof term `P` by pattern-matching (`Nil` gives 0, `Cons`
+adds 1 to the tail's length). Confirm it agrees with the index the list is built
+at.
 
 ---
 

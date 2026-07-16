@@ -1952,7 +1952,37 @@ A proof mark may be applied only to a positive atom of a proof-carrying
 predicate. Applying one to an extensional or unnamed predicate, or to a negated
 atom, is an error.
 
-### 8.4 Finiteness
+### 8.4 Destructuring
+
+The `V :` capture surfaces a whole proof term; to take one apart, put a
+**constructor pattern** on one side of a body or query equality. Given a bound
+value `S`, the equality `S = Ctor(p1, ..., pn)` matches `S` against `Ctor` and
+binds the pattern's variables from its components:
+
+```prolog
+opt_value(V) :- P : num_opt(), P = Some(V).
+```
+
+It desugars to the tag guard `as_string(S["$proof"]) = "Ctor"` followed by one
+element per argument, matched against the accessor `S["args"][i]`: a variable
+binds (via `=`), a literal becomes a guard, `_` ignores the position, and a
+nested pattern recurses. The matched value `S` must already be bound, and case
+analysis is ordinary rule disjunction (one rule per constructor), which is how
+a fold over a proof-term datatype is written:
+
+```prolog
+list_sum(P, 0) :- P : num_list(_), P = Nil().
+list_sum(P, S) :- P : num_list(_), P = Cons(H, T), list_sum(T, S0),
+                  S = as_integer(H) + S0.
+```
+
+Patterns only match, never construct (construction is the job of named rules).
+A pattern's arity must match the constructor's, and a constructor name may not
+collide with a built-in operation, so `Ctor(...)` in an expression is
+unambiguous. Extracted components are `value`-typed, so an explicit coercion
+(`as_integer(H)` above) is still needed to use one as a primitive.
+
+### 8.5 Finiteness
 
 The set of derivations can be infinite even when the set of facts is finite: a
 recursion whose constructor nests a sub-proof (for example transitive closure
@@ -1963,7 +1993,7 @@ unbounded. Suppressing the recursive sub-proof with `_ :` removes the growth and
 keeps the proof terms finite; it is the way to record a shallow derivation over
 cyclic data.
 
-### 8.5 Evaluation
+### 8.6 Evaluation
 
 Proof terms are a source-level feature: they desugar to one extra `value` column
 plus object and array construction in rule heads, so every backend evaluates
