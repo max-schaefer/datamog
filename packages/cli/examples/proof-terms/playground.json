@@ -1,0 +1,5 @@
+{
+  "name": "Proof Terms",
+  "description": "Named rules as ADT constructors: an enum and length-indexed lists whose proof terms are the data",
+  "order": 200
+}
