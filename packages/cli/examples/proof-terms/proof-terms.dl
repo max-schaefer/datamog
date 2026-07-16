@@ -1,0 +1,23 @@
+# Proof terms as ADT constructors
+#
+# Naming a rule with `[Ctor]` turns its predicate into an algebraic datatype:
+# every derivation is recorded as a proof term, the constructor applied to the
+# witnesses of the existential body variables followed by the sub-proofs of the
+# recursive body atoms. Capture a proof term with `Xs : p(...)`; suppress a
+# sub-proof with `_ : p(...)`.
+
+num(1). num(2).
+
+# An enum: three nullary constructors, so three proof terms.
+suit()[Hearts].
+suit()[Diamonds].
+suit()[Spades].
+
+# Lists of numbers indexed by length. The proof terms *are* the lists:
+# Nil() and Cons(car, cdr), where cdr is the sub-proof of the shorter list.
+num_list(0)[Nil].
+num_list(n + 1)[Cons] :- num(Car), n <= 2, num_list(n).
+
+# Each query captures the proof term (the datatype value) of its atom.
+?- S : suit().
+?- Xs : num_list(Len).
