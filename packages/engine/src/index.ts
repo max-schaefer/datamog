@@ -21,6 +21,7 @@ export {
   bigintSafeReplacer,
   canonicalizeJson,
   compareJsonbObjectKeys,
+  formatProofTerm,
   isJsonValue,
   type JsonValue,
 } from "./json-canonical.ts";

@@ -29,6 +29,19 @@ describe("formatCell", () => {
     expect(formatCell([9007199254740990n, "x"])).toBe('[9007199254740990,"x"]');
   });
 
+  test("proof-term cells render in constructor form", () => {
+    // A named rule produces `{"$proof": Ctor, "args": [...]}` value
+    // cells; the table should show `Ctor(...)` like the CLI, not raw
+    // JSON. Ordinary value data keeps its JSON rendering (above).
+    expect(formatCell({ $proof: "Nil", args: [] })).toBe("Nil()");
+    expect(
+      formatCell({
+        $proof: "Cons",
+        args: [1, { $proof: "Cons", args: [2, { $proof: "Nil", args: [] }] }],
+      }),
+    ).toBe("Cons(1, Cons(2, Nil()))");
+  });
+
   test("primitives pass through unchanged", () => {
     expect(formatCell("hello")).toBe("hello");
     expect(formatCell(42)).toBe("42");

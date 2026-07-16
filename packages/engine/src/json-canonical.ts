@@ -71,6 +71,33 @@ export function bigintSafeReplacer(_key: string, value: unknown): unknown {
   return value;
 }
 
+/** Render a single argument of a proof term (recursing into nested ones). */
+function formatProofArg(value: unknown): string {
+  const nested = formatProofTerm(value);
+  if (nested !== undefined) return nested;
+  if (typeof value === "string") return JSON.stringify(value);
+  if (value === null) return "null";
+  if (typeof value === "object") return JSON.stringify(value, bigintSafeReplacer);
+  return String(value);
+}
+
+/**
+ * If `value` is a proof term (the tagged object a named rule produces:
+ * exactly `{ "$proof": <string>, "args": <array> }`), render it in
+ * constructor form `Ctor(arg, ...)`, recursing into nested proof terms.
+ * Returns `undefined` for anything that is not exactly that shape, so
+ * ordinary `value` data is never reinterpreted as a proof term. Shared by
+ * the CLI's table output and the playground's cell formatter.
+ */
+export function formatProofTerm(value: unknown): string | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
+  const keys = Object.keys(value);
+  if (keys.length !== 2 || !keys.includes("$proof") || !keys.includes("args")) return undefined;
+  const { $proof, args } = value as { $proof: unknown; args: unknown };
+  if (typeof $proof !== "string" || !Array.isArray(args)) return undefined;
+  return `${$proof}(${args.map(formatProofArg).join(", ")})`;
+}
+
 /**
  * Compare object keys in PostgreSQL jsonb's canonical order: UTF-8 byte length
  * first, then byte value. Datamog adopts this for every canonical-TEXT backend

@@ -117,8 +117,8 @@ datatype built for free out of the derivation structure.
 Under the hood a proof term is an ordinary `value` (Chapter 14):
 the object `{"$proof": "Cons", "args": [7, ...]}`, with a
 reserved `$proof` key so it can't be mistaken for your own data.
-The CLI table prints it in the friendlier constructor form;
-`to_json` or `--output-format jsonl` show the raw object.
+The CLI and playground tables print it in the friendlier
+constructor form; `to_json` or the JSON output show the raw object.
 
 ## Capturing and suppressing
 

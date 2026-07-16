@@ -1,4 +1,4 @@
-import { bigintSafeReplacer } from "datamog-engine";
+import { bigintSafeReplacer, formatProofTerm } from "datamog-engine";
 
 /**
  * Render a result-row cell as a string suitable for the playground's
@@ -16,9 +16,15 @@ import { bigintSafeReplacer } from "datamog-engine";
  * Mirrors `formatCellAsString` in `packages/cli/src/output.ts` and
  * `cellToString` in `packages/engine/src/mermaid-output.ts` — every
  * surface that renders rows for a human goes through this shape now.
+ *
+ * Proof-term cells (the `{"$proof", "args"}` objects a named rule
+ * produces) render in constructor form `Ctor(...)`, matching the CLI's
+ * table output.
  */
 export function formatCell(value: unknown): string {
   if (value === null || value === undefined) return "";
+  const proof = formatProofTerm(value);
+  if (proof !== undefined) return proof;
   if (typeof value === "object") return JSON.stringify(value, bigintSafeReplacer);
   return String(value);
 }
