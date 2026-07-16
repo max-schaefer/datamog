@@ -270,4 +270,57 @@ describe("proof terms", () => {
       await expect(run("foo()[length].\n?- P : foo().")).rejects.toThrow(/conflicts with built-in/);
     });
   });
+
+  describe("construction", () => {
+    const listPrelude = `
+      num(1). num(2).
+      num_list(0)[Nil].
+      num_list(n + 1)[Cons] :- num(Car), n <= 1, num_list(n).
+      append(A, B, B) :- A : num_list(_), B : num_list(_), A = Nil().
+      append(A, B, Cons(H, R)) :- A : num_list(_), B : num_list(_), A = Cons(H, T), append(T, B, R).
+    `;
+    const nil = proof("Nil", []);
+
+    test("a constructor term in an argument position builds a value", async () => {
+      const rows = (
+        await run(`${listPrelude}
+          demo(C) :- A : num_list(_), B : num_list(_), append(A, B, C),
+                     A = Cons(1, Nil()), B = Cons(2, Nil()).
+          ?- demo(C).
+        `)
+      )[0]!;
+      // [1] ++ [2] = [1, 2]
+      expect(sortRows(rows)).toEqual(
+        sortRows([{ C: proof("Cons", [1, proof("Cons", [2, nil])]) }]),
+      );
+    });
+
+    test("reverse (built on append) reverses a list proof term", async () => {
+      const rows = (
+        await run(`${listPrelude}
+          reverse(A, Nil()) :- A : num_list(_), A = Nil().
+          reverse(A, R) :- A : num_list(_), A = Cons(H, T), reverse(T, RT),
+                           append(RT, Cons(H, Nil()), R).
+          demo(R) :- A : num_list(_), reverse(A, R), A = Cons(1, Cons(2, Nil())).
+          ?- demo(R).
+        `)
+      )[0]!;
+      // reverse([1, 2]) = [2, 1]
+      expect(sortRows(rows)).toEqual(
+        sortRows([{ R: proof("Cons", [2, proof("Cons", [1, nil])]) }]),
+      );
+    });
+
+    test("rejects constructing with the wrong arity", async () => {
+      await expect(
+        run(`
+          num(7).
+          num_list(0)[Nil].
+          num_list(n + 1)[Cons] :- num(Car), n <= 1, num_list(n).
+          bad(Cons(7)).
+          ?- bad(X).
+        `),
+      ).rejects.toThrow(/'Cons' takes 2/);
+    });
+  });
 });

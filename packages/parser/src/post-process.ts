@@ -182,6 +182,24 @@ function mkEquality(left: Expression, expr: Expression, cst: Cst): Equality {
   return node;
 }
 
+// Replace `oldNode` with `newNode` at its position in the tree, using the
+// container links (single-valued or array-valued container property).
+function replaceNode(oldNode: AstNode, newNode: AstNode): void {
+  const c = oldNode as {
+    $container?: AstNode;
+    $containerProperty?: string;
+    $containerIndex?: number;
+  };
+  if (c.$container === undefined || c.$containerProperty === undefined) return;
+  const container = c.$container as unknown as Record<string, unknown>;
+  if (c.$containerIndex !== undefined) {
+    (container[c.$containerProperty] as AstNode[])[c.$containerIndex] = newNode;
+  } else {
+    container[c.$containerProperty] = newNode;
+  }
+  setContainer(newNode, c.$container, c.$containerProperty, c.$containerIndex);
+}
+
 /**
  * Post-parse transforms applied to the Langium AST:
  * 1. Desugar don't-care variables: rename every `_` to a unique internal name.
@@ -593,6 +611,25 @@ export function postProcess(program: Program): void {
         stmt.body.splice(0, stmt.body.length, ...rewritten);
         stmt.body.forEach((el, i) => setContainer(el, stmt, "body", i));
       }
+    }
+
+    // Construction: any constructor term not consumed as a pattern above builds
+    // a value. `Ctor(a1, ..., an)` in an argument or expression position becomes
+    // the tagged object { "$proof": "Ctor", "args": [a1, ..., an] }. Children
+    // are rewritten before parents so nested constructors compose.
+    const ctorCalls: FunctionCall[] = [];
+    for (const node of streamAll(program)) {
+      if (isFunctionCall(node) && seenCtors.has(node.name)) ctorCalls.push(node);
+    }
+    for (const call of ctorCalls.reverse()) {
+      const arity = ctorArity.get(call.name);
+      if (arity !== undefined && call.args.length !== arity) {
+        throw parseErrorAtNode(
+          `Constructor '${call.name}' takes ${arity} argument(s) but is built with ${call.args.length}`,
+          call,
+        );
+      }
+      replaceNode(call, buildProofTerm(call.name, call.args, call.$cstNode));
     }
   }
 }
