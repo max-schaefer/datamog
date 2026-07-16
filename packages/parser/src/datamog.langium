@@ -231,7 +231,7 @@ Primary infers Expression:
     | {infer Wildcard} '*';
 
 FunctionCall:
-    name=IDENT '(' args+=Expression (',' args+=Expression)* ')';
+    name=IDENT '(' (args+=Expression (',' args+=Expression)*)? ')';
 
 // A single identifier surface shared by predicates, variables, function
 // names, column names. Case is a stylistic convention (uppercase =

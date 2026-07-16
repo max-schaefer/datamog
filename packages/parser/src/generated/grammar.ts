@@ -1934,24 +1934,8 @@ export const DatamogGrammar = (): Grammar => loadedDatamogGrammar ?? (loadedData
             "value": "("
           },
           {
-            "$type": "Assignment",
-            "feature": "args",
-            "operator": "+=",
-            "terminal": {
-              "$type": "RuleCall",
-              "rule": {
-                "$ref": "#/rules@15"
-              },
-              "arguments": []
-            }
-          },
-          {
             "$type": "Group",
             "elements": [
-              {
-                "$type": "Keyword",
-                "value": ","
-              },
               {
                 "$type": "Assignment",
                 "feature": "args",
@@ -1963,9 +1947,31 @@ export const DatamogGrammar = (): Grammar => loadedDatamogGrammar ?? (loadedData
                   },
                   "arguments": []
                 }
+              },
+              {
+                "$type": "Group",
+                "elements": [
+                  {
+                    "$type": "Keyword",
+                    "value": ","
+                  },
+                  {
+                    "$type": "Assignment",
+                    "feature": "args",
+                    "operator": "+=",
+                    "terminal": {
+                      "$type": "RuleCall",
+                      "rule": {
+                        "$ref": "#/rules@15"
+                      },
+                      "arguments": []
+                    }
+                  }
+                ],
+                "cardinality": "*"
               }
             ],
-            "cardinality": "*"
+            "cardinality": "?"
           },
           {
             "$type": "Keyword",
