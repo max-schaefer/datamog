@@ -146,12 +146,19 @@ contributes a non-null value, and `null` flows through at runtime.
 
 ### 1.6 Keywords
 
-The following words are reserved and cannot be used as unquoted predicate
-or column names:
+Two groups of words are reserved. **Lexical keywords** cannot appear as a bare
+identifier in any position (predicate, column, or variable):
 
 ```
 extensional    not    in    true    false    null
 string    integer    float    boolean    value
+```
+
+**Built-in operation names** (functions, body atoms, and aggregates) are
+reserved only against unquoted predicate names; they may be used as extensional
+columns and as variables:
+
+```
 object_entry    array_element
 upper    lower    trim    replace
 abs    round    floor    ceil    sqrt    ln    exp
@@ -160,6 +167,9 @@ has_key    keys    values    to_json    parse_json
 to_string    to_integer    to_float    to_boolean
 count    sum    avg    min    max    concat    list
 ```
+
+Backtick-quoting escapes both restrictions (§1.4). See §1.8 for how these
+groups interact with the predicate, column, and variable namespaces.
 
 ### 1.7 Operators and Punctuation
 
@@ -178,6 +188,72 @@ Separators:    ,  :  .
 `=`/`<>` are *logical* equality and inequality (null-aware); `==`/`!=`
 are *computational* (3VL — see §5.4). Body-level Equality reuses the
 logical operator and can bind an unbound bare variable on either side.
+
+### 1.8 Namespaces
+
+Identifiers in Datamog fall into several namespaces. Because an identifier's
+role is fixed by its syntactic position, not its spelling (§1.4), two names in
+different namespaces never collide even when written identically. The
+constraints below are the only exceptions.
+
+**The namespaces**
+
+- **Reserved keywords**: `extensional`, `not`, `in`, `true`, `false`, `null`,
+  and the five type names `string`, `integer`, `float`, `boolean`, `value`.
+  These are *lexical* keywords, so the parser rejects them as a bare identifier
+  in every position (predicate, extensional column, and variable alike). `true`, `false`,
+  and `null` are also the literals of §1.5.
+- **Built-in operation names**: one set covering the three kinds of built-in
+  operation, the *functions* (`upper`, `abs`, `as_integer`, `to_json`,
+  and so on), the *body atoms* (`object_entry`, `array_element`), and the
+  *aggregates* (`count`, `sum`, `avg`, `min`, `max`, `concat`, `list`). The
+  complete list is in §1.6. Lexically these are ordinary identifiers; they are
+  reserved only against predicate names, and may be used freely as extensional
+  columns and as variables.
+- **Predicate names**: a single namespace shared by extensional (EDB) and
+  intensional (IDB) predicates. Each name is one or the other, never both
+  (§4.6), and carries a fixed arity (§4.2).
+- **Extensional columns**: the named, typed fields of an `extensional`
+  declaration (§2.2), unique within it, and matched against loader input by
+  exact, case-sensitive name. Intensional (rule-defined) predicates have no
+  named columns; their fields are positional.
+- **Variables**: scoped to a single rule or query and never declared. Repeated
+  occurrences of one spelling within a rule denote the same variable; the same
+  spelling in a different rule is unrelated. Names are case-sensitive, so `X`
+  and `x` are distinct.
+
+**Two reservation mechanisms.** Keywords and type names are rejected by the
+*parser*, a hard syntax error in any position (predicate, column, or variable).
+Built-in operation names are rejected by the *analyzer*, and only as predicate
+names: written `f(...)`, a predicate named after a built-in operation would be
+indistinguishable from an invocation of that operation, giving `f(...)` two
+meanings.
+Extensional columns and variables need no such protection, because neither is
+ever written in the `name(...)` call form: a column is declared `name: type`
+and matched positionally, and a bare `count` in term position is unambiguously a
+variable while `count(X)` is the aggregate. Both restrictions are lifted by
+backtick-quoting the name (§1.4), which forces the identifier reading, so
+`` `value` `` can name a predicate, column, or variable despite `value` being a
+type keyword.
+
+**Overlap.** Whether a word W may fill each role:
+
+| Word W                            | predicate | extensional column / variable | escaped as `` `W` `` |
+|-----------------------------------|:---------:|:-----------------------------:|:--------------------:|
+| a plain identifier (`foo`, `p2`)  | yes       | yes                           | not needed           |
+| a reserved keyword or type name   | no        | no                            | yes                  |
+| a built-in operation name         | no        | yes                           | yes (as a predicate) |
+
+Because roles are position-based, one spelling can name both a predicate and a
+variable in the same rule: in `p(p) :- edge(p, _).` the head `p(...)` is the
+predicate and the argument `p` is a variable.
+
+**Not identifiers.** String, numeric, boolean, and null literals (§1.5) and
+object-literal keys (`{"k": ...}`) are literal tokens, not identifiers, so they
+do not touch any namespace above. There are no bare-word constants: an unquoted
+term is always a variable, so `friend(alice, bob)` binds `alice` and `bob` as
+variables (here unsafe, since neither appears in a body), not as string
+constants.
 
 ## 2 Grammar
 
