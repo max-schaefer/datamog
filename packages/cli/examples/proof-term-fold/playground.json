@@ -1,0 +1,5 @@
+{
+  "name": "Proof Terms: Fold",
+  "description": "Destructuring proof terms with constructor patterns: a fold that sums the elements of list proof terms",
+  "order": 210
+}

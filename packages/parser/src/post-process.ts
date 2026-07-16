@@ -4,7 +4,10 @@ import type {
   ArrayLiteral,
   BodyElement,
   BracketAccess,
+  Equality,
   Expression,
+  FunctionCall,
+  NumberLiteral,
   ObjectEntry,
   ObjectLiteral,
   Program,
@@ -138,6 +141,45 @@ function buildProofTerm(ctor: string, args: Expression[], cst: Cst): ObjectLiter
   setContainer(nameEntry, obj, "entries", 0);
   setContainer(argsEntry, obj, "entries", 1);
   return obj;
+}
+
+// Node factories for the destructuring desugar (Section below). Each wires up
+// the `$container` links of its children, matching how the parser would.
+
+function mkStringLiteral(value: string, cst: Cst): StringLiteral {
+  return { $type: "StringLiteral", value, $cstNode: cst } as unknown as StringLiteral;
+}
+
+function mkNumberLiteral(value: number, cst: Cst): NumberLiteral {
+  return {
+    $type: "NumberLiteral",
+    value,
+    rawText: String(value),
+    $cstNode: cst,
+  } as unknown as NumberLiteral;
+}
+
+// Returns `Expression` (not `Subscript`): the grammar only ever produces
+// `BracketAccess`, so the parser's `Expression` union omits the
+// post-process-synthesised `Subscript`; core widens it back in.
+function mkSubscript(object: Expression, index: Expression, cst: Cst): Expression {
+  const node = { $type: "Subscript", object, index, $cstNode: cst } as unknown as Subscript;
+  setContainer(object, node, "object");
+  setContainer(index, node, "index");
+  return node as unknown as Expression;
+}
+
+function mkFunctionCall(name: string, args: Expression[], cst: Cst): FunctionCall {
+  const node = { $type: "FunctionCall", name, args, $cstNode: cst } as unknown as FunctionCall;
+  args.forEach((a, i) => setContainer(a, node, "args", i));
+  return node;
+}
+
+function mkEquality(left: Expression, expr: Expression, cst: Cst): Equality {
+  const node = { $type: "Equality", left, expr, $cstNode: cst } as unknown as Equality;
+  setContainer(left, node, "left");
+  setContainer(expr, node, "expr");
+  return node;
 }
 
 /**
@@ -326,8 +368,16 @@ export function postProcess(program: Program): void {
   //    arities stay consistent.
   const proofCarrying = new Set<string>();
   for (const stmt of program.statements) {
-    if (isRule(stmt) && stmt.ruleName !== undefined) proofCarrying.add(stmt.head.predicate);
+    if (isRule(stmt) && stmt.ruleName !== undefined) {
+      // Normalise the constructor name in place so every later stage (and the
+      // analyzer) sees the decoded form.
+      stmt.ruleName = decodeQuotedIdentifier(stmt.ruleName);
+      proofCarrying.add(stmt.head.predicate);
+    }
   }
+  // Constructor name -> arity, filled in as each named rule's constructor is
+  // built; consumed by the destructuring desugar to validate pattern arity.
+  const ctorArity = new Map<string, number>();
 
   // Sub-proof columns must be ordinary (non-anonymous) variables: the native
   // planner drops `$anonN` names as don't-care, which would null out a captured
@@ -443,9 +493,107 @@ export function postProcess(program: Program): void {
       ...existentialVals.map((name) => mkVar(name, stmt.head.$cstNode)),
       ...subProofs.map((name) => mkVar(name, stmt.head.$cstNode)),
     ];
+    ctorArity.set(ctor, argExprs.length);
     const proofTerm = buildProofTerm(ctor, argExprs, stmt.head.$cstNode);
     setContainer(proofTerm, stmt.head, "args", stmt.head.args.length);
     (stmt.head.args as Expression[]).push(proofTerm);
+  }
+
+  // Destructuring: a constructor term `Ctor(p...)` on one side of a body or
+  // query equality is a pattern. Rewrite `S = Ctor(p1, ..., pn)` into a tag
+  // guard plus one element per argument (recursing into nested patterns), all
+  // expressed with the existing `value` accessors. The scrutinee `S` must be
+  // bound; a variable argument binds via `=`, a literal argument becomes a
+  // guard, `_` binds a throwaway, and a nested constructor recurses.
+  if (seenCtors.size > 0) {
+    let patVarCounter = 0;
+    const freshPat = (): string => {
+      let name = `$pat${patVarCounter++}`;
+      while (usedNames.has(name)) name = `$pat${patVarCounter++}`;
+      return name;
+    };
+
+    const isCtorTerm = (e: Expression | undefined): e is FunctionCall =>
+      e !== undefined && e.$type === "FunctionCall" && seenCtors.has(e.name);
+
+    const expandPattern = (
+      scrutVar: string,
+      pattern: FunctionCall,
+      cst: Cst,
+      out: BodyElement[],
+    ): void => {
+      const ctor = pattern.name;
+      const arity = ctorArity.get(ctor);
+      if (arity !== undefined && pattern.args.length !== arity) {
+        throw parseErrorAtNode(
+          `Constructor pattern '${ctor}' has ${pattern.args.length} argument(s) but '${ctor}' takes ${arity}`,
+          pattern,
+        );
+      }
+      // Tag guard: as_string(S["$proof"]) = "Ctor".
+      const tag = mkFunctionCall(
+        "as_string",
+        [mkSubscript(mkVar(scrutVar, cst), mkStringLiteral("$proof", cst), cst)],
+        cst,
+      );
+      out.push(mkEquality(tag, mkStringLiteral(ctor, cst), cst));
+      for (let i = 0; i < pattern.args.length; i++) {
+        const p = pattern.args[i]!;
+        // Accessor: S["args"][i].
+        const accessor = mkSubscript(
+          mkSubscript(mkVar(scrutVar, cst), mkStringLiteral("args", cst), cst),
+          mkNumberLiteral(i, cst),
+          cst,
+        );
+        if (isCtorTerm(p)) {
+          const f = freshPat();
+          out.push(mkEquality(mkVar(f, cst), accessor, cst));
+          expandPattern(f, p, cst, out);
+        } else {
+          out.push(mkEquality(p, accessor, cst));
+        }
+      }
+    };
+
+    const rewriteBody = (body: BodyElement[]): BodyElement[] => {
+      const out: BodyElement[] = [];
+      for (const el of body) {
+        if (el.$type === "Equality") {
+          const leftPat = isCtorTerm(el.left);
+          const rightPat = isCtorTerm(el.expr);
+          if (leftPat && rightPat) {
+            throw parseErrorAtNode("A constructor pattern cannot appear on both sides of '='", el);
+          }
+          if (leftPat || rightPat) {
+            const pattern = (leftPat ? el.left : el.expr) as FunctionCall;
+            const scrut = leftPat ? el.expr : el.left;
+            let scrutVar: string;
+            if (scrut.$type === "Variable") {
+              scrutVar = scrut.name;
+            } else {
+              scrutVar = freshPat();
+              out.push(mkEquality(mkVar(scrutVar, el.$cstNode), scrut, el.$cstNode));
+            }
+            expandPattern(scrutVar, pattern, el.$cstNode, out);
+            continue;
+          }
+        }
+        out.push(el);
+      }
+      return out;
+    };
+
+    for (const stmt of program.statements) {
+      if (isRule(stmt)) {
+        const rewritten = rewriteBody(stmt.body);
+        stmt.body.splice(0, stmt.body.length, ...rewritten);
+        stmt.body.forEach((el, i) => setContainer(el, stmt, "body", i));
+      } else if (isQuery(stmt)) {
+        const rewritten = rewriteBody(stmt.body);
+        stmt.body.splice(0, stmt.body.length, ...rewritten);
+        stmt.body.forEach((el, i) => setContainer(el, stmt, "body", i));
+      }
+    }
   }
 }
 

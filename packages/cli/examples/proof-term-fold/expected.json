@@ -1,0 +1,113 @@
+[
+  [
+    {
+      "Xs": {
+        "args": [],
+        "$proof": "Nil"
+      },
+      "S": 0
+    },
+    {
+      "Xs": {
+        "args": [
+          1,
+          {
+            "args": [],
+            "$proof": "Nil"
+          }
+        ],
+        "$proof": "Cons"
+      },
+      "S": 1
+    },
+    {
+      "Xs": {
+        "args": [
+          2,
+          {
+            "args": [],
+            "$proof": "Nil"
+          }
+        ],
+        "$proof": "Cons"
+      },
+      "S": 2
+    },
+    {
+      "Xs": {
+        "args": [
+          1,
+          {
+            "args": [
+              1,
+              {
+                "args": [],
+                "$proof": "Nil"
+              }
+            ],
+            "$proof": "Cons"
+          }
+        ],
+        "$proof": "Cons"
+      },
+      "S": 2
+    },
+    {
+      "Xs": {
+        "args": [
+          2,
+          {
+            "args": [
+              1,
+              {
+                "args": [],
+                "$proof": "Nil"
+              }
+            ],
+            "$proof": "Cons"
+          }
+        ],
+        "$proof": "Cons"
+      },
+      "S": 3
+    },
+    {
+      "Xs": {
+        "args": [
+          1,
+          {
+            "args": [
+              2,
+              {
+                "args": [],
+                "$proof": "Nil"
+              }
+            ],
+            "$proof": "Cons"
+          }
+        ],
+        "$proof": "Cons"
+      },
+      "S": 3
+    },
+    {
+      "Xs": {
+        "args": [
+          2,
+          {
+            "args": [
+              2,
+              {
+                "args": [],
+                "$proof": "Nil"
+              }
+            ],
+            "$proof": "Cons"
+          }
+        ],
+        "$proof": "Cons"
+      },
+      "S": 4
+    }
+  ]
+]

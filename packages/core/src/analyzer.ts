@@ -288,6 +288,23 @@ export function analyze(program: Program): AnalyzedProgram {
     }
   }
 
+  // A constructor name (a rule's `[Ctor]` annotation) may not collide with a
+  // built-in operation name either, so a constructor term `Ctor(...)` in an
+  // expression stays unambiguous with a built-in call.
+  for (const predRules of rules.values()) {
+    for (const rule of predRules) {
+      if (rule.ruleName === undefined) continue;
+      const kind = reservedOperationKind(rule.ruleName);
+      if (kind) {
+        const pos = nodePos(rule.head);
+        throw new AnalyzerError(
+          `Constructor name '${rule.ruleName}' conflicts with built-in ${kind} '${rule.ruleName}'`,
+          ...(pos ?? []),
+        );
+      }
+    }
+  }
+
   // Check arity of literals in rule bodies and queries
   function checkLiteral(literal: Literal) {
     const builtin = BUILTIN_BODY_ATOMS.get(literal.predicate);

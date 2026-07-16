@@ -202,4 +202,72 @@ describe("proof terms", () => {
       );
     });
   });
+
+  describe("destructuring", () => {
+    test("a constructor pattern extracts a component; `_` ignores one", async () => {
+      const rows = (
+        await run(`
+          num(1). num(2).
+          num_opt()[None].
+          num_opt()[Some] :- num(Val).
+          opt_value(V) :- P : num_opt(), P = Some(V).
+          ?- opt_value(V).
+        `)
+      )[0]!;
+      // None() has no Some(_) match; Some(1)/Some(2) yield their component.
+      expect(sortRows(rows)).toEqual(sortRows([{ V: 1 }, { V: 2 }]));
+    });
+
+    test("nested patterns reach into sub-proofs", async () => {
+      const rows = (
+        await run(`
+          num(5).
+          num_list(0)[Nil].
+          num_list(n + 1)[Cons] :- num(Car), n <= 3, num_list(n).
+          second(X) :- P : num_list(_), P = Cons(_, Cons(X, _)).
+          ?- second(X).
+        `)
+      )[0]!;
+      expect(sortRows(rows)).toEqual(sortRows([{ X: 5 }]));
+    });
+
+    test("folds over a recursive proof term (case analysis via multiple rules)", async () => {
+      const rows = (
+        await run(`
+          num(7).
+          num_list(0)[Nil].
+          num_list(n + 1)[Cons] :- num(Car), n <= 3, num_list(n).
+          list_sum(P, 0) :- P : num_list(_), P = Nil().
+          list_sum(P, S) :- P : num_list(_), P = Cons(H, T), list_sum(T, S0), S = as_integer(H) + S0.
+          sum_by_len(Len, S) :- P : num_list(Len), list_sum(P, S).
+          ?- sum_by_len(Len, S).
+        `)
+      )[0]!;
+      expect(sortRows(rows)).toEqual(
+        sortRows([
+          { Len: 0, S: 0 },
+          { Len: 1, S: 7 },
+          { Len: 2, S: 14 },
+          { Len: 3, S: 21 },
+          { Len: 4, S: 28 },
+        ]),
+      );
+    });
+
+    test("rejects a constructor pattern of the wrong arity", async () => {
+      await expect(
+        run(`
+          num(7).
+          num_list(0)[Nil].
+          num_list(n + 1)[Cons] :- num(Car), n <= 2, num_list(n).
+          bad(X) :- P : num_list(_), P = Cons(X).
+          ?- bad(X).
+        `),
+      ).rejects.toThrow(/'Cons' takes 2/);
+    });
+
+    test("rejects a constructor name that collides with a built-in", async () => {
+      await expect(run("foo()[length].\n?- P : foo().")).rejects.toThrow(/conflicts with built-in/);
+    });
+  });
 });
