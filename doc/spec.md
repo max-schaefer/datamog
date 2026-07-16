@@ -221,6 +221,10 @@ constraints below are the only exceptions.
   occurrences of one spelling within a rule denote the same variable; the same
   spelling in a different rule is unrelated. Names are case-sensitive, so `X`
   and `x` are distinct.
+- **Constructor names**: the rule names introduced by a head annotation
+  `p(args)[Ctor]` (Section 8). Written only inside `[...]`, globally unique, and
+  disjoint from every namespace above, since they never appear in a term or call
+  position.
 
 **Two reservation mechanisms.** Keywords and type names are rejected by the
 *parser*, a hard syntax error in any position (predicate, column, or variable).
@@ -1872,7 +1876,103 @@ new UrlJsonLoader({
 });
 ```
 
-## 8 Examples
+## 8 Proof Terms
+
+Naming a rule records *how* each fact is derived. A rule head annotated with a
+constructor name, `p(args)[Ctor]`, makes `p` a **proof-carrying** predicate: for
+every derivation it carries a proof term, so the predicate's meaning becomes an
+algebraic datatype whose inhabitants are its derivations. This is the
+Curry-Howard reading of a Horn clause: the predicate, indexed by its head
+arguments, is a proposition; each named rule is a constructor; a proof term is
+an inhabitant.
+
+### 8.1 Named rules and proof-carrying predicates
+
+A rule head may carry a constructor name in brackets after the closing
+parenthesis:
+
+```prolog
+suit()[Hearts].
+suit()[Spades].
+num_list(0)[Nil].
+num_list(n + 1)[Cons] :- num(Car), n <= 9, num_list(n).
+```
+
+A predicate is *proof-carrying* if any of its rules is named. Naming is
+all-or-nothing: either every rule for the predicate is named or none is, and
+mixing the two is an error. Constructor names form their own namespace (§1.8):
+they are written only inside `[...]` and must be unique across the whole
+program. A proof-carrying predicate may not use aggregates.
+
+### 8.2 Proof-term structure
+
+The proof term of a derivation is the constructor applied to, in order:
+
+1. the values of the *existential body variables* (the body variables that do
+   not appear in the head), in first-occurrence order; then
+2. the *sub-proofs* of the positive proof-carrying body atoms, in body order.
+
+Extensional atoms, comparisons, negations, and range/filter elements contribute
+nothing. A proof term is a `value` (§2.9), specifically the object
+
+```
+{ "$proof": "<Ctor>", "args": [ <arg>, ... ] }
+```
+
+The reserved `$proof` key keeps proof terms from colliding with ordinary JSON
+data. The proof terms of `num_list` above are therefore
+`{"$proof":"Nil","args":[]}`, `{"$proof":"Cons","args":[7,{"$proof":"Nil","args":[]}]}`,
+and so on: the proof terms *are* the lists.
+
+Because the proof term distinguishes derivations, a proof-carrying predicate is
+evaluated as a set of (head-argument, proof-term) rows: two different
+derivations of the same fact are two rows, while identical derivations
+deduplicate like any other tuple.
+
+### 8.3 Capturing and suppressing proof terms
+
+A proof term is carried implicitly; an ordinary reference `p(args)` does not
+mention it. A prefix on a body or query atom controls it:
+
+- `V : p(args)` **captures** the proof term into the variable `V` (read as "V is
+  a proof of `p(args)`"), so it can be projected by a query or used elsewhere.
+- `_ : p(args)` **suppresses** it, omitting that atom's sub-proof from the
+  enclosing constructor.
+- a bare `p(args)` neither names nor suppresses: inside a named rule its
+  sub-proof is included anonymously; in a query or an unnamed rule the proof is
+  ignored.
+
+A query observes proof terms by capturing them:
+
+```prolog
+?- Xs : num_list(Len).
+```
+
+A proof mark may be applied only to a positive atom of a proof-carrying
+predicate. Applying one to an extensional or unnamed predicate, or to a negated
+atom, is an error.
+
+### 8.4 Finiteness
+
+The set of derivations can be infinite even when the set of facts is finite: a
+recursion whose constructor nests a sub-proof (for example transitive closure
+over a cyclic graph) manufactures unboundedly large proof terms. This is
+ordinary `value` growth, so the finiteness check (§5.8, CLI flag
+`--warn-finiteness`) flags the proof column of such a recursion as potentially
+unbounded. Suppressing the recursive sub-proof with `_ :` removes the growth and
+keeps the proof terms finite; it is the way to record a shallow derivation over
+cyclic data.
+
+### 8.5 Evaluation
+
+Proof terms are a source-level feature: they desugar to one extra `value` column
+plus object and array construction in rule heads, so every backend evaluates
+them (the SQL backends through the usual translation, the in-memory interpreters
+directly). As with any recursion, a proof-carrying predicate whose recursion is
+non-linear (§4.4) is rejected by the SQL backends and runs only on the `native`
+and `seminaive` interpreters.
+
+## 9 Examples
 
 ### Transitive Closure (Recursion)
 
@@ -2005,7 +2105,7 @@ entropy(sum(X)) :- contribution(_, X).
 ?- entropy(H).
 ```
 
-## 9 Error Categories
+## 10 Error Categories
 
 Datamog reports errors with source positions (byte offsets) for IDE
 integration:
