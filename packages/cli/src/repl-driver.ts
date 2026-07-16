@@ -11,7 +11,7 @@ import {
   isFastCommitChunk,
   isInputComplete,
 } from "datamog-repl";
-import { bigintSafeReplacer } from "./output.ts";
+import { bigintSafeReplacer, prettifyProofRows } from "./output.ts";
 
 export interface RunReplOptions {
   backendName: string;
@@ -165,7 +165,7 @@ function renderEventsInteractive(events: ReplEvent[]): void {
         if (ev.rows.length === 0) {
           console.log("(no rows)");
         } else {
-          console.table(ev.rows);
+          console.table(prettifyProofRows(ev.rows));
         }
         break;
       }

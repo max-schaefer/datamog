@@ -24,7 +24,7 @@ import {
   validateMermaidColumns,
 } from "datamog-mermaid";
 import { parse } from "datamog-parser";
-import { bigintSafeReplacer, formatCellAsString } from "./output.ts";
+import { bigintSafeReplacer, formatCellAsString, prettifyProofRows } from "./output.ts";
 import { runRepl } from "./repl-driver.ts";
 
 function usage(exitCode = 1): never {
@@ -398,7 +398,7 @@ async function printResult(header: string, rows: Record<string, unknown>[], form
         // zero-column row.
         console.log("yes");
       } else {
-        console.table(rows);
+        console.table(prettifyProofRows(rows));
       }
       console.log();
       break;

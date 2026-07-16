@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { bigintSafeReplacer, formatCellAsString } from "../src/output.ts";
+import {
+  bigintSafeReplacer,
+  formatCellAsString,
+  formatProofTerm,
+  prettifyProofRows,
+} from "../src/output.ts";
 
 describe("bigintSafeReplacer", () => {
   test("safe-range BigInt round-trips through JSON.stringify as a number", () => {
@@ -62,5 +67,33 @@ describe("formatCellAsString", () => {
 
   test("BigInt cells survive via the shared replacer", () => {
     expect(formatCellAsString({ n: 9007199254740993n })).toBe('{"n":"9007199254740993"}');
+  });
+});
+
+describe("formatProofTerm", () => {
+  const cons = (car: unknown, cdr: unknown) => ({ $proof: "Cons", args: [car, cdr] });
+  const nil = { $proof: "Nil", args: [] };
+
+  test("renders nullary, primitive, and nested constructors", () => {
+    expect(formatProofTerm(nil)).toBe("Nil()");
+    expect(formatProofTerm({ $proof: "MkPair", args: [1, 2] })).toBe("MkPair(1, 2)");
+    expect(formatProofTerm({ $proof: "Some", args: ["a"] })).toBe('Some("a")');
+    expect(formatProofTerm(cons(7, cons(7, nil)))).toBe("Cons(7, Cons(7, Nil()))");
+  });
+
+  test("returns undefined for anything that is not exactly a proof term", () => {
+    expect(formatProofTerm({ a: 1 })).toBeUndefined();
+    expect(formatProofTerm({ $proof: "X" })).toBeUndefined(); // no args
+    expect(formatProofTerm({ $proof: "X", args: [], extra: 1 })).toBeUndefined(); // extra key
+    expect(formatProofTerm({ $proof: 5, args: [] })).toBeUndefined(); // $proof not a string
+    expect(formatProofTerm({ $proof: "X", args: {} })).toBeUndefined(); // args not an array
+    expect(formatProofTerm([1, 2])).toBeUndefined();
+    expect(formatProofTerm("Nil()")).toBeUndefined();
+    expect(formatProofTerm(null)).toBeUndefined();
+  });
+
+  test("prettifyProofRows rewrites only proof cells, leaving others intact", () => {
+    const rows = [{ P: nil, Len: 0, note: { plain: "data" } }];
+    expect(prettifyProofRows(rows)).toEqual([{ P: "Nil()", Len: 0, note: { plain: "data" } }]);
   });
 });
