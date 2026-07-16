@@ -187,9 +187,8 @@ list proof term (there it is construction, not a pattern, since patterns only
 live on one side of a body equality). That is enough to write append:
 
 ```prolog
-append(A, B, B) :- A : num_list(_), B : num_list(_), A = Nil().
-append(A, B, Cons(H, R)) :- A : num_list(_), B : num_list(_), A = Cons(H, T),
-                            append(T, B, R).
+append(Nil(), B, B) :- B : num_list(_).
+append(A, B, Cons(H, R)) :- A : num_list(_), A = Cons(H, T), append(T, B, R).
 ```
 
 The base case passes `B` through; the recursive case peels `A`'s head `H` with a

@@ -276,8 +276,8 @@ describe("proof terms", () => {
       num(1). num(2).
       num_list(0)[Nil].
       num_list(n + 1)[Cons] :- num(Car), n <= 1, num_list(n).
-      append(A, B, B) :- A : num_list(_), B : num_list(_), A = Nil().
-      append(A, B, Cons(H, R)) :- A : num_list(_), B : num_list(_), A = Cons(H, T), append(T, B, R).
+      append(Nil(), B, B) :- B : num_list(_).
+      append(A, B, Cons(H, R)) :- A : num_list(_), A = Cons(H, T), append(T, B, R).
     `;
     const nil = proof("Nil", []);
 

@@ -1989,9 +1989,8 @@ then desugars to `{ "$proof": "Ctor", "args": [a1, ..., an] }`. This is how
 programs that produce new proof terms are written, for example list append:
 
 ```prolog
-append(A, B, B) :- A : num_list(_), B : num_list(_), A = Nil().
-append(A, B, Cons(H, R)) :- A : num_list(_), B : num_list(_), A = Cons(H, T),
-                            append(T, B, R).
+append(Nil(), B, B) :- B : num_list(_).
+append(A, B, Cons(H, R)) :- A : num_list(_), A = Cons(H, T), append(T, B, R).
 ```
 
 `Cons(H, R)` in the head builds the result. Along with the head annotation
