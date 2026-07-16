@@ -20,7 +20,7 @@ append(Nil(), B, B) :- B : num_list(_).
 append(A, B, Cons(H, R)) :- A : num_list(_), A = Cons(H, T), append(T, B, R).
 
 # reverse: built on append.
-reverse(A, Nil()) :- A : num_list(_), A = Nil().
+reverse(Nil(), Nil()).
 reverse(A, R) :- A : num_list(_), A = Cons(H, T), reverse(T, RT), append(RT, Cons(H, Nil()), R).
 
 # member: X occurs in list L.
@@ -31,11 +31,11 @@ member(X, L) :- L : num_list(_), L = Cons(_, T), member(X, T).
 suffix(L, S) :- L : num_list(_), S = L.
 suffix(L, S) :- L : num_list(_), L = Cons(_, T), suffix(T, S).
 
-# Demonstrations on the list [1, 2].
-demo_append(C) :- A : num_list(_), A = Cons(1, Cons(2, Nil())), B : num_list(_), B = Cons(2, Nil()), append(A, B, C).
-demo_reverse(R) :- A : num_list(_), A = Cons(1, Cons(2, Nil())), reverse(A, R).
-demo_member(X) :- L : num_list(_), L = Cons(1, Cons(2, Nil())), member(X, L).
-demo_suffix(S) :- L : num_list(_), L = Cons(1, Cons(2, Nil())), suffix(L, S).
+# Demonstrations on the list [1, 2], built directly as arguments.
+demo_append(C) :- append(Cons(1, Cons(2, Nil())), Cons(2, Nil()), C).
+demo_reverse(R) :- reverse(Cons(1, Cons(2, Nil())), R).
+demo_member(X) :- member(X, Cons(1, Cons(2, Nil()))).
+demo_suffix(S) :- suffix(Cons(1, Cons(2, Nil())), S).
 
 ?- demo_append(C).
 ?- demo_reverse(R).

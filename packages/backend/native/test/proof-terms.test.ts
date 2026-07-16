@@ -284,8 +284,7 @@ describe("proof terms", () => {
     test("a constructor term in an argument position builds a value", async () => {
       const rows = (
         await run(`${listPrelude}
-          demo(C) :- A : num_list(_), B : num_list(_), append(A, B, C),
-                     A = Cons(1, Nil()), B = Cons(2, Nil()).
+          demo(C) :- append(Cons(1, Nil()), Cons(2, Nil()), C).
           ?- demo(C).
         `)
       )[0]!;
@@ -298,10 +297,10 @@ describe("proof terms", () => {
     test("reverse (built on append) reverses a list proof term", async () => {
       const rows = (
         await run(`${listPrelude}
-          reverse(A, Nil()) :- A : num_list(_), A = Nil().
+          reverse(Nil(), Nil()).
           reverse(A, R) :- A : num_list(_), A = Cons(H, T), reverse(T, RT),
                            append(RT, Cons(H, Nil()), R).
-          demo(R) :- A : num_list(_), reverse(A, R), A = Cons(1, Cons(2, Nil())).
+          demo(R) :- reverse(Cons(1, Cons(2, Nil())), R).
           ?- demo(R).
         `)
       )[0]!;
