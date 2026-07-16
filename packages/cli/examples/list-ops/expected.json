@@ -1,0 +1,94 @@
+[
+  [
+    {
+      "C": {
+        "args": [
+          1,
+          {
+            "args": [
+              2,
+              {
+                "args": [
+                  2,
+                  {
+                    "args": [],
+                    "$proof": "Nil"
+                  }
+                ],
+                "$proof": "Cons"
+              }
+            ],
+            "$proof": "Cons"
+          }
+        ],
+        "$proof": "Cons"
+      }
+    }
+  ],
+  [
+    {
+      "R": {
+        "args": [
+          2,
+          {
+            "args": [
+              1,
+              {
+                "args": [],
+                "$proof": "Nil"
+              }
+            ],
+            "$proof": "Cons"
+          }
+        ],
+        "$proof": "Cons"
+      }
+    }
+  ],
+  [
+    {
+      "X": 1
+    },
+    {
+      "X": 2
+    }
+  ],
+  [
+    {
+      "S": {
+        "args": [
+          1,
+          {
+            "args": [
+              2,
+              {
+                "args": [],
+                "$proof": "Nil"
+              }
+            ],
+            "$proof": "Cons"
+          }
+        ],
+        "$proof": "Cons"
+      }
+    },
+    {
+      "S": {
+        "args": [
+          2,
+          {
+            "args": [],
+            "$proof": "Nil"
+          }
+        ],
+        "$proof": "Cons"
+      }
+    },
+    {
+      "S": {
+        "args": [],
+        "$proof": "Nil"
+      }
+    }
+  ]
+]

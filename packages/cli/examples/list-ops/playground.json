@@ -1,0 +1,5 @@
+{
+  "name": "List Operations",
+  "description": "append, reverse, member, and sublists over proof-term lists, using capture, destructuring, and construction",
+  "order": 220
+}

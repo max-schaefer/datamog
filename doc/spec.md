@@ -1952,7 +1952,7 @@ A proof mark may be applied only to a positive atom of a proof-carrying
 predicate. Applying one to an extensional or unnamed predicate, or to a negated
 atom, is an error.
 
-### 8.4 Destructuring
+### 8.4 Destructuring and construction
 
 The `V :` capture surfaces a whole proof term; to take one apart, put a
 **constructor pattern** on one side of a body or query equality. Given a bound
@@ -1976,11 +1976,28 @@ list_sum(P, S) :- P : num_list(_), P = Cons(H, T), list_sum(T, S0),
                   S = as_integer(H) + S0.
 ```
 
-Patterns only match, never construct (construction is the job of named rules).
 A pattern's arity must match the constructor's, and a constructor name may not
-collide with a built-in operation, so `Ctor(...)` in an expression is
-unambiguous. Extracted components are `value`-typed, so an explicit coercion
-(`as_integer(H)` above) is still needed to use one as a primitive.
+collide with a built-in operation, so `Ctor(...)` is unambiguous. Extracted
+components are `value`-typed, so an explicit coercion (`as_integer(H)` above) is
+still needed to use one as a primitive.
+
+The same constructor term **builds** a value when it appears in an argument or
+expression position rather than as an equality's pattern. Position alone
+disambiguates the two, with no mode inference: inside a body equality a
+constructor term matches, everywhere else it constructs. `Ctor(a1, ..., an)`
+then desugars to `{ "$proof": "Ctor", "args": [a1, ..., an] }`. This is how
+programs that produce new proof terms are written, for example list append:
+
+```prolog
+append(A, B, B) :- A : num_list(_), B : num_list(_), A = Nil().
+append(A, B, Cons(H, R)) :- A : num_list(_), B : num_list(_), A = Cons(H, T),
+                            append(T, B, R).
+```
+
+`Cons(H, R)` in the head builds the result. Along with the head annotation
+`[Ctor]` (which builds the proof column, §8.1), that is the third and last use
+of a constructor term. The built value need not be one any predicate already
+derives.
 
 ### 8.5 Finiteness
 
@@ -2000,7 +2017,10 @@ plus object and array construction in rule heads, so every backend evaluates
 them (the SQL backends through the usual translation, the in-memory interpreters
 directly). As with any recursion, a proof-carrying predicate whose recursion is
 non-linear (§4.4) is rejected by the SQL backends and runs only on the `native`
-and `seminaive` interpreters.
+and `seminaive` interpreters. Construction-heavy programs (such as recursive
+list operations) also translate to deeply nested SQL that can exceed a SQL
+engine's expression-depth limit; the in-memory interpreters have no such limit,
+so they are the reliable target for substantial proof-term manipulation.
 
 ## 9 Examples
 

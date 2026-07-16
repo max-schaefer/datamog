@@ -1,0 +1,43 @@
+# List operations over proof-term lists
+#
+# `num_list` is a length-indexed list datatype whose proof terms are the lists.
+# Capture (`V : p(...)`), destructuring (`P = Cons(H, T)`), and construction
+# (`Cons(H, R)` in an argument position) together let the classic list
+# operations read like Prolog. Each list argument is captured from `num_list`
+# so it is range-restricted, as bottom-up evaluation requires.
+#
+# native/seminaive only: the SQL backends translate proof-term construction
+# into deeply nested JSON expressions, and a program this construction-heavy
+# exceeds SQLite's parser depth limit.
+
+num(1). num(2).
+
+num_list(0)[Nil].
+num_list(n + 1)[Cons] :- num(Car), n <= 1, num_list(n).
+
+# append: concatenate two lists, constructing the result.
+append(A, B, B) :- A : num_list(_), B : num_list(_), A = Nil().
+append(A, B, Cons(H, R)) :- A : num_list(_), B : num_list(_), A = Cons(H, T), append(T, B, R).
+
+# reverse: built on append.
+reverse(A, Nil()) :- A : num_list(_), A = Nil().
+reverse(A, R) :- A : num_list(_), A = Cons(H, T), reverse(T, RT), append(RT, Cons(H, Nil()), R).
+
+# member: X occurs in list L.
+member(X, L) :- L : num_list(_), L = Cons(X, _).
+member(X, L) :- L : num_list(_), L = Cons(_, T), member(X, T).
+
+# suffix: S is a tail of L (a sublist), including L itself.
+suffix(L, S) :- L : num_list(_), S = L.
+suffix(L, S) :- L : num_list(_), L = Cons(_, T), suffix(T, S).
+
+# Demonstrations on the list [1, 2].
+demo_append(C) :- A : num_list(_), A = Cons(1, Cons(2, Nil())), B : num_list(_), B = Cons(2, Nil()), append(A, B, C).
+demo_reverse(R) :- A : num_list(_), A = Cons(1, Cons(2, Nil())), reverse(A, R).
+demo_member(X) :- L : num_list(_), L = Cons(1, Cons(2, Nil())), member(X, L).
+demo_suffix(S) :- L : num_list(_), L = Cons(1, Cons(2, Nil())), suffix(L, S).
+
+?- demo_append(C).
+?- demo_reverse(R).
+?- demo_member(X).
+?- demo_suffix(S).

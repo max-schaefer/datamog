@@ -179,6 +179,28 @@ explicit `as_integer` before the arithmetic. Under the hood a pattern is just
 sugar for the JSON accessors of Chapter 14: `P["$proof"]` for the tag and
 `P["args"][i]` for the components.
 
+## Building new lists
+
+Matching takes a list apart; the same constructor syntax, used in an *argument*
+position, puts one together. `Cons(H, R)` as a rule-head argument builds a new
+list proof term (there it is construction, not a pattern, since patterns only
+live on one side of a body equality). That is enough to write append:
+
+```prolog
+append(A, B, B) :- A : num_list(_), B : num_list(_), A = Nil().
+append(A, B, Cons(H, R)) :- A : num_list(_), B : num_list(_), A = Cons(H, T),
+                            append(T, B, R).
+```
+
+The base case passes `B` through; the recursive case peels `A`'s head `H` with a
+pattern and rebuilds it onto the appended tail with `Cons(H, R)`. `reverse` then
+falls out by folding append over the elements. Two caveats: every list argument
+has to be captured from a list predicate (`A : num_list(_)`) so it is
+range-restricted, which bounds these programs to the lists that predicate
+enumerates; and because each `Cons` becomes nested JSON, construction-heavy
+programs are best run on the `native` / `seminaive` backends (the SQL
+translation can outgrow a SQL engine's expression-depth limit).
+
 ## A few rules of the road
 
 - Naming is all-or-nothing: name every rule for a predicate, or
