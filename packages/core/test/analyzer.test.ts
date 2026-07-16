@@ -59,15 +59,14 @@ describe("analyzer", () => {
     expect(() => analyze(program)).toThrow(/duplicate column name 'name'/);
   });
 
-  test("rejects reserved built-in names as extensional columns", () => {
-    const cases = [
-      ["length", /conflicts with built-in function 'length'/],
-      ["count", /conflicts with aggregate function 'count'/],
-      ["object_entry", /conflicts with iteration function 'object_entry'/],
-    ] as const;
-    for (const [name, message] of cases) {
+  test("allows built-in function names as extensional columns", () => {
+    // Columns are non-callable (declared `name: type`, matched positionally),
+    // so like variables they may reuse a built-in function name without
+    // quoting. The reservation only applies to predicate names, where a bare
+    // `f(...)` would be ambiguous with a call to the built-in.
+    for (const name of ["length", "count", "object_entry", "sum"]) {
       const program = parse(`extensional t(${name}: integer).`);
-      expect(() => analyze(program)).toThrow(message);
+      expect(() => analyze(program)).not.toThrow();
     }
   });
 
@@ -493,14 +492,14 @@ describe("analyzer", () => {
       extensional base(x: integer).
       count(X) :- base(X).
     `);
-    expect(() => analyze(program)).toThrow(/conflicts with aggregate function/);
+    expect(() => analyze(program)).toThrow(/conflicts with built-in aggregate/);
   });
 
   test("rejects aggregate function name as extensional predicate", () => {
     const program = parse(`
       extensional sum(x: integer).
     `);
-    expect(() => analyze(program)).toThrow(/conflicts with aggregate function/);
+    expect(() => analyze(program)).toThrow(/conflicts with built-in aggregate/);
   });
 
   test("rejects ordinary built-in function name as predicate", () => {
@@ -609,7 +608,7 @@ describe("analyzer", () => {
       const program = parse(`
         extensional object_entry(o: value, k: string, v: value).
       `);
-      expect(() => analyze(program)).toThrow(/'object_entry' conflicts with iteration function/);
+      expect(() => analyze(program)).toThrow(/'object_entry' conflicts with built-in body atom/);
     });
 
     test("rejects rule head that shadows a built-in", () => {
@@ -617,7 +616,7 @@ describe("analyzer", () => {
         extensional p(x: integer).
         array_element(X) :- p(X).
       `);
-      expect(() => analyze(program)).toThrow(/'array_element' conflicts with iteration function/);
+      expect(() => analyze(program)).toThrow(/'array_element' conflicts with built-in body atom/);
     });
 
     test("rejects negated built-in body atom", () => {

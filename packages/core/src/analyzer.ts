@@ -83,10 +83,10 @@ export function isBuiltinBodyAtom(name: string): boolean {
   return BUILTIN_BODY_ATOMS.has(name);
 }
 
-function reservedFunctionKind(name: string): "aggregate" | "iteration" | "built-in" | undefined {
+function reservedOperationKind(name: string): "function" | "body atom" | "aggregate" | undefined {
   if (AGGREGATE_NAMES.has(name)) return "aggregate";
-  if (BUILTIN_BODY_ATOMS.has(name)) return "iteration";
-  if (BUILTINS.has(name)) return "built-in";
+  if (BUILTIN_BODY_ATOMS.has(name)) return "body atom";
+  if (BUILTINS.has(name)) return "function";
   return undefined;
 }
 
@@ -213,14 +213,6 @@ export function analyze(program: Program): AnalyzedProgram {
         // across backends and points at the source location.
         const seenCols = new Set<string>();
         for (const col of stmt.columns) {
-          const reservedKind = reservedFunctionKind(col.name);
-          if (reservedKind && !(col as { nameQuoted?: boolean }).nameQuoted) {
-            const pos = nodePos(col);
-            throw new AnalyzerError(
-              `Column name '${col.name}' of predicate '${stmt.predicate}' conflicts with ${reservedKind} function '${col.name}'`,
-              ...(pos ?? []),
-            );
-          }
           if (seenCols.has(col.name)) {
             const pos = nodePos(col);
             throw new AnalyzerError(
@@ -271,17 +263,13 @@ export function analyze(program: Program): AnalyzedProgram {
     }
   }
 
-  // Check no predicate name conflicts with a built-in function name. This
-  // already covered aggregates (`count`, `sum`, …); extending it to the
-  // ordinary built-ins (`length`, `upper`, `floor`, …) keeps the rule
-  // consistent and avoids reading-order surprises: in a body, `length(X)`
-  // parses as a body literal (Literal precedes Expression's FunctionCall),
-  // but in an expression position it's the built-in — same source token,
-  // two different meanings. Built-in body atoms (`object_entry`,
-  // `array_element`) are reserved for the same reason: they look like
-  // user predicates but are dispatched by the analyzer / translator.
+  // A predicate name may not collide with a built-in operation name (function,
+  // body atom, or aggregate): written `f(...)` a predicate would be
+  // indistinguishable from invoking the built-in, giving one source token two
+  // meanings. Extensional columns and variables are exempt, since neither uses
+  // the `name(...)` call form. Backtick-quoting the head predicate opts out.
   for (const predicate of [...extDecls.keys(), ...rules.keys()]) {
-    const kind = reservedFunctionKind(predicate);
+    const kind = reservedOperationKind(predicate);
     if (kind) {
       const extDecl = extDecls.get(predicate);
       const ruleWithUnquotedHead = rules
@@ -294,7 +282,7 @@ export function analyze(program: Program): AnalyzedProgram {
       if (!decl) continue;
       const pos = decl ? nodePos(decl) : undefined;
       throw new AnalyzerError(
-        `Predicate name '${predicate}' conflicts with ${kind} function '${predicate}'`,
+        `Predicate name '${predicate}' conflicts with built-in ${kind} '${predicate}'`,
         ...(pos ?? []),
       );
     }
