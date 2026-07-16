@@ -91,6 +91,10 @@ the browser.
 - [Chapter 13. Case study — graph algorithms](13-graphs.md)
 - [Chapter 14. Working with values](14-json.md)
 
+### Part V — Extensions
+
+- [Chapter 15. Proof terms](15-proof-terms.md)
+
 ### Companion tutorials
 
 Two standalone tutorials live alongside this walkthrough:
