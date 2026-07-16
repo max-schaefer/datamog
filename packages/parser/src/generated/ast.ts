@@ -299,13 +299,15 @@ export interface Literal extends langium.AstNode {
     args: Array<Expression>;
     negated: boolean;
     predicate: Identifier;
+    proofVar?: Identifier;
 }
 
 export const Literal = {
     $type: 'Literal',
     args: 'args',
     negated: 'negated',
-    predicate: 'predicate'
+    predicate: 'predicate',
+    proofVar: 'proofVar'
 } as const;
 
 export function isLiteral(item: unknown): item is Literal {
@@ -431,12 +433,14 @@ export interface Rule extends langium.AstNode {
     readonly $type: 'Rule';
     body: Array<BodyElement>;
     head: HeadAtom;
+    ruleName?: Identifier;
 }
 
 export const Rule = {
     $type: 'Rule',
     body: 'body',
-    head: 'head'
+    head: 'head',
+    ruleName: 'ruleName'
 } as const;
 
 export function isRule(item: unknown): item is Rule {
@@ -759,6 +763,9 @@ export class DatamogAstReflection extends langium.AbstractAstReflection {
                 },
                 predicate: {
                     name: Literal.predicate
+                },
+                proofVar: {
+                    name: Literal.proofVar
                 }
             },
             superTypes: [BodyElement.$type]
@@ -844,6 +851,9 @@ export class DatamogAstReflection extends langium.AbstractAstReflection {
                 },
                 head: {
                     name: Rule.head
+                },
+                ruleName: {
+                    name: Rule.ruleName
                 }
             },
             superTypes: [Statement.$type]

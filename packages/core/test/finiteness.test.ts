@@ -222,3 +222,36 @@ describe("finiteness analysis", () => {
     expect(source.slice(d.offset!, d.end!)).toBe("N + 1");
   });
 });
+
+describe("finiteness of proof terms", () => {
+  test("flags the proof column of an unbounded recursive derivation", () => {
+    // Transitive closure with named rules: `path` gains an implicit proof
+    // column (index 2 -> ".3"). The recursive Trans constructor nests the
+    // sub-proof, so over a cyclic graph the proof term grows without bound.
+    const source = `
+      extensional edge(a: integer, b: integer).
+      path(A, B)[Edge] :- edge(A, B).
+      path(A, C)[Trans] :- edge(A, B), path(B, C).
+    `;
+    expect(flagged(source)).toEqual(["path.3"]);
+  });
+
+  test("suppressing the recursive sub-proof (_ :) removes the growth", () => {
+    // `_ : path(B, C)` drops the nested sub-proof, so the proof column no
+    // longer lies on a value-producing cycle and the derivation stays finite.
+    const source = `
+      extensional edge(a: integer, b: integer).
+      path(A, B)[Edge] :- edge(A, B).
+      path(A, C)[Trans] :- edge(A, B), _ : path(B, C).
+    `;
+    expect(flagged(source)).toEqual([]);
+  });
+
+  test("a non-recursive proof-carrying predicate is finite", () => {
+    const source = `
+      extensional num(n: integer).
+      num_pair()[MkPair] :- num(Left), num(Right).
+    `;
+    expect(flagged(source)).toEqual([]);
+  });
+});

@@ -1,11 +1,18 @@
 import { type AstNode, AstUtils } from "langium";
 import type {
   AggregateCall,
+  ArrayLiteral,
+  BodyElement,
   BracketAccess,
+  Expression,
+  ObjectEntry,
+  ObjectLiteral,
   Program,
   Slice,
+  StringLiteral,
   Subscript,
   UnaryExpr,
+  Variable,
 } from "./generated/ast.js";
 import {
   isBracketAccess,
@@ -76,6 +83,61 @@ function parseErrorAtNode(message: string, node: { $cstNode?: AstNode["$cstNode"
   const err = new ParseError(message, line, col, cst?.offset);
   if (cst?.end !== undefined) err.end = cst.end;
   return err;
+}
+
+type Cst = AstNode["$cstNode"];
+
+function setContainer(node: AstNode, container: AstNode, property: string, index?: number): void {
+  const n = node as { $container: AstNode; $containerProperty?: string; $containerIndex?: number };
+  n.$container = container;
+  n.$containerProperty = property;
+  n.$containerIndex = index;
+}
+
+function mkVar(name: string, cst: Cst): Variable {
+  return { $type: "Variable", name, $cstNode: cst } as unknown as Variable;
+}
+
+/**
+ * Build a proof-term value: the tagged object `{ "$proof": ctor, "args": [...] }`.
+ * A reserved `$proof` key keeps proof terms from colliding with plain JSON data.
+ */
+function buildProofTerm(ctor: string, args: Expression[], cst: Cst): ObjectLiteral {
+  const nameLit = {
+    $type: "StringLiteral",
+    value: ctor,
+    $cstNode: cst,
+  } as unknown as StringLiteral;
+  const nameEntry = {
+    $type: "ObjectEntry",
+    key: "$proof",
+    value: nameLit,
+    $cstNode: cst,
+  } as unknown as ObjectEntry;
+  setContainer(nameLit, nameEntry, "value");
+
+  const argsArr = {
+    $type: "ArrayLiteral",
+    elements: args,
+    $cstNode: cst,
+  } as unknown as ArrayLiteral;
+  args.forEach((e, i) => setContainer(e, argsArr, "elements", i));
+  const argsEntry = {
+    $type: "ObjectEntry",
+    key: "args",
+    value: argsArr,
+    $cstNode: cst,
+  } as unknown as ObjectEntry;
+  setContainer(argsArr, argsEntry, "value");
+
+  const obj = {
+    $type: "ObjectLiteral",
+    entries: [nameEntry, argsEntry],
+    $cstNode: cst,
+  } as unknown as ObjectLiteral;
+  setContainer(nameEntry, obj, "entries", 0);
+  setContainer(argsEntry, obj, "entries", 1);
+  return obj;
 }
 
 /**
@@ -251,6 +313,139 @@ export function postProcess(program: Program): void {
         (rule.head.args as unknown as (typeof aggregate | typeof arg)[])[i] = aggregate;
       }
     }
+  }
+
+  // 6. Proof-term desugar. A rule whose head carries `[Ctor]` is a named rule:
+  //    its predicate becomes "proof-carrying" and gains an implicit trailing
+  //    `value` column holding the derivation as a tagged object
+  //    `{ "$proof": Ctor, "args": [...] }`. Constructor args are the values of
+  //    the existential body variables (first-occurrence order) followed by the
+  //    sub-proofs of the positive IDB body atoms (body order). A body or query
+  //    atom `q(...)[V]` captures q's proof column into `V`; an unbound
+  //    reference to a proof-carrying predicate gets a fresh anonymous column so
+  //    arities stay consistent.
+  const proofCarrying = new Set<string>();
+  for (const stmt of program.statements) {
+    if (isRule(stmt) && stmt.ruleName !== undefined) proofCarrying.add(stmt.head.predicate);
+  }
+
+  // Sub-proof columns must be ordinary (non-anonymous) variables: the native
+  // planner drops `$anonN` names as don't-care, which would null out a captured
+  // sub-proof. Use a distinct `$subN` prefix that no source variable can spell.
+  let proofVarCounter = 0;
+  const freshProofVar = (): string => {
+    let name = `$sub${proofVarCounter++}`;
+    while (usedNames.has(name)) name = `$sub${proofVarCounter++}`;
+    return name;
+  };
+
+  // Validate naming: every rule of a proof-carrying predicate must be named,
+  // aggregates cannot be combined with proofs, and constructor names are unique.
+  const seenCtors = new Set<string>();
+  for (const stmt of program.statements) {
+    if (!isRule(stmt) || !proofCarrying.has(stmt.head.predicate)) continue;
+    const pred = stmt.head.predicate;
+    if (stmt.ruleName === undefined) {
+      throw parseErrorAtNode(
+        `Predicate '${pred}' mixes named and unnamed rules; either name every rule of a proof-carrying predicate or none`,
+        stmt.head,
+      );
+    }
+    if (stmt.head.args.some((a) => (a as { $type: string }).$type === "AggregateCall")) {
+      throw parseErrorAtNode(`Proof-carrying predicate '${pred}' cannot use aggregates`, stmt.head);
+    }
+    const ctor = decodeQuotedIdentifier(stmt.ruleName);
+    if (seenCtors.has(ctor)) {
+      throw parseErrorAtNode(`Constructor name '${ctor}' is used by more than one rule`, stmt.head);
+    }
+    seenCtors.add(ctor);
+  }
+
+  // Append the proof column to every reference to a proof-carrying predicate.
+  // Returns the column variables of the positive references (the sub-proofs),
+  // in body order. Also validates stray capture binders on non-proof atoms.
+  const injectProofColumns = (body: BodyElement[], collectSubProofs: boolean): string[] => {
+    const subProofs: string[] = [];
+    for (const el of body) {
+      if (!isLiteral(el)) continue;
+      const pred = el.predicate;
+      if (!proofCarrying.has(pred)) {
+        if (el.proofVar !== undefined) {
+          throw parseErrorAtNode(
+            `Cannot capture a proof from '${pred}', which has no named rules`,
+            el,
+          );
+        }
+        continue;
+      }
+      if (el.proofVar !== undefined && el.negated) {
+        throw parseErrorAtNode("Cannot mark a proof on a negated atom", el);
+      }
+      // `_ : p(...)` suppresses the sub-proof (omit it from the constructor);
+      // `V : p(...)` captures it into `V`; a bare `p(...)` includes it
+      // anonymously. A sub-proof is included unless suppressed or negated.
+      const suppressed = el.proofVar === "_";
+      const included = collectSubProofs && !el.negated && !suppressed;
+      let colName: string;
+      if (el.proofVar !== undefined && !suppressed) {
+        colName = decodeQuotedIdentifier(el.proofVar);
+      } else if (included) {
+        // An anonymous but included sub-proof must still bind, so it needs a
+        // non-anonymous name (the native planner drops `$anonN` as don't-care).
+        colName = freshProofVar();
+      } else {
+        // Suppressed, arity-only (query / non-named rule), or negated.
+        colName = freshAnon();
+      }
+      const v = mkVar(colName, el.$cstNode);
+      setContainer(v, el, "args", el.args.length);
+      el.args.push(v);
+      if (included) subProofs.push(colName);
+    }
+    return subProofs;
+  };
+
+  for (const stmt of program.statements) {
+    if (isQuery(stmt)) {
+      injectProofColumns(stmt.body, false);
+      continue;
+    }
+    if (!isRule(stmt)) continue;
+    if (stmt.ruleName === undefined) {
+      // Not a named rule: still inject proof columns for any references to
+      // proof-carrying predicates, but there is no constructor to build.
+      injectProofColumns(stmt.body, false);
+      continue;
+    }
+    // Named rule. Collect head vars and body value vars BEFORE injecting proof
+    // columns, so the injected variables aren't mistaken for existential
+    // witnesses. Existential values = body vars minus head vars minus captures.
+    const headVars = new Set<string>();
+    for (const n of streamAll(stmt.head)) if (isVariable(n)) headVars.add(n.name);
+    const captureNames = new Set<string>();
+    const bodyVars: string[] = [];
+    const seenBodyVar = new Set<string>();
+    for (const el of stmt.body) {
+      if (isLiteral(el) && el.proofVar !== undefined) {
+        captureNames.add(decodeQuotedIdentifier(el.proofVar));
+      }
+      for (const n of streamAll(el)) {
+        if (isVariable(n) && !seenBodyVar.has(n.name)) {
+          seenBodyVar.add(n.name);
+          bodyVars.push(n.name);
+        }
+      }
+    }
+    const subProofs = injectProofColumns(stmt.body, true);
+    const ctor = decodeQuotedIdentifier(stmt.ruleName);
+    const existentialVals = bodyVars.filter((v) => !headVars.has(v) && !captureNames.has(v));
+    const argExprs: Expression[] = [
+      ...existentialVals.map((name) => mkVar(name, stmt.head.$cstNode)),
+      ...subProofs.map((name) => mkVar(name, stmt.head.$cstNode)),
+    ];
+    const proofTerm = buildProofTerm(ctor, argExprs, stmt.head.$cstNode);
+    setContainer(proofTerm, stmt.head, "args", stmt.head.args.length);
+    (stmt.head.args as Expression[]).push(proofTerm);
   }
 }
 

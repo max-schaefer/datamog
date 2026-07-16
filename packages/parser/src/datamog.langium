@@ -29,7 +29,7 @@ PrimitiveType returns string:
 // that the lexer doesn't greedily munch the `:` in a slice like
 // `W[0:-1]` together with its leading `-`.
 Rule:
-    head=HeadAtom (':' '-' body+=BodyElement (',' body+=BodyElement)*)? '.';
+    head=HeadAtom ('[' ruleName=Identifier ']')? (':' '-' body+=BodyElement (',' body+=BodyElement)*)? '.';
 
 // Queries are syntactically (almost) the same as rule bodies — a
 // conjunction of literals / equalities / range atoms / filters — so the
@@ -73,12 +73,13 @@ AggregateCall:
 BodyElement:
     Literal | Equality | RangeAtom | Filter;
 
-// A body literal: a positive or negated atom. An "atom" by itself is the
-// positive form `p(...)`; prefixing `not` produces a negated literal.
-// (The AST stays flat — `negated`/`predicate`/`args` — for ergonomics;
-// see the spec BNF for the formal two-rule structure.)
+// A body literal: a positive or negated atom, optionally prefixed by a proof
+// capture. `V : p(...)` binds the atom's proof term to `V`; `_ : p(...)`
+// suppresses it (omits it from the enclosing constructor). Prefixing `not`
+// produces a negated literal. The AST stays flat (proofVar / negated /
+// predicate / args) for ergonomics; see the spec BNF for the formal structure.
 Literal:
-    (negated?='not')? predicate=Identifier '(' (args+=Expression (',' args+=Expression)*)? ')';
+    (proofVar=Identifier ':')? (negated?='not')? predicate=Identifier '(' (args+=Expression (',' args+=Expression)*)? ')';
 
 // Equality covers both binding (`X = expr`, left side is a bare variable
 // or other unbound shape) and non-binding constraints (`X + 1 = Y`).
