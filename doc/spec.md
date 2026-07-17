@@ -1952,28 +1952,30 @@ A proof mark may be applied only to a positive atom of a proof-carrying
 predicate. Applying one to an extensional or unnamed predicate, or to a negated
 atom, is an error.
 
-### 8.4 Destructuring and construction
+### 8.4 Destructuring and matching
 
-The `V :` capture surfaces a whole proof term; to take one apart, put a
-**constructor pattern** on one side of a body or query equality. Given a bound
-value `S`, the equality `S = Ctor(p1, ..., pn)` matches `S` against `Ctor` and
-binds the pattern's variables from its components:
+The `V :` capture surfaces a whole proof term; to look inside one, put a
+**constructor pattern** on one side of a body or query equality:
 
 ```prolog
-opt_value(V) :- P : num_opt(), P = Some(V).
+opt_value(V) :- P = Some(V).
 ```
 
-It desugars to the tag guard `as_string(S["$proof"]) = "Ctor"` followed by one
-element per argument, matched against the accessor `S["args"][i]`: a variable
-binds (via `=`), a literal becomes a guard, `_` ignores the position, and a
-nested pattern recurses. The matched value `S` must already be bound, and case
-analysis is ordinary rule disjunction (one rule per constructor), which is how
-a fold over a proof-term datatype is written:
+`P = Ctor(p1, ..., pn)` desugars to the capture `P : Pred(_)` (`Pred` being the
+predicate `Ctor` names a rule of), the tag guard
+`as_string(P["$proof"]) = "Ctor"`, and one match per argument against the
+accessor `P["args"][i]`: a variable binds (via `=`), a literal becomes a guard,
+`_` ignores the position, and a nested pattern recurses. Because the capture is
+part of the desugaring, the scrutinee is range-restricted to `Pred`'s proofs
+automatically; a separate `P : num_opt(_)` is no longer needed (though writing
+one is harmless).
+
+Case analysis is ordinary rule disjunction (one rule per constructor), which is
+how a fold over a proof-term datatype is written:
 
 ```prolog
-list_sum(P, 0) :- P : num_list(_), P = Nil().
-list_sum(P, S) :- P : num_list(_), P = Cons(H, T), list_sum(T, S0),
-                  S = as_integer(H) + S0.
+list_sum(P, 0) :- P = Nil().
+list_sum(P, S) :- P = Cons(H, T), list_sum(T, S0), S = as_integer(H) + S0.
 ```
 
 A pattern's arity must match the constructor's, and a constructor name may not
@@ -1981,22 +1983,30 @@ collide with a built-in operation, so `Ctor(...)` is unambiguous. Extracted
 components are `value`-typed, so an explicit coercion (`as_integer(H)` above) is
 still needed to use one as a primitive.
 
-The same constructor term **builds** a value when it appears in an argument or
-expression position rather than as an equality's pattern. Position alone
-disambiguates the two, with no mode inference: inside a body equality a
-constructor term matches, everywhere else it constructs. `Ctor(a1, ..., an)`
-then desugars to `{ "$proof": "Ctor", "args": [a1, ..., an] }`. This is how
-programs that produce new proof terms are written, for example list append:
+**A constructor term is always a match, never a value builder**, and this holds
+wherever it appears. In a head argument or a body-atom argument it is read as an
+implicit equality against a fresh variable and desugars exactly as above, so the
+classic list operations can be written with patterns in the head:
 
 ```prolog
 append(Nil(), B, B) :- B : num_list(_).
-append(A, B, Cons(H, R)) :- A : num_list(_), A = Cons(H, T), append(T, B, R).
+append(Cons(H, T), B, Cons(H, R)) :- append(T, B, R).
 ```
 
-`Cons(H, R)` in the head builds the result. Along with the head annotation
-`[Ctor]` (which builds the proof column, §8.1), that is the third and last use
-of a constructor term. The built value need not be one any predicate already
-derives.
+`Cons(H, T)` in the first argument takes a list apart; `Cons(H, R)` in the third
+relates the result to a num_list proof. The only thing that *builds* a proof is
+the head annotation `[Ctor]` (§8.1); every other `Ctor(...)` matches one that a
+rule already derived. (The base case still needs `B : num_list(_)` because `B`
+is a plain variable passed straight through, with no constructor term to
+range-restrict it.)
+
+One consequence is worth stating plainly. Because every constructor term is
+range-restricted to its predicate, an operation can only produce proofs the
+predicate already enumerates. `num_list` above is finite (lists over a fixed set
+up to a length cap), so `append` computes the append *relation restricted to
+that universe*: concatenating two lists whose result exceeds the cap yields no
+matching proof, and that row drops out. To invent a value that is not a proof of
+any predicate, use a raw `value` literal (§7), not constructor syntax.
 
 ### 8.5 Finiteness
 
@@ -2011,15 +2021,17 @@ cyclic data.
 
 ### 8.6 Evaluation
 
-Proof terms are a source-level feature: they desugar to one extra `value` column
-plus object and array construction in rule heads, so every backend evaluates
-them (the SQL backends through the usual translation, the in-memory interpreters
-directly). As with any recursion, a proof-carrying predicate whose recursion is
-non-linear (§4.4) is rejected by the SQL backends and runs only on the `native`
-and `seminaive` interpreters. Construction-heavy programs (such as recursive
-list operations) also translate to deeply nested SQL that can exceed a SQL
-engine's expression-depth limit; the in-memory interpreters have no such limit,
-so they are the reliable target for substantial proof-term manipulation.
+Proof terms are a source-level feature: a proof-carrying predicate gains one
+extra `value` column that its named rules fill with a tagged object, and every
+constructor term elsewhere desugars to accessors over that column. Every backend
+evaluates them (the SQL backends through the usual translation, the in-memory
+interpreters directly). As with any recursion, a proof-carrying predicate whose
+recursion is non-linear (§4.4) is rejected by the SQL backends and runs only on
+the `native` and `seminaive` interpreters. Recursive programs that thread proofs
+through several constructor matches (such as the list operations) translate to
+SQL with nested accessor chains that can exceed a SQL engine's parser or
+expression-depth limit; the in-memory interpreters have no such limit, so they
+are the reliable target for substantial proof-term manipulation.
 
 ## 9 Examples
 

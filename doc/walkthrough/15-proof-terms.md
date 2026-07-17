@@ -153,52 +153,59 @@ Capturing gives you a whole proof term; often you want to look *inside* one. Put
 a constructor on one side of an equality and it becomes a **pattern**:
 
 ```prolog
-opt_value(V) :- P : num_opt(), P = Some(V).
+opt_value(V) :- P = Some(V).
 ```
 
 `P = Some(V)` matches `P` against the `Some` constructor and binds `V` to its
-argument; the `None` proofs simply don't match, so `opt_value` collects the
-values that were wrapped in `Some`. In a pattern a variable binds, a literal has
-to match, `_` ignores a position, and a nested pattern like `Cons(_, Cons(X, _))`
-reaches deeper in.
+argument; the `None` proofs don't match, so `opt_value` collects the values that
+were wrapped in `Some`. The pattern also range-restricts `P` to proofs of
+`num_opt` for you, so no separate `P : num_opt()` capture is needed. In a
+pattern a variable binds, a literal has to match, `_` ignores a position, and a
+nested pattern like `Cons(_, Cons(X, _))` reaches deeper in.
 
 Because each rule matches one constructor, ordinary rule disjunction gives you
 case analysis, and recursion gives you folds. Summing a list proof term:
 
 ```prolog
-list_sum(P, 0) :- P : num_list(_), P = Nil().
-list_sum(P, S) :- P : num_list(_), P = Cons(H, T), list_sum(T, S0),
-                  S = as_integer(H) + S0.
+list_sum(P, 0) :- P = Nil().
+list_sum(P, S) :- P = Cons(H, T), list_sum(T, S0), S = as_integer(H) + S0.
 ```
 
 The `Nil` rule is the base case; the `Cons` rule peels off the head `H`, sums
-the tail `T` recursively, and adds them. Two things to note: the value being
-matched must already be bound (here `P` comes from the `P : num_list(_)`
-capture), and a destructured component comes out as a `value`, so `H` needs an
-explicit `as_integer` before the arithmetic. Under the hood a pattern is just
-sugar for the JSON accessors of Chapter 14: `P["$proof"]` for the tag and
-`P["args"][i]` for the components.
+the tail `T` recursively, and adds them. A destructured component comes out as a
+`value`, so `H` needs an explicit `as_integer` before the arithmetic. Under the
+hood a pattern is sugar for the JSON accessors of Chapter 14 — `P["$proof"]` for
+the tag, `P["args"][i]` for the components — plus the `P : num_list()` capture
+that makes `P` range over the datatype's proofs.
 
-## Building new lists
+## Relating lists
 
-Matching takes a list apart; the same constructor syntax, used in an *argument*
-position, puts one together. `Cons(H, R)` as a rule-head argument builds a new
-list proof term (there it is construction, not a pattern, since patterns only
-live on one side of a body equality). That is enough to write append:
+A constructor term is *always* a match, wherever it appears — including a rule
+head. In a head argument `Cons(H, T)` reads as an implicit equality against that
+column, so it takes the incoming list apart just like a body pattern; there is
+no separate "construction" mode. That lets the list operations read like Prolog:
 
 ```prolog
 append(Nil(), B, B) :- B : num_list(_).
-append(A, B, Cons(H, R)) :- A : num_list(_), A = Cons(H, T), append(T, B, R).
+append(Cons(H, T), B, Cons(H, R)) :- append(T, B, R).
 ```
 
-The base case passes `B` through; the recursive case peels `A`'s head `H` with a
-pattern and rebuilds it onto the appended tail with `Cons(H, R)`. `reverse` then
-falls out by folding append over the elements. Two caveats: every list argument
-has to be captured from a list predicate (`A : num_list(_)`) so it is
-range-restricted, which bounds these programs to the lists that predicate
-enumerates; and because each `Cons` becomes nested JSON, construction-heavy
-programs are best run on the `native` / `seminaive` backends (the SQL
-translation can outgrow a SQL engine's expression-depth limit).
+The first argument's `Cons(H, T)` peels a head `H` and tail `T`; the third's
+`Cons(H, R)` relates the result to the list made of `H` and the appended tail
+`R`. Both are matches against `num_list` proofs. `reverse`, `member`, and
+sublist predicates fall out the same way (see the *List Operations* example).
+
+Because the output is matched against `num_list` too, append relates lists the
+datatype already enumerates rather than inventing new ones. If `num_list` is
+capped at some length, concatenating two lists whose result exceeds the cap
+produces no matching proof, and that row drops out — append computes the append
+*relation restricted to the enumerated universe*; widen the cap to admit longer
+results. (The base case keeps `B : num_list(_)` because `B` is a plain variable
+with no constructor term to range-restrict it.)
+
+These recursive programs thread proofs through several matches, which the SQL
+backends translate into nested accessor chains that can outgrow a SQL engine's
+parser limit, so run them on `native` / `seminaive`.
 
 ## A few rules of the road
 
@@ -209,11 +216,11 @@ translation can outgrow a SQL engine's expression-depth limit).
 - A proof mark applies only to a positive, proof-carrying atom,
   not to an extensional predicate and not to a negated atom.
 
-Proof terms desugar to one extra `value` column plus a little
-construction in the head, so they run on every backend. As with
-any recursion, though, a *non-linearly* recursive proof predicate
-is rejected by the SQL backends and runs only on `native` and
-`seminaive`.
+Proof terms desugar to one extra `value` column that named rules
+fill in, plus accessor matches wherever a constructor term
+appears, so they run on every backend. As with any recursion,
+though, a *non-linearly* recursive proof predicate is rejected by
+the SQL backends and runs only on `native` and `seminaive`.
 
 ## Exercises
 
