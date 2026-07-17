@@ -108,7 +108,11 @@ export function Toolbar({
   return (
     <div class="toolbar">
       <div class="toolbar-left">
-        <img src={`${import.meta.env.BASE_URL}datamog.jpg`} alt="Datamog" class="toolbar-logo" />
+        <img
+          src={`${import.meta.env.BASE_URL}datamog-mark.png`}
+          alt="Datamog"
+          class="toolbar-logo"
+        />
         <a
           class="toolbar-title"
           href={import.meta.env.BASE_URL}
