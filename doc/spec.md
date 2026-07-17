@@ -1906,14 +1906,16 @@ program. A proof-carrying predicate may not use aggregates.
 
 ### 8.2 Proof-term structure
 
-The proof term of a derivation is the constructor applied to, in order:
+With the bare `[Ctor]` form, the proof term of a derivation is the constructor
+applied to, in order:
 
 1. the values of the *existential body variables* (the body variables that do
    not appear in the head), in first-occurrence order; then
 2. the *sub-proofs* of the positive proof-carrying body atoms, in body order.
 
 Extensional atoms, comparisons, negations, and range/filter elements contribute
-nothing. A proof term is a `value` (§2.9), specifically the object
+nothing, and a don't-care `_` is never a witness. A proof term is a `value`
+(§2.9), specifically the object
 
 ```
 { "$proof": "<Ctor>", "args": [ <arg>, ... ] }
@@ -1923,6 +1925,20 @@ The reserved `$proof` key keeps proof terms from colliding with ordinary JSON
 data. The proof terms of `num_list` above are therefore
 `{"$proof":"Nil","args":[]}`, `{"$proof":"Cons","args":[7,{"$proof":"Nil","args":[]}]}`,
 and so on: the proof terms *are* the lists.
+
+A rule may instead **list the constructor's arguments explicitly**,
+`[Ctor(a1, ..., an)]`, and then the proof term carries exactly those expressions
+(usually captured sub-proofs and chosen witnesses) rather than the auto-derived
+list. This keeps an intermediate body variable out of the proof term -- for
+instance a chart parser's split position:
+
+```prolog
+ast(i, k)[Add(L, R)] :- L : ast(i, j), token(j, "plus", _), R : ast(j + 1, k).
+```
+
+The split point `j` is a body variable that auto-derivation would record;
+`[Add(L, R)]` lists only the two captured sub-parses, so the AST stays clean.
+Explicit `[Ctor()]` forces a nullary proof term even for a rule with witnesses.
 
 Because the proof term distinguishes derivations, a proof-carrying predicate is
 evaluated as a set of (head-argument, proof-term) rows: two different

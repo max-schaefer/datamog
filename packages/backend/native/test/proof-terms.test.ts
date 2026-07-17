@@ -397,4 +397,35 @@ describe("proof terms", () => {
       );
     });
   });
+
+  describe("explicit constructor arguments", () => {
+    test("[Ctor(args)] records exactly the listed arguments", async () => {
+      // Y is an intermediate witness; auto-derivation would record it, but
+      // [Mk(X)] keeps it out, so the two derivations of each X collapse to one.
+      const rows = (
+        await run(`
+          num(1). num(2).
+          pick()[Mk(X)] :- num(X), num(Y).
+          ?- P : pick().
+        `)
+      )[0]!;
+      expect(sortRows(rows)).toEqual(sortRows([{ P: proof("Mk", [1]) }, { P: proof("Mk", [2]) }]));
+    });
+
+    test("a chart parser builds clean AST proof terms", async () => {
+      // The split position j is a body variable, but [Add(L, R)] keeps it out
+      // of the AST -- the proof term carries only the two captured sub-parses.
+      const rows = (
+        await run(`
+          token(0, "num", 2). token(1, "plus", 0). token(2, "num", 3).
+          ast(i, i + 1)[Lit(V)] :- token(i, "num", V).
+          ast(i, k)[Add(L, R)] :- L : ast(i, j), token(j, "plus", _), R : ast(j + 1, k).
+          ?- A : ast(0, 3).
+        `)
+      )[0]!;
+      expect(sortRows(rows)).toEqual(
+        sortRows([{ A: proof("Add", [proof("Lit", [2]), proof("Lit", [3])]) }]),
+      );
+    });
+  });
 });

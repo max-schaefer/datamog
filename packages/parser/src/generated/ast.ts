@@ -84,7 +84,7 @@ export function isAggregateCall(item: unknown): item is AggregateCall {
 }
 
 export interface ArrayLiteral extends langium.AstNode {
-    readonly $container: AggregateCall | ArrayLiteral | BinaryExpr | BracketAccess | Equality | Filter | FunctionCall | HeadAtom | Literal | ObjectEntry | RangeAtom | Slice | Subscript | UnaryExpr;
+    readonly $container: AggregateCall | ArrayLiteral | BinaryExpr | BracketAccess | Equality | Filter | FunctionCall | HeadAtom | Literal | ObjectEntry | RangeAtom | Rule | Slice | Subscript | UnaryExpr;
     readonly $type: 'ArrayLiteral';
     elements: Array<Expression>;
 }
@@ -99,7 +99,7 @@ export function isArrayLiteral(item: unknown): item is ArrayLiteral {
 }
 
 export interface BinaryExpr extends langium.AstNode {
-    readonly $container: AggregateCall | ArrayLiteral | BinaryExpr | BracketAccess | Equality | Filter | FunctionCall | HeadAtom | Literal | ObjectEntry | RangeAtom | Slice | Subscript | UnaryExpr;
+    readonly $container: AggregateCall | ArrayLiteral | BinaryExpr | BracketAccess | Equality | Filter | FunctionCall | HeadAtom | Literal | ObjectEntry | RangeAtom | Rule | Slice | Subscript | UnaryExpr;
     readonly $type: 'BinaryExpr';
     left: Expression;
     op: '!=' | '%' | '&&' | '&' | '*' | '**' | '+' | '-' | '/' | '<' | '<<' | '<=' | '<>' | '=' | '==' | '>' | '>=' | '>>' | '>>>' | '^' | '|' | '||';
@@ -128,7 +128,7 @@ export function isBodyElement(item: unknown): item is BodyElement {
 }
 
 export interface BooleanLiteral extends langium.AstNode {
-    readonly $container: AggregateCall | ArrayLiteral | BinaryExpr | BracketAccess | Equality | Filter | FunctionCall | HeadAtom | Literal | ObjectEntry | RangeAtom | Slice | Subscript | UnaryExpr;
+    readonly $container: AggregateCall | ArrayLiteral | BinaryExpr | BracketAccess | Equality | Filter | FunctionCall | HeadAtom | Literal | ObjectEntry | RangeAtom | Rule | Slice | Subscript | UnaryExpr;
     readonly $type: 'BooleanLiteral';
     value: boolean;
 }
@@ -143,7 +143,7 @@ export function isBooleanLiteral(item: unknown): item is BooleanLiteral {
 }
 
 export interface BracketAccess extends langium.AstNode {
-    readonly $container: AggregateCall | ArrayLiteral | BinaryExpr | BracketAccess | Equality | Filter | FunctionCall | HeadAtom | Literal | ObjectEntry | RangeAtom | Slice | Subscript | UnaryExpr;
+    readonly $container: AggregateCall | ArrayLiteral | BinaryExpr | BracketAccess | Equality | Filter | FunctionCall | HeadAtom | Literal | ObjectEntry | RangeAtom | Rule | Slice | Subscript | UnaryExpr;
     readonly $type: 'BracketAccess';
     end?: Expression;
     object: Expression;
@@ -244,7 +244,7 @@ export function isFilter(item: unknown): item is Filter {
 }
 
 export interface FunctionCall extends langium.AstNode {
-    readonly $container: AggregateCall | ArrayLiteral | BinaryExpr | BracketAccess | Equality | Filter | FunctionCall | HeadAtom | Literal | ObjectEntry | RangeAtom | Slice | Subscript | UnaryExpr;
+    readonly $container: AggregateCall | ArrayLiteral | BinaryExpr | BracketAccess | Equality | Filter | FunctionCall | HeadAtom | Literal | ObjectEntry | RangeAtom | Rule | Slice | Subscript | UnaryExpr;
     readonly $type: 'FunctionCall';
     args: Array<Expression>;
     name: string;
@@ -317,7 +317,7 @@ export function isLiteral(item: unknown): item is Literal {
 }
 
 export interface NullLiteral extends langium.AstNode {
-    readonly $container: AggregateCall | ArrayLiteral | BinaryExpr | BracketAccess | Equality | Filter | FunctionCall | HeadAtom | Literal | ObjectEntry | RangeAtom | Slice | Subscript | UnaryExpr;
+    readonly $container: AggregateCall | ArrayLiteral | BinaryExpr | BracketAccess | Equality | Filter | FunctionCall | HeadAtom | Literal | ObjectEntry | RangeAtom | Rule | Slice | Subscript | UnaryExpr;
     readonly $type: 'NullLiteral';
 }
 
@@ -330,7 +330,7 @@ export function isNullLiteral(item: unknown): item is NullLiteral {
 }
 
 export interface NumberLiteral extends langium.AstNode {
-    readonly $container: AggregateCall | ArrayLiteral | BinaryExpr | BracketAccess | Equality | Filter | FunctionCall | HeadAtom | Literal | ObjectEntry | RangeAtom | Slice | Subscript | UnaryExpr;
+    readonly $container: AggregateCall | ArrayLiteral | BinaryExpr | BracketAccess | Equality | Filter | FunctionCall | HeadAtom | Literal | ObjectEntry | RangeAtom | Rule | Slice | Subscript | UnaryExpr;
     readonly $type: 'NumberLiteral';
     value: number;
 }
@@ -362,7 +362,7 @@ export function isObjectEntry(item: unknown): item is ObjectEntry {
 }
 
 export interface ObjectLiteral extends langium.AstNode {
-    readonly $container: AggregateCall | ArrayLiteral | BinaryExpr | BracketAccess | Equality | Filter | FunctionCall | HeadAtom | Literal | ObjectEntry | RangeAtom | Slice | Subscript | UnaryExpr;
+    readonly $container: AggregateCall | ArrayLiteral | BinaryExpr | BracketAccess | Equality | Filter | FunctionCall | HeadAtom | Literal | ObjectEntry | RangeAtom | Rule | Slice | Subscript | UnaryExpr;
     readonly $type: 'ObjectLiteral';
     entries: Array<ObjectEntry>;
 }
@@ -434,6 +434,8 @@ export interface Rule extends langium.AstNode {
     readonly $container: Program;
     readonly $type: 'Rule';
     body: Array<BodyElement>;
+    ctorArgs: Array<Expression>;
+    ctorParens: boolean;
     head: HeadAtom;
     ruleName?: Identifier;
 }
@@ -441,6 +443,8 @@ export interface Rule extends langium.AstNode {
 export const Rule = {
     $type: 'Rule',
     body: 'body',
+    ctorArgs: 'ctorArgs',
+    ctorParens: 'ctorParens',
     head: 'head',
     ruleName: 'ruleName'
 } as const;
@@ -478,7 +482,7 @@ export function isStatement(item: unknown): item is Statement {
 }
 
 export interface StringLiteral extends langium.AstNode {
-    readonly $container: AggregateCall | ArrayLiteral | BinaryExpr | BracketAccess | Equality | Filter | FunctionCall | HeadAtom | Literal | ObjectEntry | RangeAtom | Slice | Subscript | UnaryExpr;
+    readonly $container: AggregateCall | ArrayLiteral | BinaryExpr | BracketAccess | Equality | Filter | FunctionCall | HeadAtom | Literal | ObjectEntry | RangeAtom | Rule | Slice | Subscript | UnaryExpr;
     readonly $type: 'StringLiteral';
     value: string;
 }
@@ -509,7 +513,7 @@ export function isSubscript(item: unknown): item is Subscript {
 }
 
 export interface UnaryExpr extends langium.AstNode {
-    readonly $container: AggregateCall | ArrayLiteral | BinaryExpr | BracketAccess | Equality | Filter | FunctionCall | HeadAtom | Literal | ObjectEntry | RangeAtom | Slice | Subscript | UnaryExpr;
+    readonly $container: AggregateCall | ArrayLiteral | BinaryExpr | BracketAccess | Equality | Filter | FunctionCall | HeadAtom | Literal | ObjectEntry | RangeAtom | Rule | Slice | Subscript | UnaryExpr;
     readonly $type: 'UnaryExpr';
     op: '!' | '-';
     operand: Expression;
@@ -526,7 +530,7 @@ export function isUnaryExpr(item: unknown): item is UnaryExpr {
 }
 
 export interface Variable extends langium.AstNode {
-    readonly $container: AggregateCall | ArrayLiteral | BinaryExpr | BracketAccess | Equality | Filter | FunctionCall | HeadAtom | Literal | ObjectEntry | RangeAtom | Slice | Subscript | UnaryExpr;
+    readonly $container: AggregateCall | ArrayLiteral | BinaryExpr | BracketAccess | Equality | Filter | FunctionCall | HeadAtom | Literal | ObjectEntry | RangeAtom | Rule | Slice | Subscript | UnaryExpr;
     readonly $type: 'Variable';
     name: Identifier;
 }
@@ -541,7 +545,7 @@ export function isVariable(item: unknown): item is Variable {
 }
 
 export interface Wildcard extends langium.AstNode {
-    readonly $container: AggregateCall | ArrayLiteral | BinaryExpr | BracketAccess | Equality | Filter | FunctionCall | HeadAtom | Literal | ObjectEntry | RangeAtom | Slice | Subscript | UnaryExpr;
+    readonly $container: AggregateCall | ArrayLiteral | BinaryExpr | BracketAccess | Equality | Filter | FunctionCall | HeadAtom | Literal | ObjectEntry | RangeAtom | Rule | Slice | Subscript | UnaryExpr;
     readonly $type: 'Wildcard';
 }
 
@@ -854,6 +858,14 @@ export class DatamogAstReflection extends langium.AbstractAstReflection {
                 body: {
                     name: Rule.body,
                     defaultValue: []
+                },
+                ctorArgs: {
+                    name: Rule.ctorArgs,
+                    defaultValue: []
+                },
+                ctorParens: {
+                    name: Rule.ctorParens,
+                    defaultValue: false
                 },
                 head: {
                     name: Rule.head

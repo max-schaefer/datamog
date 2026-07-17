@@ -28,8 +28,17 @@ PrimitiveType returns string:
 // Using `':' '-'` as two tokens instead of the composite `:-` keyword so
 // that the lexer doesn't greedily munch the `:` in a slice like
 // `W[0:-1]` together with its leading `-`.
+//
+// A named rule `[Ctor]` builds a proof term. Bare `[Ctor]` auto-derives the
+// constructor's arguments (existential witnesses then sub-proofs);
+// `[Ctor(a, b, ...)]` lists them explicitly instead, so a rule can name exactly
+// what the proof term carries (typically captured sub-proofs) and leave
+// intermediate variables out. `ctorParens` records that the argument list was
+// written, distinguishing explicit `[Ctor()]` (nullary) from bare `[Ctor]`.
 Rule:
-    head=HeadAtom ('[' ruleName=Identifier ']')? (':' '-' body+=BodyElement (',' body+=BodyElement)*)? '.';
+    head=HeadAtom
+        ('[' ruleName=Identifier (ctorParens?='(' (ctorArgs+=Expression (',' ctorArgs+=Expression)*)? ')')? ']')?
+        (':' '-' body+=BodyElement (',' body+=BodyElement)*)? '.';
 
 // Queries are syntactically (almost) the same as rule bodies — a
 // conjunction of literals / equalities / range atoms / filters — so the

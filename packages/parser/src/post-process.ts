@@ -526,16 +526,25 @@ export function postProcess(program: Program): void {
     }
     const subProofs = injectProofColumns(stmt.body, true);
     const ctor = decodeQuotedIdentifier(stmt.ruleName);
-    // Existential witnesses are the body's own value variables. A don't-care
-    // `_` (desugared to a `$`-prefixed synthetic name) carries no information,
-    // so it must not be recorded in the proof term.
-    const existentialVals = bodyVars.filter(
-      (v) => !headVars.has(v) && !captureNames.has(v) && !v.startsWith("$"),
-    );
-    const argExprs: Expression[] = [
-      ...existentialVals.map((name) => mkVar(name, stmt.head.$cstNode)),
-      ...subProofs.map((name) => mkVar(name, stmt.head.$cstNode)),
-    ];
+    let argExprs: Expression[];
+    if (stmt.ctorParens) {
+      // Explicit constructor arguments `[Ctor(a, b, ...)]`: the proof term
+      // carries exactly these expressions (typically captured sub-proofs and
+      // chosen witnesses), so intermediate body variables stay out of it.
+      argExprs = stmt.ctorArgs as Expression[];
+    } else {
+      // Bare `[Ctor]`: auto-derive the arguments as the existential witnesses
+      // followed by the sub-proofs. Existential witnesses are the body's own
+      // value variables; a don't-care `_` (desugared to a `$`-prefixed
+      // synthetic name) carries no information, so it is excluded.
+      const existentialVals = bodyVars.filter(
+        (v) => !headVars.has(v) && !captureNames.has(v) && !v.startsWith("$"),
+      );
+      argExprs = [
+        ...existentialVals.map((name) => mkVar(name, stmt.head.$cstNode)),
+        ...subProofs.map((name) => mkVar(name, stmt.head.$cstNode)),
+      ];
+    }
     ctorArity.set(ctor, argExprs.length);
     const proofTerm = buildProofTerm(ctor, argExprs, stmt.head.$cstNode);
     setContainer(proofTerm, stmt.head, "args", stmt.head.args.length);
