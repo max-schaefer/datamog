@@ -183,11 +183,11 @@ list_sum(Cons(H, T), S + as_integer(H)) :- list_sum(T, S).
 The `Nil` rule is the base case; the `Cons` rule matches off the head `H`,
 recurses on the tail `T` for its sum `S`, and adds the two right in the head. A
 matched component comes out as a `value`, so `H` needs an explicit `as_integer`
-before the arithmetic. Pair each list with its sum by capturing the proof and
-joining:
+before the arithmetic. `list_sum`'s first column already ranges over `num_list`
+proofs, so pairing each list with its sum needs no capture:
 
 ```prolog
-?- Xs : num_list, list_sum(Xs, S).
+?- list_sum(Xs, S).
 ```
 
 Under the hood a pattern is sugar for the JSON accessors of Chapter 14 — the tag

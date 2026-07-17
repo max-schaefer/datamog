@@ -15,5 +15,6 @@ num_list(n + 1)[Cons] :- num(Car), n <= 1, num_list(n).
 list_sum(Nil(), 0).
 list_sum(Cons(H, T), S + as_integer(H)) :- list_sum(T, S).
 
-# Pair each list (shown by its proof term) with its sum.
-?- Xs : num_list, list_sum(Xs, S).
+# Pair each list (shown by its proof term) with its sum. list_sum's first
+# column already ranges over num_list proofs, so no capture is needed.
+?- list_sum(Xs, S).
