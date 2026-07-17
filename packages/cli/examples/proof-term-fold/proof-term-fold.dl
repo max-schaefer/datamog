@@ -1,10 +1,10 @@
-# Destructuring proof terms with constructor patterns
+# Folding proof terms with constructor patterns
 #
-# `V : p(...)` captures a proof term; a constructor pattern on one side of an
-# equality (`P = Cons(H, T)`) destructures it, binding `H` and `T` from the
-# proof term's components. Here we fold over the list proof terms of `num_list`
-# to sum their elements, doing case analysis by writing one rule per
-# constructor.
+# A constructor pattern matches a proof term against a constructor. In a rule
+# head it reads as an implicit equality against that column, so `list_sum` folds
+# over the list proof terms of `num_list` to sum their elements: one rule per
+# constructor, with the head expression combining the tail's sum with the
+# matched head.
 
 num(1). num(2).
 
@@ -12,8 +12,8 @@ num_list(0)[Nil].
 num_list(n + 1)[Cons] :- num(Car), n <= 1, num_list(n).
 
 # A catamorphism: Nil sums to 0; Cons adds its (coerced) head to the tail's sum.
-list_sum(P, 0) :- P : num_list(_), P = Nil().
-list_sum(P, S) :- P : num_list(_), P = Cons(H, T), list_sum(T, S0), S = as_integer(H) + S0.
+list_sum(Nil(), 0).
+list_sum(Cons(H, T), S + as_integer(H)) :- list_sum(T, S).
 
 # Pair each list (shown by its proof term) with its sum.
-?- Xs : num_list(_), list_sum(Xs, S).
+?- Xs : num_list, list_sum(Xs, S).

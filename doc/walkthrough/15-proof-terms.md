@@ -171,29 +171,38 @@ pattern a variable binds, a literal has to match, `_` ignores a position, and a
 nested pattern like `Cons(_, Cons(X, _))` reaches deeper in.
 
 Because each rule matches one constructor, ordinary rule disjunction gives you
-case analysis, and recursion gives you folds. Summing a list proof term:
+case analysis, and recursion gives you folds. A pattern works just as well in a
+rule *head*, where it reads as an implicit equality against that column, so
+summing a list proof term takes two rules and no scratch variable:
 
 ```prolog
-list_sum(P, 0) :- P = Nil().
-list_sum(P, S) :- P = Cons(H, T), list_sum(T, S0), S = as_integer(H) + S0.
+list_sum(Nil(), 0).
+list_sum(Cons(H, T), S + as_integer(H)) :- list_sum(T, S).
 ```
 
-The `Nil` rule is the base case; the `Cons` rule peels off the head `H`, sums
-the tail `T` recursively, and adds them. A destructured component comes out as a
-`value`, so `H` needs an explicit `as_integer` before the arithmetic. Under the
-hood a pattern is sugar for the JSON accessors of Chapter 14 — `P["$proof"]` for
-the tag, `P["args"][i]` for the components — plus the `P : num_list()` capture
-that makes `P` range over the datatype's proofs.
+The `Nil` rule is the base case; the `Cons` rule matches off the head `H`,
+recurses on the tail `T` for its sum `S`, and adds the two right in the head. A
+matched component comes out as a `value`, so `H` needs an explicit `as_integer`
+before the arithmetic. Pair each list with its sum by capturing the proof and
+joining:
+
+```prolog
+?- Xs : num_list, list_sum(Xs, S).
+```
+
+Under the hood a pattern is sugar for the JSON accessors of Chapter 14 — the tag
+`["$proof"]` and the components `["args"][i]` — plus the implicit `: num_list`
+capture that makes the matched value range over the datatype's proofs.
 
 ## Relating lists
 
-A constructor term is *always* a match, wherever it appears — including a rule
-head. In a head argument `Cons(H, T)` reads as an implicit equality against that
-column, so it takes the incoming list apart just like a body pattern; there is
-no separate "construction" mode. That lets the list operations read like Prolog:
+The same head patterns turn the list operations into near-Prolog. There is no
+separate "construction" mode: a constructor term is always a match, so
+`Cons(H, R)` in an *output* position relates that column to a `num_list` proof
+rather than building a fresh value. append concatenates two lists:
 
 ```prolog
-append(Nil(), B, B) :- B : num_list(_).
+append(Nil(), B, B) :- B : num_list.
 append(Cons(H, T), B, Cons(H, R)) :- append(T, B, R).
 ```
 
@@ -207,7 +216,7 @@ datatype already enumerates rather than inventing new ones. If `num_list` is
 capped at some length, concatenating two lists whose result exceeds the cap
 produces no matching proof, and that row drops out — append computes the append
 *relation restricted to the enumerated universe*; widen the cap to admit longer
-results. (The base case keeps `B : num_list(_)` because `B` is a plain variable
+results. (The base case keeps `B : num_list` because `B` is a plain variable
 with no constructor term to range-restrict it.)
 
 These recursive programs thread proofs through several matches, which the SQL

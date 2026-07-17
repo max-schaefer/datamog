@@ -1977,35 +1977,37 @@ part of the desugaring, the scrutinee is range-restricted to `Pred`'s proofs
 automatically; a separate `P : num_opt(_)` is no longer needed (though writing
 one is harmless).
 
-Case analysis is ordinary rule disjunction (one rule per constructor), which is
-how a fold over a proof-term datatype is written:
-
-```prolog
-list_sum(P, 0) :- P = Nil().
-list_sum(P, S) :- P = Cons(H, T), list_sum(T, S0), S = as_integer(H) + S0.
-```
-
 A pattern's arity must match the constructor's, and a constructor name may not
 collide with a built-in operation, so `Ctor(...)` is unambiguous. Extracted
-components are `value`-typed, so an explicit coercion (`as_integer(H)` above) is
-still needed to use one as a primitive.
+components are `value`-typed, so an explicit coercion (`as_integer(...)` below)
+is still needed to use one as a primitive.
 
 **A constructor term is always a match, never a value builder**, and this holds
 wherever it appears. In a head argument or a body-atom argument it is read as an
-implicit equality against a fresh variable and desugars exactly as above, so the
-classic list operations can be written with patterns in the head:
+implicit equality against a fresh variable and desugars exactly as above, so
+folds and the classic list operations can be written with patterns in the head.
+Case analysis is ordinary rule disjunction, one rule per constructor. A fold
+sums a list proof term (the head expression `S + as_integer(H)` combines the
+tail's sum with the matched head):
 
 ```prolog
-append(Nil(), B, B) :- B : num_list(_).
+list_sum(Nil(), 0).
+list_sum(Cons(H, T), S + as_integer(H)) :- list_sum(T, S).
+```
+
+and append concatenates two:
+
+```prolog
+append(Nil(), B, B) :- B : num_list.
 append(Cons(H, T), B, Cons(H, R)) :- append(T, B, R).
 ```
 
-`Cons(H, T)` in the first argument takes a list apart; `Cons(H, R)` in the third
-relates the result to a num_list proof. The only thing that *builds* a proof is
-the head annotation `[Ctor]` (§8.1); every other `Ctor(...)` matches one that a
-rule already derived. (The base case still needs `B : num_list(_)` because `B`
-is a plain variable passed straight through, with no constructor term to
-range-restrict it.)
+`Cons(H, T)` in a head argument takes a list apart; `Cons(H, R)` relates a
+result to a num_list proof. The only thing that *builds* a proof is the head
+annotation `[Ctor]` (§8.1); every other `Ctor(...)` matches one a rule already
+derived. (append's base case still needs `B : num_list` — shorthand for
+`B : num_list(_)`, §8.3 — because `B` is a plain variable passed straight
+through, with no constructor term to range-restrict it.)
 
 One consequence is worth stating plainly. Because every constructor term is
 range-restricted to its predicate, an operation can only produce proofs the
