@@ -271,35 +271,63 @@ describe("proof terms", () => {
     });
   });
 
-  describe("construction", () => {
+  describe("constructor terms in output positions", () => {
+    // A constructor term is always a match, never a value builder, so a head
+    // argument like `Cons(H, R)` relates to an existing num_list proof. The
+    // head-pattern rules read like Prolog and desugar to captures + accessors.
     const listPrelude = `
       num(1). num(2).
       num_list(0)[Nil].
-      num_list(n + 1)[Cons] :- num(Car), n <= 1, num_list(n).
+      num_list(n + 1)[Cons] :- num(Car), n <= 2, num_list(n).
       append(Nil(), B, B) :- B : num_list(_).
-      append(A, B, Cons(H, R)) :- A : num_list(_), A = Cons(H, T), append(T, B, R).
+      append(Cons(H, T), B, Cons(H, R)) :- append(T, B, R).
     `;
     const nil = proof("Nil", []);
 
-    test("a constructor term in an argument position builds a value", async () => {
+    test("a constructor term in an argument position matches a proof", async () => {
       const rows = (
         await run(`${listPrelude}
           demo(C) :- append(Cons(1, Nil()), Cons(2, Nil()), C).
           ?- demo(C).
         `)
       )[0]!;
-      // [1] ++ [2] = [1, 2]
+      // [1] ++ [2] = [1, 2], which is within the enumerated universe.
       expect(sortRows(rows)).toEqual(
         sortRows([{ C: proof("Cons", [1, proof("Cons", [2, nil])]) }]),
       );
+    });
+
+    test("a constructor argument in a query does not leak internal columns", async () => {
+      // The query's constructor arguments hoist to internal `$pat` variables;
+      // only the user-written `C` should surface as an output column.
+      const rows = (
+        await run(`${listPrelude}
+          ?- append(Cons(1, Nil()), Cons(2, Nil()), C).
+        `)
+      )[0]!;
+      expect(rows.length).toBe(1);
+      expect(Object.keys(rows[0]!)).toEqual(["C"]);
+      expect(rows[0]!.C).toEqual(proof("Cons", [1, proof("Cons", [2, nil])]));
+    });
+
+    test("a result outside the enumerated universe is clipped", async () => {
+      // append relates num_list proofs only, so a concatenation longer than the
+      // length cap (3 here) has no matching proof and drops out entirely.
+      const rows = (
+        await run(`${listPrelude}
+          demo(C) :- append(Cons(1, Cons(2, Nil())), Cons(1, Cons(2, Nil())), C).
+          ?- demo(C).
+        `)
+      )[0]!;
+      // [1, 2] ++ [1, 2] = [1, 2, 1, 2], length 4 > cap: no proof, no rows.
+      expect(rows).toEqual([]);
     });
 
     test("reverse (built on append) reverses a list proof term", async () => {
       const rows = (
         await run(`${listPrelude}
           reverse(Nil(), Nil()).
-          reverse(A, R) :- A : num_list(_), A = Cons(H, T), reverse(T, RT),
-                           append(RT, Cons(H, Nil()), R).
+          reverse(Cons(H, T), R) :- reverse(T, RT), append(RT, Cons(H, Nil()), R).
           demo(R) :- reverse(Cons(1, Cons(2, Nil())), R).
           ?- demo(R).
         `)
@@ -310,7 +338,7 @@ describe("proof terms", () => {
       );
     });
 
-    test("rejects constructing with the wrong arity", async () => {
+    test("rejects a constructor term with the wrong arity", async () => {
       await expect(
         run(`
           num(7).

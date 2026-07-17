@@ -99,6 +99,14 @@ export function isAnonymousVar(name: string): boolean {
   return ANON_VAR_RE.test(name);
 }
 
+// Every synthetic variable the post-processor introduces starts with `$`,
+// which source variables cannot contain: `$anonN` don't-cares, plus the
+// `$patN` / `$subN` temporaries from the proof-term desugar. These are
+// internal plumbing and must never appear as a query output column.
+export function isSyntheticVar(name: string): boolean {
+  return name.startsWith("$");
+}
+
 /**
  * Allowed built-in functions are defined in `./builtins.ts` as a
  * registry of overload sets. `analyze` only validates name + arity here
@@ -984,7 +992,7 @@ export function queryProjection(query: Query): HeadTerm[] {
   function visit(term: HeadTerm): void {
     switch (term.$type) {
       case "Variable":
-        if (!isAnonymousVar(term.name) && !seen.has(term.name)) {
+        if (!isSyntheticVar(term.name) && !seen.has(term.name)) {
           seen.add(term.name);
           projection.push(term);
         }

@@ -410,6 +410,12 @@ export function postProcess(program: Program): void {
   // Validate naming: every rule of a proof-carrying predicate must be named,
   // aggregates cannot be combined with proofs, and constructor names are unique.
   const seenCtors = new Set<string>();
+  // Constructor -> the predicate it belongs to, and predicate -> its declared
+  // column count (before the proof column is appended). The constructor-term
+  // desugar uses these to synthesise the `scrut : Pred(_)` capture that
+  // range-restricts a matched proof.
+  const ctorPred = new Map<string, string>();
+  const predArity = new Map<string, number>();
   for (const stmt of program.statements) {
     if (!isRule(stmt) || !proofCarrying.has(stmt.head.predicate)) continue;
     const pred = stmt.head.predicate;
@@ -427,6 +433,8 @@ export function postProcess(program: Program): void {
       throw parseErrorAtNode(`Constructor name '${ctor}' is used by more than one rule`, stmt.head);
     }
     seenCtors.add(ctor);
+    ctorPred.set(ctor, pred);
+    predArity.set(pred, stmt.head.args.length);
   }
 
   // Append the proof column to every reference to a proof-carrying predicate.
@@ -517,12 +525,19 @@ export function postProcess(program: Program): void {
     (stmt.head.args as Expression[]).push(proofTerm);
   }
 
-  // Destructuring: a constructor term `Ctor(p...)` on one side of a body or
-  // query equality is a pattern. Rewrite `S = Ctor(p1, ..., pn)` into a tag
-  // guard plus one element per argument (recursing into nested patterns), all
-  // expressed with the existing `value` accessors. The scrutinee `S` must be
-  // bound; a variable argument binds via `=`, a literal argument becomes a
-  // guard, `_` binds a throwaway, and a nested constructor recurses.
+  // Constructor terms. A constructor `Ctor(p...)` is never a value builder:
+  // it always matches a proof of its predicate. Proofs are built only by the
+  // labelled rule that introduces the proof column (the `[Ctor]` head
+  // annotation, above). Everywhere a constructor term appears -- on a side of
+  // a body/query equality, or (read as an implicit equality) as a head or
+  // body-atom argument -- it desugars to a capture of the predicate's proof
+  // column plus a tag guard and one match per argument, all expressed with the
+  // existing `value` accessors. A variable argument binds via `=`, a literal
+  // argument becomes a guard, `_` binds a throwaway, and a nested constructor
+  // recurses. Because the match includes the `scrut : Pred(_)` capture, the
+  // scrutinee is range-restricted to the predicate's (finite) proofs -- so a
+  // constructor in an output position relates to an existing proof rather than
+  // inventing a new value. See spec section 8.4.
   if (seenCtors.size > 0) {
     let patVarCounter = 0;
     const freshPat = (): string => {
@@ -534,6 +549,32 @@ export function postProcess(program: Program): void {
     const isCtorTerm = (e: Expression | undefined): e is FunctionCall =>
       e !== undefined && e.$type === "FunctionCall" && seenCtors.has(e.name);
 
+    // Synthesise `scrutVar : Pred(_)` as a fully-injected atom: one don't-care
+    // per declared column, then `scrutVar` in the trailing proof-column slot.
+    // Built directly in post-injection shape because injectProofColumns has
+    // already run by now.
+    const captureAtom = (ctor: string, scrutVar: string, cst: Cst): BodyElement => {
+      const pred = ctorPred.get(ctor)!;
+      const declared = predArity.get(pred) ?? 0;
+      const args: Expression[] = [];
+      for (let i = 0; i < declared; i++) args.push(mkVar(freshAnon(), cst));
+      args.push(mkVar(scrutVar, cst));
+      const lit = {
+        $type: "Literal",
+        predicate: pred,
+        negated: false,
+        args,
+        $cstNode: cst,
+      } as unknown as BodyElement;
+      args.forEach((a, i) => setContainer(a, lit as unknown as AstNode, "args", i));
+      return lit;
+    };
+
+    // Emit the accessor matches for `scrutVar` against `pattern`: a tag guard
+    // plus one element per argument. Nested constructor arguments recurse here
+    // WITHOUT an added capture -- a component of a real proof is already a
+    // proof of its component type, so only the outermost term (via matchTop)
+    // needs the range restriction.
     const expandPattern = (
       scrutVar: string,
       pattern: FunctionCall,
@@ -573,6 +614,21 @@ export function postProcess(program: Program): void {
       }
     };
 
+    // Match a top-level constructor term: range-restrict the scrutinee to its
+    // predicate's proofs, then destructure it.
+    const matchTop = (
+      scrutVar: string,
+      pattern: FunctionCall,
+      cst: Cst,
+      out: BodyElement[],
+    ): void => {
+      out.push(captureAtom(pattern.name, scrutVar, cst));
+      expandPattern(scrutVar, pattern, cst, out);
+    };
+
+    // Pass 1: a constructor term on a side of a body/query equality. The other
+    // side is the scrutinee -- a plain variable is matched directly, anything
+    // else is bound to a fresh scrutinee variable first.
     const rewriteBody = (body: BodyElement[]): BodyElement[] => {
       const out: BodyElement[] = [];
       for (const el of body) {
@@ -592,7 +648,7 @@ export function postProcess(program: Program): void {
               scrutVar = freshPat();
               out.push(mkEquality(mkVar(scrutVar, el.$cstNode), scrut, el.$cstNode));
             }
-            expandPattern(scrutVar, pattern, el.$cstNode, out);
+            matchTop(scrutVar, pattern, el.$cstNode, out);
             continue;
           }
         }
@@ -613,23 +669,48 @@ export function postProcess(program: Program): void {
       }
     }
 
-    // Construction: any constructor term not consumed as a pattern above builds
-    // a value. `Ctor(a1, ..., an)` in an argument or expression position becomes
-    // the tagged object { "$proof": "Ctor", "args": [a1, ..., an] }. Children
-    // are rewritten before parents so nested constructors compose.
-    const ctorCalls: FunctionCall[] = [];
-    for (const node of streamAll(program)) {
-      if (isFunctionCall(node) && seenCtors.has(node.name)) ctorCalls.push(node);
-    }
-    for (const call of ctorCalls.reverse()) {
-      const arity = ctorArity.get(call.name);
-      if (arity !== undefined && call.args.length !== arity) {
-        throw parseErrorAtNode(
-          `Constructor '${call.name}' takes ${arity} argument(s) but is built with ${call.args.length}`,
-          call,
-        );
+    // Pass 2: every remaining constructor term (a head argument, a body-atom
+    // argument, or one nested inside an ordinary expression) is read as an
+    // implicit equality. Replace it with a fresh variable in place and match
+    // that variable against the term in the enclosing rule/query body. Only
+    // top-level terms (no constructor-term ancestor) are hoisted; their nested
+    // constructor arguments are consumed by expandPattern.
+    const enclosingBody = (node: AstNode): { host: AstNode; body: BodyElement[] } | undefined => {
+      let cur: AstNode | undefined = node.$container;
+      while (cur) {
+        if (isRule(cur)) return { host: cur, body: cur.body };
+        if (isQuery(cur)) return { host: cur, body: cur.body };
+        cur = cur.$container;
       }
-      replaceNode(call, buildProofTerm(call.name, call.args, call.$cstNode));
+      return undefined;
+    };
+    const hasCtorAncestor = (node: AstNode): boolean => {
+      let cur = node.$container;
+      while (cur) {
+        if (isFunctionCall(cur) && seenCtors.has(cur.name)) return true;
+        cur = cur.$container;
+      }
+      return false;
+    };
+
+    const topLevel: FunctionCall[] = [];
+    for (const node of streamAll(program)) {
+      if (isFunctionCall(node) && seenCtors.has(node.name) && !hasCtorAncestor(node)) {
+        topLevel.push(node);
+      }
+    }
+    for (const call of topLevel) {
+      const enc = enclosingBody(call);
+      if (enc === undefined) continue;
+      const f = freshPat();
+      replaceNode(call, mkVar(f, call.$cstNode));
+      const additions: BodyElement[] = [];
+      matchTop(f, call, call.$cstNode, additions);
+      const start = enc.body.length;
+      for (let i = 0; i < additions.length; i++) {
+        enc.body.push(additions[i]!);
+        setContainer(additions[i]!, enc.host, "body", start + i);
+      }
     }
   }
 }
