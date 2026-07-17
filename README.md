@@ -99,6 +99,27 @@ Datamog maintains structural equality across every backend: PostgreSQL stores `v
 
 Two loaders feed `value` columns: JSONL with a single-`value`-column declaration consumes each line as one row; a standalone `<predicate>.json` file loads the whole file as one row. The [Working with values](doc/walkthrough/14-json.md) tutorial chapter walks through a complete example, and the [`json-events`](packages/cli/examples/json-events), [`json-config`](packages/cli/examples/json-config), and [`parse-json`](packages/cli/examples/parse-json) CLI examples are runnable end-to-end.
 
+## Algebraic data types (proof terms)
+
+Name a rule with `p(...)[Ctor]` and its predicate becomes an algebraic datatype: every derivation is recorded as a **proof term**, the constructor applied to its witnesses and sub-proofs. Read the Curry-Howard way — a predicate is a proposition, a named rule is a constructor, a proof term is an inhabitant — a named predicate *is* an ADT and its proof terms are the values.
+
+```prolog
+num(1). num(2).
+num_list(0)[Nil].
+num_list(n + 1)[Cons] :- num(Car), n <= 2, num_list(n).   # the proof terms ARE the lists
+
+?- Xs : num_list(Len).                # capture the proof term; Len is its length index
+```
+
+Capture a proof with `V : p(...)` (or `V : p` to ignore the declared columns). A constructor term is always a **match** — on a side of a body equality, or as a head / body-atom argument — so list operations read like Prolog:
+
+```prolog
+append(Nil(), B, B) :- B : num_list.
+append(Cons(H, T), B, Cons(H, R)) :- append(T, B, R).
+```
+
+A rule derives its proof term automatically, or lists the arguments explicitly with `[Ctor(a, b, ...)]` to keep an intermediate variable out. Because a constructor term matches an existing proof, operations relate values their predicate already enumerates. Runnable examples: [`proof-terms`](packages/cli/examples/proof-terms) (enums, pairs, lists), [`proof-term-fold`](packages/cli/examples/proof-term-fold) (a fold), [`peano`](packages/cli/examples/peano) (naturals), [`list-ops`](packages/cli/examples/list-ops) (append / reverse / member), and [`expr-eval`](packages/cli/examples/expr-eval) (a chart parser feeding an evaluator). The [Proof terms](doc/walkthrough/15-proof-terms.md) walkthrough chapter walks through it.
+
 ## Packages
 
 | Package | Description |
@@ -184,7 +205,7 @@ The CLI auto-discovers data files in the same directory as the `.dl` file: `<pre
 
 ### Examples
 
-The [`packages/cli/examples/`](packages/cli/examples/) directory holds 40+ runnable programs — transitive closure, stratified negation, aggregates, mutual recursion, classic puzzles, JSON/`value` handling, propositional logic, and Boolean-circuit solvers. Run any of them with:
+The [`packages/cli/examples/`](packages/cli/examples/) directory holds 40+ runnable programs — transitive closure, stratified negation, aggregates, mutual recursion, classic puzzles, JSON/`value` handling, algebraic datatypes via proof terms, propositional logic, and Boolean-circuit solvers. Run any of them with:
 
 ```bash
 bun run datamog packages/cli/examples/<name>/<name>.dl
