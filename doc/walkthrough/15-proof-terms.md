@@ -240,21 +240,29 @@ plus(Zero(), B, B) :- B : nat.
 plus(Succ(A), B, Succ(C)) :- plus(A, B, C).
 ```
 
-**An expression AST** carries a small arithmetic language, and its evaluator is
-a fold over the proof term — one rule per constructor, a definitional
-interpreter written in Datalog:
+**An expression parser and evaluator.** Feed a token sequence in through an
+extensional and a chart parser turns it into AST proof terms — only the trees
+the input allows. Each grammar production is a constructor. Naming its arguments
+explicitly, `[Add(L, R)]`, makes the proof term carry exactly the two captured
+sub-parses, keeping the parser's split position out of the AST:
 
 ```prolog
-expr(0)[Lit] :- num(N).
-expr(d + 1)[Add] :- expr(d), expr(d), d <= 0.
+ast(i, i + 1)[Lit(V)] :- token(i, "num", V).
+ast(i, k)[Add(L, R)] :- L : ast(i, j), token(j, "plus", _), R : ast(j + 1, k).
 
 eval(Lit(N), as_integer(N)).
 eval(Add(L, R), A + B) :- eval(L, A), eval(R, B).
 ```
 
-Both thread proofs through recursion (and the AST branches on two subtrees), so
-run them on `native` / `seminaive`. See the *Peano Naturals* and *Expression
-Evaluator* examples.
+(`[Ctor(...)]` is the explicit form of the head annotation; bare `[Ctor]`
+auto-derives the arguments as the witnesses followed by the sub-proofs.) The
+evaluator is a fold over the proof term — a definitional interpreter in Datalog.
+The grammar is ambiguous, so `2 + 3 * 4` yields both parses: `(2+3)*4 = 20` and
+`2+(3*4) = 14`.
+
+Both examples thread proofs through recursion (the parser also branches on two
+sub-spans), so run them on `native` / `seminaive`. See the *Peano Naturals* and
+*Expression Evaluator* examples.
 
 ## A few rules of the road
 

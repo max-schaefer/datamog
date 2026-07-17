@@ -1,5 +1,5 @@
 {
   "name": "Expression Evaluator",
-  "description": "An arithmetic expression AST as a proof-term ADT, with a definitional interpreter that folds each tree to its value",
+  "description": "A Datalog chart parser that turns a token sequence into arithmetic AST proof terms, then evaluates each -- an ambiguous grammar yields every parse",
   "order": 240
 }

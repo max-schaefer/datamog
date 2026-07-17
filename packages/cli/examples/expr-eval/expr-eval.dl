@@ -1,24 +1,35 @@
-# An expression AST as a proof-term ADT, with an evaluator
+# Parsing and evaluating arithmetic expressions
 #
-# `expr` is a tiny arithmetic language: integer literals, addition, and
-# multiplication. Its proof terms are expression trees. `eval` folds a tree to
-# its value -- a definitional interpreter written as ordinary rules, one per
-# constructor. Add and Mul each recurse on two sub-expressions, so this is
-# non-linear recursion: native/seminaive only.
+# Rather than enumerating expression trees, parse a token sequence into ASTs and
+# evaluate them. The tokens come from an extensional; `ast(i, k)` is a chart
+# parser producing an AST proof term for the span of tokens [i, k). Each grammar
+# production is a constructor, and `[Ctor(...)]` names exactly the sub-trees the
+# proof term should carry, so intermediate positions stay out of the tree.
 #
-# expr enumerates balanced trees up to a small depth (the number of trees grows
-# fast with depth), which is plenty to show the interpreter running.
+# The grammar is ambiguous (no precedence), so `2 + 3 * 4` parses two ways --
+# (2 + 3) * 4 = 20 and 2 + (3 * 4) = 14 -- and the evaluator values each.
+#
+# native/seminaive only: Add and Mul each recurse on two sub-spans (non-linear).
 
-num(2). num(3).
+extensional token(pos: integer, kind: string, val: integer?).
 
-expr(0)[Lit] :- num(N).
-expr(d + 1)[Add] :- expr(d), expr(d), d <= 0.
-expr(d + 1)[Mul] :- expr(d), expr(d), d <= 0.
+# A number token is a Lit leaf spanning one position.
+ast(i, i + 1)[Lit(V)] :- token(i, "num", V).
+# An expression, a '+', and an expression make an Add over the whole span. The
+# split position j is a body variable, but [Add(L, R)] keeps it out of the tree.
+ast(i, k)[Add(L, R)] :- L : ast(i, j), token(j, "plus", _), R : ast(j + 1, k).
+ast(i, k)[Mul(L, R)] :- L : ast(i, j), token(j, "times", _), R : ast(j + 1, k).
 
 # The evaluator: a fold over the proof term, one rule per constructor.
 eval(Lit(N), as_integer(N)).
 eval(Add(L, R), A + B) :- eval(L, A), eval(R, B).
 eval(Mul(L, R), A * B) :- eval(L, A), eval(R, B).
 
-# Evaluate every expression tree, each shown by its proof term.
-?- E : expr(_), eval(E, V).
+# One past the last token: the end of the whole input.
+input_end(E) :- token(P, _, _), E = P + 1, not token(E, _, _).
+
+# A full parse of the whole input: an AST spanning it, with its value.
+full_parse(Ast, V) :- Ast : ast(0, E), input_end(E), eval(Ast, V).
+
+# Every parse, each shown by its AST.
+?- full_parse(Ast, V).
