@@ -19,7 +19,9 @@ suit()[Spades].
 num_list(0)[Nil].
 num_list(n + 1)[Cons] :- num(Car), n <= 2, num_list(n).
 
-# Each query captures the proof term (the datatype value) of its atom, using the
-# abbreviated `:` syntax to ignore the declared columns.
+# Each query captures the proof term (the datatype value) of its atom. `suit`
+# has no columns, so the shorthand `S : suit` is the whole capture; `num_list`
+# is indexed by length, so `Xs : num_list(Len)` also binds that index, pairing
+# each list with the length it is a proof of.
 ?- S : suit.
-?- Xs : num_list.
+?- Xs : num_list(Len).
