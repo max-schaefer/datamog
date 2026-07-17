@@ -3,8 +3,9 @@
 # Naming a rule with `[Ctor]` turns its predicate into an algebraic datatype:
 # every derivation is recorded as a proof term, the constructor applied to the
 # witnesses of the existential body variables followed by the sub-proofs of the
-# recursive body atoms. Capture a proof term with `Xs : p(...)`; suppress a
-# sub-proof with `_ : p(...)`.
+# recursive body atoms. Capture a proof term with `Xs : p(...)`, or just
+# `Xs : p` when you don't need the declared columns; suppress a sub-proof with
+# `_ : p(...)`.
 
 num(1). num(2).
 
@@ -18,6 +19,7 @@ suit()[Spades].
 num_list(0)[Nil].
 num_list(n + 1)[Cons] :- num(Car), n <= 2, num_list(n).
 
-# Each query captures the proof term (the datatype value) of its atom.
-?- S : suit().
-?- Xs : num_list(Len).
+# Each query captures the proof term (the datatype value) of its atom, using the
+# abbreviated `:` syntax to ignore the declared columns.
+?- S : suit.
+?- Xs : num_list.
