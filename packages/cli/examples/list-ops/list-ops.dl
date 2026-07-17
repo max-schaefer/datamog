@@ -1,37 +1,40 @@
 # List operations over proof-term lists
 #
-# `num_list` is a length-indexed list datatype whose proof terms are the lists.
-# Capture (`V : p(...)`), destructuring (`P = Cons(H, T)`), and construction
-# (`Cons(H, R)` in an argument position) together let the classic list
-# operations read like Prolog. Each list argument is captured from `num_list`
-# so it is range-restricted, as bottom-up evaluation requires.
+# `num_list` enumerates a finite universe of lists (here, lists over {1, 2} up
+# to length 3). Its proof terms ARE those lists. A constructor term such as
+# `Cons(H, T)` is always a match against a num_list proof -- never a value
+# builder -- so these operations relate lists that num_list already derives.
+# append/reverse therefore compute the append/reverse relation restricted to
+# the enumerated universe: a result longer than the length cap has no matching
+# proof and simply drops out.
 #
-# native/seminaive only: the SQL backends translate proof-term construction
-# into deeply nested JSON expressions, and a program this construction-heavy
-# exceeds SQLite's parser depth limit.
+# native/seminaive only: the recursive rules translate into SQL with nested
+# accessor chains over the proof column that exceed SQLite's parser depth.
 
 num(1). num(2).
 
 num_list(0)[Nil].
-num_list(n + 1)[Cons] :- num(Car), n <= 1, num_list(n).
+num_list(n + 1)[Cons] :- num(Car), n <= 2, num_list(n).
 
-# append: concatenate two lists, constructing the result.
+# append: concatenate two lists. The base case passes B through, so B needs an
+# explicit capture to be range-restricted; the recursive case takes A apart and
+# rebuilds it, all via constructor matches.
 append(Nil(), B, B) :- B : num_list(_).
-append(A, B, Cons(H, R)) :- A : num_list(_), A = Cons(H, T), append(T, B, R).
+append(Cons(H, T), B, Cons(H, R)) :- append(T, B, R).
 
 # reverse: built on append.
 reverse(Nil(), Nil()).
-reverse(A, R) :- A : num_list(_), A = Cons(H, T), reverse(T, RT), append(RT, Cons(H, Nil()), R).
+reverse(Cons(H, T), R) :- reverse(T, RT), append(RT, Cons(H, Nil()), R).
 
 # member: X occurs in list L.
-member(X, L) :- L : num_list(_), L = Cons(X, _).
-member(X, L) :- L : num_list(_), L = Cons(_, T), member(X, T).
+member(X, Cons(X, _)).
+member(X, Cons(_, T)) :- member(X, T).
 
 # suffix: S is a tail of L (a sublist), including L itself.
-suffix(L, S) :- L : num_list(_), S = L.
-suffix(L, S) :- L : num_list(_), L = Cons(_, T), suffix(T, S).
+suffix(L, L) :- L : num_list(_).
+suffix(Cons(_, T), S) :- suffix(T, S).
 
-# Demonstrations on the list [1, 2], built directly as arguments.
+# Demonstrations on the list [1, 2].
 demo_append(C) :- append(Cons(1, Cons(2, Nil())), Cons(2, Nil()), C).
 demo_reverse(R) :- reverse(Cons(1, Cons(2, Nil())), R).
 demo_member(X) :- member(X, Cons(1, Cons(2, Nil()))).
