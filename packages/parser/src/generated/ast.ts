@@ -298,6 +298,7 @@ export interface Literal extends langium.AstNode {
     readonly $type: 'Literal';
     args: Array<Expression>;
     negated: boolean;
+    parens: boolean;
     predicate: Identifier;
     proofVar?: Identifier;
 }
@@ -306,6 +307,7 @@ export const Literal = {
     $type: 'Literal',
     args: 'args',
     negated: 'negated',
+    parens: 'parens',
     predicate: 'predicate',
     proofVar: 'proofVar'
 } as const;
@@ -759,6 +761,10 @@ export class DatamogAstReflection extends langium.AbstractAstReflection {
                 },
                 negated: {
                     name: Literal.negated,
+                    defaultValue: false
+                },
+                parens: {
+                    name: Literal.parens,
                     defaultValue: false
                 },
                 predicate: {

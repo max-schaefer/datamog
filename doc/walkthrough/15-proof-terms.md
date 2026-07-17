@@ -131,6 +131,13 @@ There are three ways to treat a proof-carrying body atom:
 - **suppress** `_ : num_list(n)` — drop the sub-proof, keeping it
   out of the enclosing constructor.
 
+When you capture a proof and don't care about the declared columns,
+drop the parentheses: `V : num_list` is shorthand for
+`V : num_list(_)`, and `?- C : colour` reads as plainly as "C is a
+colour". The parens can only be dropped after a `V :` or `_ :`
+capture; a bare `p` on its own is still a variable, so ordinary
+atoms keep them.
+
 Suppression is about more than tidiness. A derivation set can be
 *infinite* even when the fact set is finite: transitive closure
 over a cyclic graph proves the same reachabilities in endlessly

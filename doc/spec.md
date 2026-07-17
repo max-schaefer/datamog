@@ -1948,6 +1948,13 @@ A query observes proof terms by capturing them:
 ?- Xs : num_list(Len).
 ```
 
+When a capture ignores every declared column, the parentheses may be dropped:
+`V : p` is shorthand for `V : p(_, ..., _)` (one don't-care per declared column,
+and just `p()` for a nullary predicate), so `?- Xs : num_list.` captures every
+proof of `num_list` without naming its length column. The shorthand is available
+only after a `V :` or `_ :` capture; a bare `p` with no capture is still a
+variable, not a nullary atom, so ordinary atoms keep their parentheses.
+
 A proof mark may be applied only to a positive atom of a proof-carrying
 predicate. Applying one to an extensional or unnamed predicate, or to a negated
 atom, is an error.

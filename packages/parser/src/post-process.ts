@@ -457,6 +457,18 @@ export function postProcess(program: Program): void {
       if (el.proofVar !== undefined && el.negated) {
         throw parseErrorAtNode("Cannot mark a proof on a negated atom", el);
       }
+      if (!el.parens) {
+        // `V : p` shorthand for `V : p(_, ..., _)`: fill one don't-care per
+        // declared column before the proof column is appended below. The
+        // grammar only drops the parens after a proof capture, so this is
+        // always a capture (proofVar set).
+        const declared = predArity.get(pred) ?? 0;
+        for (let i = 0; i < declared; i++) {
+          const dc = mkVar(freshAnon(), el.$cstNode);
+          setContainer(dc, el, "args", el.args.length);
+          el.args.push(dc);
+        }
+      }
       // `_ : p(...)` suppresses the sub-proof (omit it from the constructor);
       // `V : p(...)` captures it into `V`; a bare `p(...)` includes it
       // anonymously. A sub-proof is included unless suppressed or negated.

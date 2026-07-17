@@ -78,8 +78,17 @@ BodyElement:
 // suppresses it (omits it from the enclosing constructor). Prefixing `not`
 // produces a negated literal. The AST stays flat (proofVar / negated /
 // predicate / args) for ergonomics; see the spec BNF for the formal structure.
+//
+// Two alternatives so the parentheses can be dropped ONLY after a proof
+// capture: `V : p` is shorthand for `V : p(_, ..., _)` (one don't-care per
+// declared column), expanded in post-processing. `parens` records whether the
+// source had them, distinguishing the bare shorthand from an explicit `V : p()`
+// (zero args). A bare atom with no capture still requires parens, so `p` on its
+// own stays a Variable rather than a nullary atom.
 Literal:
-    (proofVar=Identifier ':')? (negated?='not')? predicate=Identifier '(' (args+=Expression (',' args+=Expression)*)? ')';
+    proofVar=Identifier ':' (negated?='not')? predicate=Identifier
+        (parens?='(' (args+=Expression (',' args+=Expression)*)? ')')?
+  | (negated?='not')? predicate=Identifier parens?='(' (args+=Expression (',' args+=Expression)*)? ')';
 
 // Equality covers both binding (`X = expr`, left side is a bare variable
 // or other unbound shape) and non-binding constraints (`X + 1 = Y`).

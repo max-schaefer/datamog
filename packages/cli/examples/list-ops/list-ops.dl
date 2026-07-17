@@ -17,9 +17,10 @@ num_list(0)[Nil].
 num_list(n + 1)[Cons] :- num(Car), n <= 2, num_list(n).
 
 # append: concatenate two lists. The base case passes B through, so B needs an
-# explicit capture to be range-restricted; the recursive case takes A apart and
-# rebuilds it, all via constructor matches.
-append(Nil(), B, B) :- B : num_list(_).
+# explicit capture to be range-restricted (`B : num_list` is shorthand for
+# `B : num_list(_)`); the recursive case takes A apart and rebuilds it, all via
+# constructor matches.
+append(Nil(), B, B) :- B : num_list.
 append(Cons(H, T), B, Cons(H, R)) :- append(T, B, R).
 
 # reverse: built on append.
@@ -31,7 +32,7 @@ member(X, Cons(X, _)).
 member(X, Cons(_, T)) :- member(X, T).
 
 # suffix: S is a tail of L (a sublist), including L itself.
-suffix(L, L) :- L : num_list(_).
+suffix(L, L) :- L : num_list.
 suffix(Cons(_, T), S) :- suffix(T, S).
 
 # Demonstrations on the list [1, 2].

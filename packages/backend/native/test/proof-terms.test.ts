@@ -350,4 +350,35 @@ describe("proof terms", () => {
       ).rejects.toThrow(/'Cons' takes 2/);
     });
   });
+
+  describe("capture shorthand", () => {
+    test("V : p abbreviates V : p() for a nullary predicate", async () => {
+      const bare = (await run("colour()[Red].\ncolour()[Green].\n?- C : colour."))[0]!;
+      const full = (await run("colour()[Red].\ncolour()[Green].\n?- C : colour()."))[0]!;
+      expect(sortRows(bare)).toEqual(sortRows(full));
+      expect(bare.length).toBe(2);
+    });
+
+    test("V : p fills one don't-care per declared column", async () => {
+      // num_list has one declared column (the length index); `X : num_list`
+      // ignores it, exactly like `X : num_list(_)`.
+      const prog = `
+        num(1). num(2).
+        num_list(0)[Nil].
+        num_list(n + 1)[Cons] :- num(Car), n <= 1, num_list(n).
+      `;
+      const bare = (await run(`${prog}\n?- X : num_list.`))[0]!;
+      const full = (await run(`${prog}\n?- X : num_list(_).`))[0]!;
+      expect(sortRows(bare)).toEqual(sortRows(full));
+      expect(bare.length).toBeGreaterThan(0);
+    });
+
+    test("a bare predicate reference without a capture is not a nullary atom", async () => {
+      // Parentheses may be dropped only after a proof capture; `colour` alone
+      // is parsed as a variable, not a nullary atom.
+      await expect(run("colour()[Red].\nseen() :- colour.\n?- seen().")).rejects.toThrow(
+        /Unsafe variable 'colour'/,
+      );
+    });
+  });
 });
