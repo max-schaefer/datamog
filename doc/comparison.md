@@ -53,7 +53,7 @@ extensibility that production engines carry.
 
 | System | Recursion | Negation | Aggregation | Types | Standout feature |
 |---|---|---|---|---|---|
-| **Datamog** | General (in-memory) / linear only (SQL backends) | Stratified | count, sum, avg, min, max, concat, list | Static inference: string/integer/float/boolean/value (JSON) | Multiple cross-checked backends; compiles Datalog to SQL |
+| **Datamog** | General (in-memory) / linear only (SQL backends) | Stratified | count, sum, avg, min, max, concat, list | Static inference: string/integer/float/boolean/value (JSON); algebraic datatypes as proof terms | Multiple cross-checked backends; compiles Datalog to SQL |
 | **DES** | General | Stratified | Yes, with `group_by` | Optional, declared as integrity constraints | One database queried via Datalog, SQL, and relational algebra; tracers and declarative debuggers; nulls and duplicates |
 | **Soufflé** | General | Stratified | count, sum, min, max, mean | Static: number/unsigned/float/symbol plus records and ADTs | Subsumption, choice domains, generic components, C++ foreign functors |
 | **CodeQL** | General, plus `+`/`*` transitive-closure operators | Parity-stratified (recursion through an even number of negations) | Yes, plus monotonic aggregates usable inside recursion | Static OO: int/float/string/boolean/date/bigint, classes, and algebraic datatypes (`newtype`) | First-order-logic bodies (not just Horn clauses); OO classes plus ADTs; no nulls |
@@ -220,7 +220,7 @@ because the language is full first-order logic, not Horn clauses. QL is a
 production, largely commercial system for security analysis, running queries
 over a relational snapshot database extracted from a codebase, and it notably
 has no nulls: a predicate either holds for a tuple or it does not. Datamog is
-far smaller: flat predicates rather than an OO type system with ADTs,
+far smaller: flat predicates rather than a statically typed OO class hierarchy,
 Horn-clause bodies, classic stratified negation, and explicit nulls.
 
 ### A research language
@@ -326,9 +326,10 @@ by plain saturation.
 
 It is worth being precise about what is new here, because "inventing values" is
 not the line. Soufflé and CodeQL build new values with algebraic-datatype
-constructors, and Datamog builds them with JSON object/array literals and
-`parse_json` (which is exactly why Datamog carries a finiteness checker); all of
-these leave the input's active domain. The difference is that a constructor
+constructors; Datamog does too — its proof terms are constructed datatype values
+— as well as with JSON object/array literals and `parse_json` (which is exactly
+why Datamog carries a finiteness checker); all of these leave the input's active
+domain. The difference is that a constructor
 produces a *specific, transparent* term (`pair(1, 2)`, `{"k": v}`) that you can
 inspect and that has structural identity, whereas an existential rule *posits an
 unnamed, opaque* individual, which shifts the task from computing a least model
@@ -361,9 +362,11 @@ and treats SMT formulas as first-class terms, so a rule can assemble a formula
 mid-evaluation and discharge it with `is_sat` / `is_valid` against an external
 solver (Z3 by default). It is a Harvard research language, a Java interpreter
 with a newer Soufflé/C++ compiled backend, built for SMT-based static analyses
-such as symbolic execution and refinement typing. Datamog has none of this: no
-functional sublanguage, no algebraic datatypes, no solver; a `value`-typed
-nested document is the most structured thing it builds.
+such as symbolic execution and refinement typing. Datamog has algebraic
+datatypes of its own — proof terms, where a named rule is a constructor — but
+none of the rest: no ML-style functional sublanguage and no solver, and its
+datatypes desugar to the dynamically-shaped `value` type rather than Formulog's
+statically-typed ADTs.
 
 ## Where Datamog fits
 
@@ -380,16 +383,20 @@ small set of deliberate choices:
   honest.
 - **It has a first-class JSON `value` type.** Nested data is handled directly,
   which most classical Datalogs (flat, typed or untyped tuples) do not offer.
+- **It presents algebraic datatypes as proof terms.** Naming a rule turns its
+  predicate into a datatype whose values are the derivations — a concrete
+  Curry-Howard reading you can compute with, unusual among Datalogs.
 - **It is approachable.** A browser playground, a VS Code extension, and
   step-through tracing lower the barrier for learners.
 
 The flip side is everything it leaves out on purpose: no user-defined or foreign
 functions (Soufflé) or host-language interop (Ascent, Crepe), no lattices (Flix,
-Ascent), no algebraic datatypes (Soufflé, Formulog), no incremental maintenance
-(DDlog, LogicBlox, RelationalAI), no persistence or time travel (Datomic, Cozo),
-no existential rules (Nemo), no SMT or theory reasoning (Z3, Formulog), and
-linear-recursion-only on the SQL path. It does construct values (JSON objects,
-arrays, `parse_json`), so it is not value-free; what it lacks is the *existential*
+Ascent), no statically typed record/ADT type system (Soufflé, Formulog), no
+incremental maintenance (DDlog, LogicBlox, RelationalAI), no persistence or time
+travel (Datomic, Cozo), no existential rules (Nemo), no SMT or theory reasoning
+(Z3, Formulog), and linear-recursion-only on the SQL path. It does construct
+values (JSON objects, arrays, `parse_json`, and proof-term datatypes), so it is
+not value-free; what it lacks is the *existential*
 positing of unnamed ones. Those richer features are what turn a Datalog into a
 research or production system; leaving them out is what keeps Datamog a teaching
 one.
