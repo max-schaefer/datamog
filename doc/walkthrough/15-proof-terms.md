@@ -223,6 +223,39 @@ These recursive programs thread proofs through several matches, which the SQL
 backends translate into nested accessor chains that can outgrow a SQL engine's
 parser limit, so run them on `native` / `seminaive`.
 
+## Beyond lists
+
+The same three moves — name the rules, capture proofs, match constructors —
+build any inductive datatype. Two more live in the examples.
+
+**Peano naturals** are the list datatype with the payload removed: `Zero()` and
+`Succ(n)`. Addition is structural, the same shape as `append` (and clipped the
+same way):
+
+```prolog
+nat(0)[Zero].
+nat(n + 1)[Succ] :- nat(n), n <= 2.
+
+plus(Zero(), B, B) :- B : nat.
+plus(Succ(A), B, Succ(C)) :- plus(A, B, C).
+```
+
+**An expression AST** carries a small arithmetic language, and its evaluator is
+a fold over the proof term — one rule per constructor, a definitional
+interpreter written in Datalog:
+
+```prolog
+expr(0)[Lit] :- num(N).
+expr(d + 1)[Add] :- expr(d), expr(d), d <= 0.
+
+eval(Lit(N), as_integer(N)).
+eval(Add(L, R), A + B) :- eval(L, A), eval(R, B).
+```
+
+Both thread proofs through recursion (and the AST branches on two subtrees), so
+run them on `native` / `seminaive`. See the *Peano Naturals* and *Expression
+Evaluator* examples.
+
 ## A few rules of the road
 
 - Naming is all-or-nothing: name every rule for a predicate, or

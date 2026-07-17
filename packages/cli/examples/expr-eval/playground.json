@@ -1,0 +1,5 @@
+{
+  "name": "Expression Evaluator",
+  "description": "An arithmetic expression AST as a proof-term ADT, with a definitional interpreter that folds each tree to its value",
+  "order": 240
+}

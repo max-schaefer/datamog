@@ -1,0 +1,333 @@
+[
+  [
+    {
+      "N": {
+        "args": [],
+        "$proof": "Zero"
+      }
+    },
+    {
+      "N": {
+        "args": [
+          {
+            "args": [],
+            "$proof": "Zero"
+          }
+        ],
+        "$proof": "Succ"
+      }
+    },
+    {
+      "N": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [],
+                "$proof": "Zero"
+              }
+            ],
+            "$proof": "Succ"
+          }
+        ],
+        "$proof": "Succ"
+      }
+    },
+    {
+      "N": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "args": [],
+                    "$proof": "Zero"
+                  }
+                ],
+                "$proof": "Succ"
+              }
+            ],
+            "$proof": "Succ"
+          }
+        ],
+        "$proof": "Succ"
+      }
+    }
+  ],
+  [
+    {
+      "Sum": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "args": [],
+                    "$proof": "Zero"
+                  }
+                ],
+                "$proof": "Succ"
+              }
+            ],
+            "$proof": "Succ"
+          }
+        ],
+        "$proof": "Succ"
+      }
+    }
+  ],
+  [
+    {
+      "M": {
+        "args": [],
+        "$proof": "Zero"
+      },
+      "N": {
+        "args": [],
+        "$proof": "Zero"
+      }
+    },
+    {
+      "M": {
+        "args": [],
+        "$proof": "Zero"
+      },
+      "N": {
+        "args": [
+          {
+            "args": [],
+            "$proof": "Zero"
+          }
+        ],
+        "$proof": "Succ"
+      }
+    },
+    {
+      "M": {
+        "args": [],
+        "$proof": "Zero"
+      },
+      "N": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [],
+                "$proof": "Zero"
+              }
+            ],
+            "$proof": "Succ"
+          }
+        ],
+        "$proof": "Succ"
+      }
+    },
+    {
+      "M": {
+        "args": [],
+        "$proof": "Zero"
+      },
+      "N": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "args": [],
+                    "$proof": "Zero"
+                  }
+                ],
+                "$proof": "Succ"
+              }
+            ],
+            "$proof": "Succ"
+          }
+        ],
+        "$proof": "Succ"
+      }
+    },
+    {
+      "M": {
+        "args": [
+          {
+            "args": [],
+            "$proof": "Zero"
+          }
+        ],
+        "$proof": "Succ"
+      },
+      "N": {
+        "args": [
+          {
+            "args": [],
+            "$proof": "Zero"
+          }
+        ],
+        "$proof": "Succ"
+      }
+    },
+    {
+      "M": {
+        "args": [
+          {
+            "args": [],
+            "$proof": "Zero"
+          }
+        ],
+        "$proof": "Succ"
+      },
+      "N": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [],
+                "$proof": "Zero"
+              }
+            ],
+            "$proof": "Succ"
+          }
+        ],
+        "$proof": "Succ"
+      }
+    },
+    {
+      "M": {
+        "args": [
+          {
+            "args": [],
+            "$proof": "Zero"
+          }
+        ],
+        "$proof": "Succ"
+      },
+      "N": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "args": [],
+                    "$proof": "Zero"
+                  }
+                ],
+                "$proof": "Succ"
+              }
+            ],
+            "$proof": "Succ"
+          }
+        ],
+        "$proof": "Succ"
+      }
+    },
+    {
+      "M": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [],
+                "$proof": "Zero"
+              }
+            ],
+            "$proof": "Succ"
+          }
+        ],
+        "$proof": "Succ"
+      },
+      "N": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [],
+                "$proof": "Zero"
+              }
+            ],
+            "$proof": "Succ"
+          }
+        ],
+        "$proof": "Succ"
+      }
+    },
+    {
+      "M": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [],
+                "$proof": "Zero"
+              }
+            ],
+            "$proof": "Succ"
+          }
+        ],
+        "$proof": "Succ"
+      },
+      "N": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "args": [],
+                    "$proof": "Zero"
+                  }
+                ],
+                "$proof": "Succ"
+              }
+            ],
+            "$proof": "Succ"
+          }
+        ],
+        "$proof": "Succ"
+      }
+    },
+    {
+      "M": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "args": [],
+                    "$proof": "Zero"
+                  }
+                ],
+                "$proof": "Succ"
+              }
+            ],
+            "$proof": "Succ"
+          }
+        ],
+        "$proof": "Succ"
+      },
+      "N": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [
+                  {
+                    "args": [],
+                    "$proof": "Zero"
+                  }
+                ],
+                "$proof": "Succ"
+              }
+            ],
+            "$proof": "Succ"
+          }
+        ],
+        "$proof": "Succ"
+      }
+    }
+  ]
+]

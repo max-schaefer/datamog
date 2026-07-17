@@ -1,0 +1,182 @@
+[
+  [
+    {
+      "E": {
+        "args": [
+          2
+        ],
+        "$proof": "Lit"
+      },
+      "V": 2
+    },
+    {
+      "E": {
+        "args": [
+          3
+        ],
+        "$proof": "Lit"
+      },
+      "V": 3
+    },
+    {
+      "E": {
+        "args": [
+          {
+            "args": [
+              2
+            ],
+            "$proof": "Lit"
+          },
+          {
+            "args": [
+              2
+            ],
+            "$proof": "Lit"
+          }
+        ],
+        "$proof": "Add"
+      },
+      "V": 4
+    },
+    {
+      "E": {
+        "args": [
+          {
+            "args": [
+              2
+            ],
+            "$proof": "Lit"
+          },
+          {
+            "args": [
+              3
+            ],
+            "$proof": "Lit"
+          }
+        ],
+        "$proof": "Add"
+      },
+      "V": 5
+    },
+    {
+      "E": {
+        "args": [
+          {
+            "args": [
+              3
+            ],
+            "$proof": "Lit"
+          },
+          {
+            "args": [
+              2
+            ],
+            "$proof": "Lit"
+          }
+        ],
+        "$proof": "Add"
+      },
+      "V": 5
+    },
+    {
+      "E": {
+        "args": [
+          {
+            "args": [
+              3
+            ],
+            "$proof": "Lit"
+          },
+          {
+            "args": [
+              3
+            ],
+            "$proof": "Lit"
+          }
+        ],
+        "$proof": "Add"
+      },
+      "V": 6
+    },
+    {
+      "E": {
+        "args": [
+          {
+            "args": [
+              2
+            ],
+            "$proof": "Lit"
+          },
+          {
+            "args": [
+              2
+            ],
+            "$proof": "Lit"
+          }
+        ],
+        "$proof": "Mul"
+      },
+      "V": 4
+    },
+    {
+      "E": {
+        "args": [
+          {
+            "args": [
+              2
+            ],
+            "$proof": "Lit"
+          },
+          {
+            "args": [
+              3
+            ],
+            "$proof": "Lit"
+          }
+        ],
+        "$proof": "Mul"
+      },
+      "V": 6
+    },
+    {
+      "E": {
+        "args": [
+          {
+            "args": [
+              3
+            ],
+            "$proof": "Lit"
+          },
+          {
+            "args": [
+              2
+            ],
+            "$proof": "Lit"
+          }
+        ],
+        "$proof": "Mul"
+      },
+      "V": 6
+    },
+    {
+      "E": {
+        "args": [
+          {
+            "args": [
+              3
+            ],
+            "$proof": "Lit"
+          },
+          {
+            "args": [
+              3
+            ],
+            "$proof": "Lit"
+          }
+        ],
+        "$proof": "Mul"
+      },
+      "V": 9
+    }
+  ]
+]

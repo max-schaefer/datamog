@@ -1,0 +1,30 @@
+# Peano naturals as a proof-term ADT
+#
+# `nat` is the natural numbers built from two constructors: Zero and Succ. Its
+# proof terms ARE the numbers -- Zero(), Succ(Zero()), Succ(Succ(Zero())), ...
+# -- a unary encoding, and the list datatype of Chapter 15 with the payload
+# removed. The index bounds the type to a finite prefix (here 0 through 3).
+#
+# native/seminaive only: nat, plus, and leq are three recursive predicates whose
+# proof-column accessor chains nest into SQL beyond SQLite's parser depth.
+
+nat(0)[Zero].
+nat(n + 1)[Succ] :- nat(n), n <= 2.
+
+# Addition, structural on the first argument -- the same shape as list append,
+# and clipped the same way: Succ(C) matches a nat proof, so a sum past the cap
+# has no matching proof. The base case passes B through, so B needs a capture to
+# range-restrict it.
+plus(Zero(), B, B) :- B : nat.
+plus(Succ(A), B, Succ(C)) :- plus(A, B, C).
+
+# Less-than-or-equal: Zero is below every natural; Succ steps both sides.
+leq(Zero(), N) :- N : nat.
+leq(Succ(A), Succ(B)) :- leq(A, B).
+
+# The naturals themselves.
+?- N : nat.
+# 2 + 1 = 3.
+?- plus(Succ(Succ(Zero())), Succ(Zero()), Sum).
+# Every pair with M <= N.
+?- leq(M, N).

@@ -1,0 +1,24 @@
+# An expression AST as a proof-term ADT, with an evaluator
+#
+# `expr` is a tiny arithmetic language: integer literals, addition, and
+# multiplication. Its proof terms are expression trees. `eval` folds a tree to
+# its value -- a definitional interpreter written as ordinary rules, one per
+# constructor. Add and Mul each recurse on two sub-expressions, so this is
+# non-linear recursion: native/seminaive only.
+#
+# expr enumerates balanced trees up to a small depth (the number of trees grows
+# fast with depth), which is plenty to show the interpreter running.
+
+num(2). num(3).
+
+expr(0)[Lit] :- num(N).
+expr(d + 1)[Add] :- expr(d), expr(d), d <= 0.
+expr(d + 1)[Mul] :- expr(d), expr(d), d <= 0.
+
+# The evaluator: a fold over the proof term, one rule per constructor.
+eval(Lit(N), as_integer(N)).
+eval(Add(L, R), A + B) :- eval(L, A), eval(R, B).
+eval(Mul(L, R), A * B) :- eval(L, A), eval(R, B).
+
+# Evaluate every expression tree, each shown by its proof term.
+?- E : expr(_), eval(E, V).

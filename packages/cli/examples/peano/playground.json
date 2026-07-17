@@ -1,0 +1,5 @@
+{
+  "name": "Peano Naturals",
+  "description": "The natural numbers as a proof-term ADT (Zero/Succ), with structural addition and less-than-or-equal",
+  "order": 230
+}
