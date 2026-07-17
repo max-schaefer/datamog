@@ -526,7 +526,12 @@ export function postProcess(program: Program): void {
     }
     const subProofs = injectProofColumns(stmt.body, true);
     const ctor = decodeQuotedIdentifier(stmt.ruleName);
-    const existentialVals = bodyVars.filter((v) => !headVars.has(v) && !captureNames.has(v));
+    // Existential witnesses are the body's own value variables. A don't-care
+    // `_` (desugared to a `$`-prefixed synthetic name) carries no information,
+    // so it must not be recorded in the proof term.
+    const existentialVals = bodyVars.filter(
+      (v) => !headVars.has(v) && !captureNames.has(v) && !v.startsWith("$"),
+    );
     const argExprs: Expression[] = [
       ...existentialVals.map((name) => mkVar(name, stmt.head.$cstNode)),
       ...subProofs.map((name) => mkVar(name, stmt.head.$cstNode)),

@@ -74,6 +74,22 @@ describe("proof terms", () => {
     );
   });
 
+  test("a don't-care body variable is not a constructor witness", async () => {
+    // `_` carries no information, so it must not be recorded in the proof term:
+    // Only(X) records X, and the num(_) side contributes nothing (so the two
+    // derivations of each X collapse to one proof term).
+    const rows = (
+      await run(`
+        num(1). num(2).
+        pick()[Only] :- num(X), num(_).
+        ?- P : pick().
+      `)
+    )[0]!;
+    expect(sortRows(rows)).toEqual(
+      sortRows([{ P: proof("Only", [1]) }, { P: proof("Only", [2]) }]),
+    );
+  });
+
   test("optional: a base constructor and a witnessed one", async () => {
     const rows = (
       await run(`
