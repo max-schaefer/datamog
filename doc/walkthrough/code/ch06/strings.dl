@@ -11,15 +11,12 @@ extensional words(w: string).
 greeting(G) :- words(W), G = "hello, " + W.
 
 # Length in characters.
-length_of(W, N) :- words(W), N = length(W).
+output predicate length_of(W, N) :- words(W), N = length(W).
 
 # First character.
-first_char(W, C) :- words(W), C = W[0].
+output predicate first_char(W, C) :- words(W), C = W[0].
 
 # First three characters, or as many as exist.
-prefix3(W, P) :- words(W), length(W) >= 3, P = W[:3].
+output predicate prefix3(W, P) :- words(W), length(W) >= 3, P = W[:3].
 
 ?- greeting(G).
-?- length_of(W, N).
-?- first_char(W, C).
-?- prefix3(W, P).

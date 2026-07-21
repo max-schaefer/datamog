@@ -7,11 +7,10 @@
 extensional parent(parent_name: string, child_name: string).
 
 grandparent(X, Z) :- parent(X, Y), parent(Y, Z).
-great_grandparent(X, W) :- parent(X, Y), parent(Y, Z), parent(Z, W).
+output predicate great_grandparent(X, W) :- parent(X, Y), parent(Y, Z), parent(Z, W).
 
 # TODO: add great_great_grandparent.
 
 ?- grandparent(X, Y).
-?- great_grandparent(X, Y).
 
 # TODO: query great_great_grandparent.

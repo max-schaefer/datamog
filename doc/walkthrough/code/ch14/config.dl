@@ -12,17 +12,15 @@ app_name(N) :- config(C), N = as_string(C["name"]).
 # Iterate the `features` object: project the names whose flag is
 # the JSON boolean true. `as_boolean` returns SQL NULL on shape
 # mismatch, and the `= true` test then drops those rows.
-enabled_feature(F) :-
+output predicate enabled_feature(F) :-
     config(C),
     object_entry(C["features"], F, Flag),
     as_boolean(Flag) = true.
 
 # Walk the `endpoints` array and project (index, path) for each.
-endpoint(I, Path) :-
+output predicate endpoint(I, Path) :-
     config(C),
     array_element(C["endpoints"], I, E),
     Path = as_string(E["path"]).
 
 ?- app_name(N).
-?- enabled_feature(F).
-?- endpoint(I, P).

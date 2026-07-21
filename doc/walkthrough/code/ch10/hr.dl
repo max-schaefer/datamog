@@ -16,14 +16,12 @@ reports_to(R, M) :- manages(M, X), reports_to(R, X).
 ic(E) :- employee(E, _, _), not is_manager(E).
 
 # Head count per department.
-head_count(Dept, count(E)) :- in_department(E, Dept).
+output predicate head_count(Dept, count(E)) :- in_department(E, Dept).
 
 # A "big team" manager is one who directly or indirectly manages
 # at least 2 reports. Two strata: compute report_count first,
 # then filter.
 report_count(M, count(R)) :- reports_to(R, M).
-big_team_manager(M) :- report_count(M, C), C >= 2.
+output predicate big_team_manager(M) :- report_count(M, C), C >= 2.
 
 ?- ic(E).
-?- head_count(D, N).
-?- big_team_manager(M).

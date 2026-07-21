@@ -11,5 +11,6 @@ reach_in(K, X, Y) :- edge(X, Y), K = "0".
 # TODO: one rule per value of K.
 
 ?- reach_in("1", "a", Y).
-?- reach_in("2", "a", Y).
-?- reach_in("3", "a", Y).
+
+output predicate reach2(Y) :- reach_in("2", "a", Y).
+output predicate reach3(Y) :- reach_in("3", "a", Y).

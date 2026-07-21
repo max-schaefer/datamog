@@ -61,8 +61,9 @@ For non-toy data, declare a typed predicate and load values from a file:
 extensional person(name: string, country: string, year_born: integer).
 
 ?- person(Name, Country, Year).
-?- person(Name, "uk", Year).
-?- person(Name, Country, 1912).
+# A file runs one query; swap one in to ask another:
+#   ?- person(Name, "uk", Year).
+#   ?- person(Name, Country, 1912).
 ```
 
 Datamog looks for a sibling `person.csv` (or `.jsonl` / `.mmd`) and loads it.
@@ -123,13 +124,12 @@ CREATE TABLE IF NOT EXISTS "person" (
 
 SELECT DISTINCT "name" AS "Name", "country" AS "Country",
        "year_born" AS "Year" FROM "person";
-SELECT DISTINCT "name" AS "Name", "year_born" AS "Year"
-       FROM "person" WHERE "country" = 'uk';
 ```
 
 - `extensional` → `CREATE TABLE`
 - query → `SELECT DISTINCT`
-- variables → `AS` aliases; constants → `WHERE` conditions
+- variables → `AS` aliases
+- swap in a constant (`?- person(Name, "uk", Year).`) → a `WHERE` condition
 - `DISTINCT` because Datalog has set semantics
 
 ---

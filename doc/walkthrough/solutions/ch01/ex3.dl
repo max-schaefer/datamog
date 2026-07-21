@@ -18,6 +18,6 @@ person("donald_knuth",    "us", 1938).
 person("leslie_lamport",  "us", 1941).
 person("margaret_hamilton", "us", 1936).
 
-?- person(Name, Country, Year).
+output predicate born_1927(Name, Country) :- person(Name, Country, 1927).
 
-?- person(Name, Country, 1927).
+?- person(Name, Country, Year).

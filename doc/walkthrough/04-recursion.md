@@ -42,13 +42,13 @@ bun run datamog doc/walkthrough/code/ch04/ancestor.dl
 and you'll see Alice has three descendants (`erin`, `helen`, `greg`),
 exactly as the family tree from Chapter 2 predicts.
 
-**[Open this program in the playground →](https://max-schaefer.github.io/datamog/#p=parent(%22alice%22%2C%20%22erin%22).%0Aparent(%22bob%22%2C%20%22erin%22).%0Aparent(%22cecil%22%2C%20%22frank%22).%0Aparent(%22diana%22%2C%20%22frank%22).%0Aparent(%22erin%22%2C%20%22greg%22).%0Aparent(%22erin%22%2C%20%22helen%22).%0Aparent(%22frank%22%2C%20%22greg%22).%0Aparent(%22frank%22%2C%20%22helen%22).%0A%23%20Tutorial%2C%20chapter%204%20%E2%80%94%20recursion%20and%20transitive%20closure.%0A%23%0A%23%20The%20canonical%20example.%20Two%20rules%3A%0A%23%0A%23%20%20%20-%20A%20parent%20is%20an%20ancestor%20(base%20case).%0A%23%20%20%20-%20A%20parent%20of%20an%20ancestor%20is%20also%20an%20ancestor%20(recursive%20step).%0A%23%0A%23%20Datalog%20evaluates%20the%20pair%20to%20a%20fixed%20point%2C%20giving%20every%20ancestor%0A%23%20relationship%20reachable%20through%20any%20chain%20of%20%60parent%60%20facts.%0A%0Aancestor(X%2C%20Y)%20%3A-%20parent(X%2C%20Y).%0Aancestor(X%2C%20Y)%20%3A-%20parent(X%2C%20Z)%2C%20ancestor(Z%2C%20Y).%0A%0A%3F-%20ancestor(%22alice%22%2C%20X).%20%20%20%20%20%20%20%20%23%20who%20are%20Alice's%20descendants%3F%0A%3F-%20ancestor(X%2C%20%22greg%22).%20%20%20%20%20%20%20%20%20%23%20who%20are%20Greg's%20ancestors%3F%0A%3F-%20ancestor(%22alice%22%2C%20%22greg%22).%20%20%20%23%20is%20Alice%20an%20ancestor%20of%20Greg%3F%0A%3F-%20ancestor(X%2C%20Y).%20%20%20%20%20%20%20%20%20%20%20%20%20%20%23%20every%20ancestor-descendant%20pair%0A)**
+**[Open this program in the playground →](https://max-schaefer.github.io/datamog/#p=parent(%22alice%22%2C%20%22erin%22).%0Aparent(%22bob%22%2C%20%22erin%22).%0Aparent(%22cecil%22%2C%20%22frank%22).%0Aparent(%22diana%22%2C%20%22frank%22).%0Aparent(%22erin%22%2C%20%22greg%22).%0Aparent(%22erin%22%2C%20%22helen%22).%0Aparent(%22frank%22%2C%20%22greg%22).%0Aparent(%22frank%22%2C%20%22helen%22).%0A%23%20Tutorial%2C%20chapter%204%20%E2%80%94%20recursion%20and%20transitive%20closure.%0A%23%0A%23%20The%20canonical%20example.%20Two%20rules%3A%0A%23%0A%23%20%20%20-%20A%20parent%20is%20an%20ancestor%20(base%20case).%0A%23%20%20%20-%20A%20parent%20of%20an%20ancestor%20is%20also%20an%20ancestor%20(recursive%20step).%0A%23%0A%23%20Datalog%20evaluates%20the%20pair%20to%20a%20fixed%20point%2C%20giving%20every%20ancestor%0A%23%20relationship%20reachable%20through%20any%20chain%20of%20%60parent%60%20facts.%0A%0Aancestor(X%2C%20Y)%20%3A-%20parent(X%2C%20Y).%0Aancestor(X%2C%20Y)%20%3A-%20parent(X%2C%20Z)%2C%20ancestor(Z%2C%20Y).%0A%0A%3F-%20ancestor(%22alice%22%2C%20X).%20%20%20%20%20%20%20%20%23%20who%20are%20Alice's%20descendants%3F%0A%0A%23%20every%20ancestor-descendant%20pair%0Aoutput%20predicate%20all_pairs(X%2C%20Y)%20%3A-%20ancestor(X%2C%20Y).%0A%0A%23%20who%20are%20Greg's%20ancestors%3F%0Aoutput%20predicate%20greg_ancestor(X)%20%3A-%20ancestor(X%2C%20%22greg%22).%0A%0A%23%20is%20Alice%20an%20ancestor%20of%20Greg%3F%0Aoutput%20predicate%20alice_greg()%20%3A-%20ancestor(%22alice%22%2C%20%22greg%22).%0A)**
 
-The same rule also answers the backwards question
-(`?- ancestor(X, "greg")` → Greg's six ancestors: `erin` and `frank`
-through one generation, then `alice`, `bob`, `cecil`, `diana`
-through two), the yes/no question (`?- ancestor("alice", "greg")` →
-one row confirming it), and the "every pair" question.
+The file exposes the other directions as named outputs: `greg_ancestor`
+(the backwards question, Greg's six ancestors: `erin` and `frank`
+through one generation, then `alice`, `bob`, `cecil`, `diana` through
+two), `alice_greg` (the yes/no question, one row confirming it), and
+`all_pairs` (every ancestor-descendant pair).
 
 ### What it's computing, intuitively
 
@@ -105,8 +105,8 @@ coincidence: **the structural pattern "base case + linear recursive
 step" is exactly transitive closure**. Every Datalog recursion you
 see in this tutorial is a variant of it.
 
-`?- reach("a", Y).` returns `{b, c, d, e, f}` — everything reachable
-from `a`. `?- reach(X, "f").` returns `{a, b, c, d, e}` — everything
+`?- reach("a", Y).` returns `{b, c, d, e, f}`, everything reachable
+from `a`. The `reaches_f` output returns `{a, b, c, d, e}`, everything
 that can reach `f`.
 
 ## A small anatomy of a recursive rule

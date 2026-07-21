@@ -180,7 +180,7 @@ remaining positions become bindings when they're bare variables.
 From `events.dl`:
 
 ```prolog
-event_string_header(Id, Key, Value) :-
+output predicate event_string_header(Id, Key, Value) :-
     event(E),
     Id = as_integer(E["id"]),
     object_entry(E["headers"], Key, V),
@@ -195,7 +195,7 @@ whose `headers` are missing or non-object simply don't appear —
 `array_element` is the symmetric primitive for lists:
 
 ```prolog
-endpoint(I, Path) :-
+output predicate endpoint(I, Path) :-
     config(C),
     array_element(C["endpoints"], I, E),
     Path = as_string(E["path"]).
@@ -324,20 +324,19 @@ request(Id, Method, Path, Status) :-
     Path = as_string(E["path"]),
     Status = as_integer(E["status"]).
 
-ok_v1_request(Id, Path) :-
+output predicate ok_v1_request(Id, Path) :-
     request(Id, _, Path, Status),
     Status >= 200,
     Status < 300,
     Path[0:4] = "/v1/".
 
-event_string_header(Id, Key, Value) :-
+output predicate event_string_header(Id, Key, Value) :-
     event(E),
     Id = as_integer(E["id"]),
     object_entry(E["headers"], Key, V),
     Value = as_string(V).
 
-?- ok_v1_request(Id, P).
-?- event_string_header(Id, K, V).
+?- request(Id, M, P, S).
 ```
 
 Run it:

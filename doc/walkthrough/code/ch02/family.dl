@@ -18,15 +18,13 @@ extensional parent(parent_name: string, child_name: string).
 grandparent(X, Z) :- parent(X, Y), parent(Y, Z).
 
 # Same pattern, one step deeper.
-great_grandparent(X, W) :- parent(X, Y), parent(Y, Z), parent(Z, W).
+output predicate great_grandparent(X, W) :- parent(X, Y), parent(Y, Z), parent(Z, W).
 
 # Rules can also have a single body atom — here we project `parent`
 # down to just the set of children (anyone who has a parent).
-has_a_parent(C) :- parent(_, C).
+output predicate has_a_parent(C) :- parent(_, C).
 
 ?- grandparent(X, Y).
-?- great_grandparent(X, Y).
-?- has_a_parent(C).
 
 # A directed question: who are Greg's grandparents?
-?- grandparent(X, "greg").
+output predicate greg_grandparent(X) :- grandparent(X, "greg").

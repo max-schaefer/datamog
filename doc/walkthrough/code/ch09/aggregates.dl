@@ -8,13 +8,13 @@ extensional scores(student: string, subject: string, score: integer).
 student_avg(Student, avg(Score)) :- scores(Student, _, Score).
 
 # Highest score per student.
-best(Student, max(Score)) :- scores(Student, _, Score).
+output predicate best(Student, max(Score)) :- scores(Student, _, Score).
 
 # Number of subjects each student took.
-num_subjects(Student, count(Subject)) :- scores(Student, Subject, _).
+output predicate num_subjects(Student, count(Subject)) :- scores(Student, Subject, _).
 
 # Total records — count(*) means "count the rows", like COUNT(*).
-total(count(*)) :- scores(_, _, _).
+output predicate total(count(*)) :- scores(_, _, _).
 
 # `list` is the language's list-comprehension idiom: build a json
 # value in a non-aggregate rule, then aggregate it. Each student's
@@ -22,10 +22,6 @@ total(count(*)) :- scores(_, _, _).
 # rolls those objects into a single per-student JSON array.
 record(Student, {"subject": Subject, "score": Score}) :-
     scores(Student, Subject, Score).
-all_records(Student, list(R)) :- record(Student, R).
+output predicate all_records(Student, list(R)) :- record(Student, R).
 
 ?- student_avg(S, A).
-?- best(S, B).
-?- num_subjects(S, N).
-?- total(T).
-?- all_records(S, R).

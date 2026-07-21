@@ -22,5 +22,6 @@ close_kin(X, Y) :- parent(Y, X).
 close_kin(X, Y) :- spouse(X, Y).
 
 ?- spouse("alice", X).
-?- spouse(X, "frank").
-?- close_kin("erin", X).
+
+output predicate frank_spouse(X) :- spouse(X, "frank").
+output predicate erin_kin(X) :- close_kin("erin", X).

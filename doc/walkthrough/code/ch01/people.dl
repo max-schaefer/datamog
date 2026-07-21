@@ -6,11 +6,9 @@
 
 extensional person(name: string, country: string, year_born: integer).
 
-# Simplest possible query: print every fact.
+# A file runs a single query. This one prints every fact.
 ?- person(Name, Country, Year).
 
-# Everyone from the UK.
-?- person(Name, "uk", Year).
-
-# Who was born in 1912?
-?- person(Name, Country, 1912).
+# To ask a different question, edit the query above (or swap one of these in):
+#   ?- person(Name, "uk", Year).      # everyone from the UK
+#   ?- person(Name, Country, 1912).   # who was born in 1912

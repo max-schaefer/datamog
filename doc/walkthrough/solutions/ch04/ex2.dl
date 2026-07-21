@@ -12,5 +12,6 @@ reach_or_self(X, Y) :- edge(X, Z), reach_or_self(Z, Y).
 reach_or_self(X, X) :- edge(X, _).
 reach_or_self(X, X) :- edge(_, X).
 
+output predicate self_reachable(X) :- reach_or_self(X, X).
+
 ?- reach_or_self("a", Y).
-?- reach_or_self(X, X).

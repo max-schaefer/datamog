@@ -7,11 +7,9 @@
 num(N) :- N in [1 .. 10].
 
 # Perfect squares up to 100.
-square(N, S) :- N in [1 .. 10], S = N * N.
+output predicate square(N, S) :- N in [1 .. 10], S = N * N.
 
 # Multiplication table for 3.
-times_three(N, T) :- N in [1 .. 5], T = N * 3.
+output predicate times_three(N, T) :- N in [1 .. 5], T = N * 3.
 
 ?- num(N).
-?- square(N, S).
-?- times_three(N, T).

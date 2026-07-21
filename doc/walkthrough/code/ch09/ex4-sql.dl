@@ -7,11 +7,9 @@
 extensional scores(student: string, subject: string, score: integer).
 
 total(count(*)) :- scores(_, _, _).
-student_subjects(Student, concat(Subject)) :-
+output predicate student_subjects(Student, concat(Subject)) :-
     scores(Student, Subject, _).
-avg_by_subject(Subject, avg(Score)) :-
+output predicate avg_by_subject(Subject, avg(Score)) :-
     scores(_, Subject, Score).
 
 ?- total(T).
-?- student_subjects(S, Subs).
-?- avg_by_subject(Sub, A).

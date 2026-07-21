@@ -80,9 +80,8 @@ its columns. Look at [`code/ch01/people.dl`](code/ch01/people.dl):
 ```prolog
 extensional person(name: string, country: string, year_born: integer).
 
+# A file runs a single query. Edit it to ask a different question.
 ?- person(Name, Country, Year).
-?- person(Name, "uk", Year).
-?- person(Name, Country, 1912).
 ```
 
 No inline facts, no CSV import machinery — just a schema. The actual
@@ -104,8 +103,10 @@ for a Mermaid graph) and loads it.
 bun run datamog doc/walkthrough/code/ch01/people.dl
 ```
 
-The three queries print three tables: everyone, everyone from the
-UK, and everyone born in 1912.
+The query prints everyone. To ask the other questions (everyone from
+the UK, or everyone born in 1912), edit the query and run again: a file
+reports one query, its **default output**. Chapter 2 shows how to report
+several results from a single file at once, as *named outputs*.
 
 ### "Extensional" vs. "intensional"
 
@@ -131,8 +132,8 @@ arguments. Arguments can be:
   Use it when a column needs to be present syntactically but its
   value doesn't matter.
 
-A few examples; try them yourself or run the ones already in
-`people.dl`:
+A few example queries; try them one at a time, editing the query line
+in `people.dl` and re-running:
 
 ```prolog
 ?- person(Name, "us", Year).     # Americans and the year they were born
@@ -176,16 +177,15 @@ more than one atom in a query body, which we'll see in Chapter 2.
 > );
 >
 > SELECT DISTINCT "name" AS "Name", "country" AS "Country", "year_born" AS "Year" FROM "person";
-> SELECT DISTINCT "name" AS "Name", "year_born" AS "Year" FROM "person" WHERE "country" = 'uk';
-> SELECT DISTINCT "name" AS "Name", "country" AS "Country" FROM "person" WHERE "year_born" = 1912;
 > ```
 >
-> The `extensional` declaration became `CREATE TABLE`. Each query
-> became a `SELECT DISTINCT`. Variables in the query head turned
-> into `AS` aliases; constants in the query body turned into
-> `WHERE` conditions. Datamog keeps things `DISTINCT` by default
-> because Datalog has set semantics — a tuple is either in the
-> relation or it isn't; it can't be in it "twice".
+> The `extensional` declaration became `CREATE TABLE`, and the query
+> became a `SELECT DISTINCT`. Variables in the query turned into `AS`
+> aliases. Swap a constant into the query (say `?- person(Name, "uk",
+> Year).`) and re-run `--dry-run`: the constant becomes a `WHERE`
+> condition, `WHERE "country" = 'uk'`. Datamog keeps things `DISTINCT`
+> by default because Datalog has set semantics: a tuple is either in
+> the relation or it isn't; it can't be in it "twice".
 
 > **Imperative lens.** In Python you'd write out the data as a list
 > of tuples and then write a separate function for each question you
@@ -211,13 +211,14 @@ more than one atom in a query body, which we'll see in Chapter 2.
 >     return [p for p in people if p[1] == country and p[2] == year]
 > ```
 >
-> Four questions, four functions — and if a fifth kind of query
-> comes along, you'll write a fifth function. The Datalog version is
-> a single predicate with four queries against it, because a
-> predicate is a *relation*, not a procedure: no column is the
-> "input" and no column is the "output". Put a variable where you
-> want an answer and a constant where you know the value; the same
-> `person` predicate handles all combinations.
+> Four questions, four functions, and if a fifth kind of query comes
+> along you'll write a fifth function. The Datalog version is a single
+> predicate you can ask any of these questions of, because a predicate
+> is a *relation*, not a procedure: no column is the "input" and no
+> column is the "output". Put a variable where you want an answer and a
+> constant where you know the value; the same `person` predicate handles
+> all combinations. You ask one question per run by editing the query;
+> Chapter 2 introduces *named outputs* for reporting several at once.
 
 ## The playground shortcut
 
@@ -235,7 +236,8 @@ version control).
 ## Recap
 
 - A Datalog program is a collection of **facts** (ground atoms)
-  and **queries** (atoms with variables, prefixed with `?-`).
+  and a **query** (an atom with variables, prefixed with `?-`) whose
+  answers are the program's default output.
 - `extensional` declares a typed predicate whose extent lives in
   a data file; inline facts work for small examples.
 - Through the **logic lens**, predicates are relations and facts
@@ -272,7 +274,7 @@ Starter: [`code/ch01/ex3-extend.dl`](code/ch01/ex3-extend.dl)
 This starter uses inline facts instead of a CSV. Add three more
 computer scientists — any three you like, as long as each fact has
 all three columns. Run the program and confirm your new rows show
-up in the query output. Then add a second query that asks about a
+up in the query output. Then change the query to ask about a
 specific year of your choosing. (You don't have a `<` operator yet;
 equality is all you have for now.)
 

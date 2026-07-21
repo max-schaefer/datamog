@@ -9,6 +9,7 @@ reach_in("1", X, Y) :- edge(X, Y).
 reach_in("2", X, Y) :- edge(X, Z), edge(Z, Y).
 reach_in("3", X, Y) :- edge(X, A), edge(A, B), edge(B, Y).
 
+output predicate reach2(Y) :- reach_in("2", "a", Y).
+output predicate reach3(Y) :- reach_in("3", "a", Y).
+
 ?- reach_in("1", "a", Y).
-?- reach_in("2", "a", Y).
-?- reach_in("3", "a", Y).

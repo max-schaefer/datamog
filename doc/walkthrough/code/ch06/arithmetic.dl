@@ -8,13 +8,11 @@ out_of_ten(Student, Subject, P10) :-
     score(Student, Subject, P), P10 = P / 10.
 
 # A filter using a comparison.
-above_threshold(Student, Subject, P) :-
+output predicate above_threshold(Student, Subject, P) :-
     score(Student, Subject, P), P > 75.
 
 # Arithmetic with multiple operands.
-bonus(Student, Subject, P2) :-
+output predicate bonus(Student, Subject, P2) :-
     score(Student, Subject, P), P2 = P + 5.
 
 ?- out_of_ten(N, S, P).
-?- above_threshold(N, S, P).
-?- bonus(N, S, P).

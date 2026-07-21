@@ -12,4 +12,6 @@ reach(X, Y) :- edge(X, Y).
 reach(X, Y) :- edge(X, Z), reach(Z, Y).
 
 ?- reach("a", Y).      # everything reachable from a
-?- reach(X, "f").      # everything that can reach f
+
+# everything that can reach f
+output predicate reaches_f(X) :- reach(X, "f").

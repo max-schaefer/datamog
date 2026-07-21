@@ -6,9 +6,7 @@ extensional scores(student: string, subject: string, score: integer).
 
 # Placeholders so the file parses.
 subject_count(Subject, count(*)) :- scores(_, Subject, _).
-total_students(count(Student)) :- scores(Student, _, _).
-perfect_scores(count(*)) :- scores(_, _, S), S = 999.
+output predicate total_students(count(Student)) :- scores(Student, _, _).
+output predicate perfect_scores(count(*)) :- scores(_, _, S), S = 999.
 
 ?- subject_count(Subject, N).
-?- total_students(N).
-?- perfect_scores(N).

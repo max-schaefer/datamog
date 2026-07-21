@@ -19,19 +19,17 @@ request(Id, Method, Path, Status) :-
 # Now we can compare against regular literals — Method is `string`,
 # Status is `integer`. The slice `Path[0:4]` works on a string just
 # like any string operation from Chapter 6.
-ok_v1_request(Id, Path) :-
+output predicate ok_v1_request(Id, Path) :-
     request(Id, _, Path, Status),
     Status >= 200,
     Status < 300,
     Path[0:4] = "/v1/".
 
 # Iterate the headers object — one row per (event-id, key) pair.
-event_string_header(Id, Key, Value) :-
+output predicate event_string_header(Id, Key, Value) :-
     event(E),
     Id = as_integer(E["id"]),
     object_entry(E["headers"], Key, V),
     Value = as_string(V).
 
 ?- request(Id, M, P, S).
-?- ok_v1_request(Id, P).
-?- event_string_header(Id, K, V).

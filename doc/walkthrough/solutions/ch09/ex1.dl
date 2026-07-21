@@ -7,10 +7,8 @@ subject_count(Subject, count(Student)) :- scores(Student, Subject, _).
 # count(Student) over scores would count one row per (student, subject).
 # To count DISTINCT students, collect them into a set first, then count rows.
 student(S) :- scores(S, _, _).
-total_students(count(*)) :- student(_).
+output predicate total_students(count(*)) :- student(_).
 
-perfect_scores(count(*)) :- scores(_, _, 100).
+output predicate perfect_scores(count(*)) :- scores(_, _, 100).
 
 ?- subject_count(Subject, N).
-?- total_students(N).
-?- perfect_scores(N).

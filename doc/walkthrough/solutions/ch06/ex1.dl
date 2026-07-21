@@ -3,11 +3,8 @@
 extensional score(student: string, subject: string, points: integer).
 
 grade_a(S, Sub) :- score(S, Sub, P), P >= 90.
-grade_b(S, Sub) :- score(S, Sub, P), P >= 80, P < 90.
-grade_c(S, Sub) :- score(S, Sub, P), P >= 70, P < 80.
-grade_f(S, Sub) :- score(S, Sub, P), P < 70.
+output predicate grade_b(S, Sub) :- score(S, Sub, P), P >= 80, P < 90.
+output predicate grade_c(S, Sub) :- score(S, Sub, P), P >= 70, P < 80.
+output predicate grade_f(S, Sub) :- score(S, Sub, P), P < 70.
 
 ?- grade_a(S, Sub).
-?- grade_b(S, Sub).
-?- grade_c(S, Sub).
-?- grade_f(S, Sub).

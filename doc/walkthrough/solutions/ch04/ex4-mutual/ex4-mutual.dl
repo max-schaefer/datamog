@@ -23,5 +23,6 @@ rr(X, Y) :- bb(X, Z), edge(Z, Y, "red").
 bb(X, Y) :- edge(X, Y, "blue").
 bb(X, Y) :- rr(X, Z), edge(Z, Y, "blue").
 
+output predicate bb_from_a(Y) :- bb("a", Y).
+
 ?- rr("a", Y).
-?- bb("a", Y).

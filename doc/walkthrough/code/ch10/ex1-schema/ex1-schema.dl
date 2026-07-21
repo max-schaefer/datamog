@@ -14,9 +14,7 @@ extensional checkout(book_id: integer, borrower_id: integer, date: string).
 # TODO.
 # Placeholders.
 available(B) :- book(B, _, _), B = -1.
-local_author(A) :- author(_, A, _), A = "__never__".
-most_borrowed(B, count(Ev)) :- checkout(B, Ev, _), B = -1.
+output predicate local_author(A) :- author(_, A, _), A = "__never__".
+output predicate most_borrowed(B, count(Ev)) :- checkout(B, Ev, _), B = -1.
 
 ?- available(B).
-?- local_author(A).
-?- most_borrowed(B, N).

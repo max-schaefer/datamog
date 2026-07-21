@@ -11,10 +11,8 @@ currently_out(B) :- checkout(B, _, _).
 
 available(B) :- book(B, _, _), not currently_out(B).
 
-local_author(Name) :- author(_, Name, "uk").
+output predicate local_author(Name) :- author(_, Name, "uk").
 
-most_borrowed(B, count(Ev)) :- checkout(B, Ev, _).
+output predicate most_borrowed(B, count(Ev)) :- checkout(B, Ev, _).
 
 ?- available(B).
-?- local_author(A).
-?- most_borrowed(B, N).
