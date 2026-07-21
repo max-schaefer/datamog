@@ -101,6 +101,14 @@ function parseCsvContent(
     seen.add(name);
   }
 
+  // Reject a header missing a declared column up front, like the CLI and
+  // playground CSV loaders. `csvRowsFromKeyed`'s own presence check runs
+  // per record, so it is skipped for a header-only file (no records) and the
+  // missing column would otherwise pass silently.
+  for (const col of decl.columns) {
+    if (!header.includes(col.name)) throw new Error(`${source}: missing field '${col.name}'`);
+  }
+
   const dataRecords = parsed.slice(1);
   const records = dataRecords.map(({ record, info }) => {
     // Reject malformed rows the same way the Bun `CsvLoader` and the

@@ -48,4 +48,21 @@ describe("DiskLoader", () => {
       await rm(dir, { recursive: true });
     }
   });
+
+  test("Regression: a header-only CSV missing a declared column is rejected", async () => {
+    // The disk loader relied on `csvRowsFromKeyed`'s first-record guard to
+    // report a missing declared column, but that guard is skipped when there
+    // are no data records. So a header-only CSV whose header lacked a declared
+    // column returned [] silently, where the CLI and playground loaders (which
+    // pre-check `header.includes(col.name)`) throw "missing field".
+    dir = await mkdtemp(join(tmpdir(), "datamog-disk-"));
+    try {
+      await writeFile(join(dir, "t.csv"), "a,b\n");
+      const loader = new DiskLoader(dir);
+      const decl = getExtDecl("extensional t(a: integer, b: integer, c: integer).");
+      expect(loader.load(decl, captureBackend())).rejects.toThrow(/missing field 'c'/);
+    } finally {
+      await rm(dir, { recursive: true });
+    }
+  });
 });
