@@ -7,7 +7,6 @@ import type {
   HeadTerm,
   PrimitiveType,
   RangeAtom,
-  Rule,
 } from "./ast.ts";
 import { BITWISE_OPS, COMPARISON_OPS, isFloatLiteral } from "./ast.ts";
 import { type Overload, type ResolutionError, resolveCall } from "./builtins.ts";
@@ -391,7 +390,7 @@ function validateTypes(
             validateExpr(elem.expr, varTypes, types, functionOverloads);
             validateExpr(elem.low, varTypes, types, functionOverloads);
             validateExpr(elem.high, varTypes, types, functionOverloads);
-            checkRangeExprTypes(elem, rule, varTypes, types);
+            checkRangeExprTypes(elem, rule.body, varTypes, types);
             break;
         }
       }
@@ -463,24 +462,11 @@ function validateTypes(
           validateExpr(elem.expr, varTypes, types, functionOverloads);
           validateExpr(elem.low, varTypes, types, functionOverloads);
           validateExpr(elem.high, varTypes, types, functionOverloads);
-          const lt = inferTermType(elem.low, varTypes, types);
-          const ht = inferTermType(elem.high, varTypes, types);
-          if (lt && lt !== "integer" && lt !== "float" && lt !== "value") {
-            const cst = elem.low.$cstNode;
-            throw new AnalyzerError(
-              `Range lower bound has non-numeric type '${lt}'`,
-              cst?.offset,
-              cst?.end,
-            );
-          }
-          if (ht && ht !== "integer" && ht !== "float" && ht !== "value") {
-            const cst = elem.high.$cstNode;
-            throw new AnalyzerError(
-              `Range upper bound has non-numeric type '${ht}'`,
-              cst?.offset,
-              cst?.end,
-            );
-          }
+          // Mirror the rule-body `RangeAtom` case: the ad-hoc bound check
+          // here skipped the expr-type and integer-binding-range rules, so a
+          // `?-` accepted a float binding range / non-numeric range that the
+          // equivalent rule rejects, then the backends diverged at runtime.
+          checkRangeExprTypes(elem, query.body, varTypes, types);
           break;
         }
       }
@@ -907,7 +893,7 @@ function raiseResolutionError(term: FunctionCall, err: ResolutionError): never {
 
 function checkRangeExprTypes(
   range: RangeAtom,
-  rule: Rule,
+  body: readonly BodyElement[],
   varTypes: Map<string, PrimitiveType>,
   types: Map<string, (PrimitiveType | undefined)[]>,
 ): void {
@@ -946,7 +932,7 @@ function checkRangeExprTypes(
   // downstream as an "Unbound variable" crash. Reject that here with a
   // position-bearing error. Filter ranges (LHS already bound elsewhere,
   // or LHS a complex expression) are still allowed to have float bounds.
-  if (range.expr.$type === "Variable" && !isBoundElsewhere(range, range.expr.name, rule)) {
+  if (range.expr.$type === "Variable" && !isBoundElsewhere(range, range.expr.name, body)) {
     if (lowType && lowType !== "integer") {
       const cst = range.low.$cstNode;
       throw new AnalyzerError(
@@ -973,8 +959,8 @@ function checkRangeExprTypes(
  * binding site for its expr variable (binding range) or an additional
  * constraint on a variable already bound elsewhere (filter range).
  */
-function isBoundElsewhere(self: RangeAtom, name: string, rule: Rule): boolean {
-  for (const elem of rule.body) {
+function isBoundElsewhere(self: RangeAtom, name: string, body: readonly BodyElement[]): boolean {
+  for (const elem of body) {
     if (elem === self) continue;
     if (elem.$type === "Literal" && !elem.negated) {
       for (const arg of elem.args) {

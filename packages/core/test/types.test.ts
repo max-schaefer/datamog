@@ -364,6 +364,19 @@ describe("type inference", () => {
     ).toThrow(/Binding range.*requires integer bounds/);
   });
 
+  test("Regression: a range atom in a query body is validated like a rule body", () => {
+    // Query-body validation is a near-duplicate of rule-body validation and
+    // drifted: the query `RangeAtom` case skipped `checkRangeExprTypes`, so a
+    // `?-` accepted a float binding range and a non-numeric range expression
+    // that the equivalent rule rejects. The two then diverged at runtime
+    // (sqlite threw "Unbound variable" / returned [] where native returned
+    // rows). Both must be rejected at analyse time, like the rule forms.
+    expect(() => getTypes("?- X in [1.5 .. 3].")).toThrow(/Binding range.*requires integer bounds/);
+    expect(() => getTypes('s("hi"). ?- s(X), X in [1 .. 3].')).toThrow(
+      /Range expression has non-numeric type/,
+    );
+  });
+
   test("accepts range filter with float expression", () => {
     const typed = getTypes(`
       extensional vals(x: float).
