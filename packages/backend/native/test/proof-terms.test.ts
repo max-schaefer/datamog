@@ -227,6 +227,15 @@ describe("proof terms", () => {
         run("val(5). val(6).\nopt()[Some] :- val(X).\nr(P) :- P : opt, not P = Some(3).\n?- r(P)."),
       ).rejects.toThrow(/constructor pattern may not appear under negation/);
     });
+
+    test("rejects a `$`-prefixed quoted identifier (reserved internal namespace)", async () => {
+      // A backtick-quoted variable decoding to a `$`-name (`$w`) collided with
+      // the internal `$anon`/`$sub`/`$pat` namespace and was silently dropped
+      // from the proof witnesses. Reject any identifier that decodes to `$...`.
+      await expect(run("val(5).\nopt()[Some] :- val(`$w`).\n?- P : opt.")).rejects.toThrow(
+        /may not start with '\$'/,
+      );
+    });
   });
 
   describe("destructuring", () => {

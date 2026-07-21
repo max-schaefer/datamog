@@ -74,9 +74,22 @@ function isQuotedIdentifier(value: string): boolean {
   return value.length >= 2 && value.startsWith("`") && value.endsWith("`");
 }
 
-function decodeQuotedIdentifier(value: string): string {
+function decodeQuotedIdentifier(value: string, node?: { $cstNode?: AstNode["$cstNode"] }): string {
   if (!isQuotedIdentifier(value)) return value;
-  return value.slice(1, -1).replace(/\\([\s\S])/g, "$1");
+  const decoded = value.slice(1, -1).replace(/\\([\s\S])/g, "$1");
+  // `$` opens the reserved internal namespace: the parser mints `$anonN`
+  // don't-cares and `$sub`/`$pat` proof-term temporaries, and the analyzer's
+  // `isSyntheticVar` treats any `$`-prefixed name as internal plumbing. A
+  // quoted source identifier that decodes into it would collide with those
+  // (dropped from proof witnesses, hidden from query output, mistaken for a
+  // don't-care), so reject it rather than silently mangle it.
+  if (decoded.startsWith("$")) {
+    throw parseErrorAtNode(
+      `Identifier '${decoded}' may not start with '$' (reserved for internal names)`,
+      node ?? {},
+    );
+  }
+  return decoded;
 }
 
 function parseErrorAtNode(message: string, node: { $cstNode?: AstNode["$cstNode"] }): ParseError {
@@ -226,16 +239,16 @@ export function postProcess(program: Program): void {
   for (const node of streamAll(program)) {
     if (isExtDecl(node)) {
       node.predicateQuoted = isQuotedIdentifier(node.predicate);
-      node.predicate = decodeQuotedIdentifier(node.predicate);
+      node.predicate = decodeQuotedIdentifier(node.predicate, node);
     } else if (isHeadAtom(node)) {
       node.predicateQuoted = isQuotedIdentifier(node.predicate);
-      node.predicate = decodeQuotedIdentifier(node.predicate);
+      node.predicate = decodeQuotedIdentifier(node.predicate, node);
     } else if (isLiteral(node)) {
       node.predicateQuoted = isQuotedIdentifier(node.predicate);
-      node.predicate = decodeQuotedIdentifier(node.predicate);
+      node.predicate = decodeQuotedIdentifier(node.predicate, node);
     } else if (isColumnDecl(node)) {
       node.nameQuoted = isQuotedIdentifier(node.name);
-      node.name = decodeQuotedIdentifier(node.name);
+      node.name = decodeQuotedIdentifier(node.name, node);
     } else if (isVariable(node)) {
       // Strip backticks so `Foo` and Foo are indistinguishable downstream
       // (analyzer, translator, evaluators). Reserved keywords are matched
@@ -243,7 +256,7 @@ export function postProcess(program: Program): void {
       // can carry a keyword-looking name is via the quoted form (`true`),
       // which the analyzer treats as an ordinary identifier — no
       // re-tokenisation downstream means no name collision.
-      node.name = decodeQuotedIdentifier(node.name);
+      node.name = decodeQuotedIdentifier(node.name, node);
     }
   }
 
@@ -389,7 +402,7 @@ export function postProcess(program: Program): void {
     if (isRule(stmt) && stmt.ruleName !== undefined) {
       // Normalise the constructor name in place so every later stage (and the
       // analyzer) sees the decoded form.
-      stmt.ruleName = decodeQuotedIdentifier(stmt.ruleName);
+      stmt.ruleName = decodeQuotedIdentifier(stmt.ruleName, stmt.head);
       proofCarrying.add(stmt.head.predicate);
     }
   }
@@ -428,7 +441,7 @@ export function postProcess(program: Program): void {
     if (stmt.head.args.some((a) => (a as { $type: string }).$type === "AggregateCall")) {
       throw parseErrorAtNode(`Proof-carrying predicate '${pred}' cannot use aggregates`, stmt.head);
     }
-    const ctor = decodeQuotedIdentifier(stmt.ruleName);
+    const ctor = decodeQuotedIdentifier(stmt.ruleName, stmt.head);
     if (seenCtors.has(ctor)) {
       throw parseErrorAtNode(`Constructor name '${ctor}' is used by more than one rule`, stmt.head);
     }
@@ -476,7 +489,7 @@ export function postProcess(program: Program): void {
       const included = collectSubProofs && !el.negated && !suppressed;
       let colName: string;
       if (el.proofVar !== undefined && !suppressed) {
-        colName = decodeQuotedIdentifier(el.proofVar);
+        colName = decodeQuotedIdentifier(el.proofVar, el);
       } else if (included) {
         // An anonymous but included sub-proof must still bind, so it needs a
         // non-anonymous name (the native planner drops `$anonN` as don't-care).
@@ -515,7 +528,7 @@ export function postProcess(program: Program): void {
     const seenBodyVar = new Set<string>();
     for (const el of stmt.body) {
       if (isLiteral(el) && el.proofVar !== undefined) {
-        captureNames.add(decodeQuotedIdentifier(el.proofVar));
+        captureNames.add(decodeQuotedIdentifier(el.proofVar, el));
       }
       for (const n of streamAll(el)) {
         if (isVariable(n) && !seenBodyVar.has(n.name)) {
@@ -525,7 +538,7 @@ export function postProcess(program: Program): void {
       }
     }
     const subProofs = injectProofColumns(stmt.body, true);
-    const ctor = decodeQuotedIdentifier(stmt.ruleName);
+    const ctor = decodeQuotedIdentifier(stmt.ruleName, stmt.head);
     let argExprs: Expression[];
     if (stmt.ctorParens) {
       // Explicit constructor arguments `[Ctor(a, b, ...)]`: the proof term
