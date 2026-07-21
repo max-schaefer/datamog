@@ -43,7 +43,6 @@ pow2(N + 1, 2 * P) :- pow2(N, P), topbit(M), N < M.
 
 bit_value(Idx, V) :- zbit(W, Idx), signal(W, V).
 place(Idx, V * P) :- bit_value(Idx, V), pow2(Idx, P).
-answer(sum(WV)) :- place(_, WV).
+output predicate answer(sum(WV)) :- place(_, WV).
 
 ?- bit_value(Idx, V).
-?- answer(N).

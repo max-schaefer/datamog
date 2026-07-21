@@ -1,37 +1,37 @@
 [
   [
     {
-      "N": "datamog-demo"
-    }
-  ],
-  [
-    {
       "V": "0.1.0"
     }
   ],
   [
     {
-      "F": "cache"
+      "Name": "cache"
     },
     {
-      "F": "metrics"
+      "Name": "metrics"
     },
     {
-      "F": "tracing"
+      "Name": "tracing"
     }
   ],
   [
     {
       "I": 0,
-      "P": "/health"
+      "Path": "/health"
     },
     {
       "I": 1,
-      "P": "/users"
+      "Path": "/users"
     },
     {
       "I": 2,
-      "P": "/admin"
+      "Path": "/admin"
+    }
+  ],
+  [
+    {
+      "N": "datamog-demo"
     }
   ]
 ]

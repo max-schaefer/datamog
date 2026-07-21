@@ -22,9 +22,9 @@ plus(Succ(A), B, Succ(C)) :- plus(A, B, C).
 leq(Zero(), N) :- N : nat.
 leq(Succ(A), Succ(B)) :- leq(A, B).
 
-# The naturals themselves.
+# The naturals themselves (the default output).
 ?- N : nat.
 # 2 + 1 = 3.
-?- plus(Succ(Succ(Zero())), Succ(Zero()), Sum).
+output predicate sum_two_one(Sum) :- plus(Succ(Succ(Zero())), Succ(Zero()), Sum).
 # Every pair with M <= N.
-?- leq(M, N).
+output predicate leq_pairs(M, N) :- leq(M, N).

@@ -1,6 +1,338 @@
 [
   [
     {
+      "X": "diana",
+      "Y": "edmund"
+    },
+    {
+      "X": "diana",
+      "Y": "george"
+    },
+    {
+      "X": "edmund",
+      "Y": "diana"
+    },
+    {
+      "X": "edmund",
+      "Y": "george"
+    },
+    {
+      "X": "george",
+      "Y": "diana"
+    },
+    {
+      "X": "george",
+      "Y": "edmund"
+    },
+    {
+      "X": "eve",
+      "Y": "frank"
+    },
+    {
+      "X": "frank",
+      "Y": "eve"
+    },
+    {
+      "X": "alice",
+      "Y": "bob"
+    },
+    {
+      "X": "bob",
+      "Y": "alice"
+    }
+  ],
+  [
+    {
+      "X": "diana",
+      "Y": "alice"
+    },
+    {
+      "X": "diana",
+      "Y": "bob"
+    },
+    {
+      "X": "diana",
+      "Y": "carol"
+    },
+    {
+      "X": "diana",
+      "Y": "edmund"
+    },
+    {
+      "X": "diana",
+      "Y": "eve"
+    },
+    {
+      "X": "diana",
+      "Y": "frank"
+    },
+    {
+      "X": "diana",
+      "Y": "george"
+    },
+    {
+      "X": "diana",
+      "Y": "henry"
+    },
+    {
+      "X": "edmund",
+      "Y": "alice"
+    },
+    {
+      "X": "edmund",
+      "Y": "bob"
+    },
+    {
+      "X": "edmund",
+      "Y": "carol"
+    },
+    {
+      "X": "edmund",
+      "Y": "diana"
+    },
+    {
+      "X": "edmund",
+      "Y": "eve"
+    },
+    {
+      "X": "edmund",
+      "Y": "frank"
+    },
+    {
+      "X": "edmund",
+      "Y": "george"
+    },
+    {
+      "X": "edmund",
+      "Y": "henry"
+    },
+    {
+      "X": "george",
+      "Y": "alice"
+    },
+    {
+      "X": "george",
+      "Y": "bob"
+    },
+    {
+      "X": "george",
+      "Y": "carol"
+    },
+    {
+      "X": "george",
+      "Y": "diana"
+    },
+    {
+      "X": "george",
+      "Y": "edmund"
+    },
+    {
+      "X": "george",
+      "Y": "eve"
+    },
+    {
+      "X": "george",
+      "Y": "frank"
+    },
+    {
+      "X": "george",
+      "Y": "henry"
+    },
+    {
+      "X": "eve",
+      "Y": "frank"
+    },
+    {
+      "X": "frank",
+      "Y": "eve"
+    },
+    {
+      "X": "alice",
+      "Y": "bob"
+    },
+    {
+      "X": "alice",
+      "Y": "carol"
+    },
+    {
+      "X": "bob",
+      "Y": "alice"
+    },
+    {
+      "X": "bob",
+      "Y": "carol"
+    },
+    {
+      "X": "carol",
+      "Y": "alice"
+    },
+    {
+      "X": "carol",
+      "Y": "bob"
+    },
+    {
+      "X": "eve",
+      "Y": "alice"
+    },
+    {
+      "X": "eve",
+      "Y": "bob"
+    },
+    {
+      "X": "eve",
+      "Y": "carol"
+    },
+    {
+      "X": "eve",
+      "Y": "diana"
+    },
+    {
+      "X": "eve",
+      "Y": "edmund"
+    },
+    {
+      "X": "eve",
+      "Y": "george"
+    },
+    {
+      "X": "eve",
+      "Y": "henry"
+    },
+    {
+      "X": "frank",
+      "Y": "alice"
+    },
+    {
+      "X": "frank",
+      "Y": "bob"
+    },
+    {
+      "X": "frank",
+      "Y": "carol"
+    },
+    {
+      "X": "frank",
+      "Y": "diana"
+    },
+    {
+      "X": "frank",
+      "Y": "edmund"
+    },
+    {
+      "X": "frank",
+      "Y": "george"
+    },
+    {
+      "X": "frank",
+      "Y": "henry"
+    },
+    {
+      "X": "alice",
+      "Y": "diana"
+    },
+    {
+      "X": "alice",
+      "Y": "edmund"
+    },
+    {
+      "X": "alice",
+      "Y": "eve"
+    },
+    {
+      "X": "alice",
+      "Y": "frank"
+    },
+    {
+      "X": "alice",
+      "Y": "george"
+    },
+    {
+      "X": "alice",
+      "Y": "henry"
+    },
+    {
+      "X": "bob",
+      "Y": "diana"
+    },
+    {
+      "X": "bob",
+      "Y": "edmund"
+    },
+    {
+      "X": "bob",
+      "Y": "eve"
+    },
+    {
+      "X": "bob",
+      "Y": "frank"
+    },
+    {
+      "X": "bob",
+      "Y": "george"
+    },
+    {
+      "X": "bob",
+      "Y": "henry"
+    },
+    {
+      "X": "henry",
+      "Y": "alice"
+    },
+    {
+      "X": "henry",
+      "Y": "bob"
+    },
+    {
+      "X": "henry",
+      "Y": "carol"
+    },
+    {
+      "X": "henry",
+      "Y": "diana"
+    },
+    {
+      "X": "henry",
+      "Y": "edmund"
+    },
+    {
+      "X": "henry",
+      "Y": "eve"
+    },
+    {
+      "X": "henry",
+      "Y": "frank"
+    },
+    {
+      "X": "henry",
+      "Y": "george"
+    },
+    {
+      "X": "carol",
+      "Y": "diana"
+    },
+    {
+      "X": "carol",
+      "Y": "edmund"
+    },
+    {
+      "X": "carol",
+      "Y": "eve"
+    },
+    {
+      "X": "carol",
+      "Y": "frank"
+    },
+    {
+      "X": "carol",
+      "Y": "george"
+    },
+    {
+      "X": "carol",
+      "Y": "henry"
+    }
+  ],
+  [
+    {
       "X": "diana"
     },
     {
@@ -14,338 +346,6 @@
     },
     {
       "X": "carol"
-    }
-  ],
-  [
-    {
-      "X": "diana",
-      "Y": "edmund"
-    },
-    {
-      "X": "diana",
-      "Y": "george"
-    },
-    {
-      "X": "edmund",
-      "Y": "diana"
-    },
-    {
-      "X": "edmund",
-      "Y": "george"
-    },
-    {
-      "X": "george",
-      "Y": "diana"
-    },
-    {
-      "X": "george",
-      "Y": "edmund"
-    },
-    {
-      "X": "eve",
-      "Y": "frank"
-    },
-    {
-      "X": "frank",
-      "Y": "eve"
-    },
-    {
-      "X": "alice",
-      "Y": "bob"
-    },
-    {
-      "X": "bob",
-      "Y": "alice"
-    }
-  ],
-  [
-    {
-      "X": "diana",
-      "Y": "alice"
-    },
-    {
-      "X": "diana",
-      "Y": "bob"
-    },
-    {
-      "X": "diana",
-      "Y": "carol"
-    },
-    {
-      "X": "diana",
-      "Y": "edmund"
-    },
-    {
-      "X": "diana",
-      "Y": "eve"
-    },
-    {
-      "X": "diana",
-      "Y": "frank"
-    },
-    {
-      "X": "diana",
-      "Y": "george"
-    },
-    {
-      "X": "diana",
-      "Y": "henry"
-    },
-    {
-      "X": "edmund",
-      "Y": "alice"
-    },
-    {
-      "X": "edmund",
-      "Y": "bob"
-    },
-    {
-      "X": "edmund",
-      "Y": "carol"
-    },
-    {
-      "X": "edmund",
-      "Y": "diana"
-    },
-    {
-      "X": "edmund",
-      "Y": "eve"
-    },
-    {
-      "X": "edmund",
-      "Y": "frank"
-    },
-    {
-      "X": "edmund",
-      "Y": "george"
-    },
-    {
-      "X": "edmund",
-      "Y": "henry"
-    },
-    {
-      "X": "george",
-      "Y": "alice"
-    },
-    {
-      "X": "george",
-      "Y": "bob"
-    },
-    {
-      "X": "george",
-      "Y": "carol"
-    },
-    {
-      "X": "george",
-      "Y": "diana"
-    },
-    {
-      "X": "george",
-      "Y": "edmund"
-    },
-    {
-      "X": "george",
-      "Y": "eve"
-    },
-    {
-      "X": "george",
-      "Y": "frank"
-    },
-    {
-      "X": "george",
-      "Y": "henry"
-    },
-    {
-      "X": "eve",
-      "Y": "frank"
-    },
-    {
-      "X": "frank",
-      "Y": "eve"
-    },
-    {
-      "X": "alice",
-      "Y": "bob"
-    },
-    {
-      "X": "alice",
-      "Y": "carol"
-    },
-    {
-      "X": "bob",
-      "Y": "alice"
-    },
-    {
-      "X": "bob",
-      "Y": "carol"
-    },
-    {
-      "X": "carol",
-      "Y": "alice"
-    },
-    {
-      "X": "carol",
-      "Y": "bob"
-    },
-    {
-      "X": "eve",
-      "Y": "alice"
-    },
-    {
-      "X": "eve",
-      "Y": "bob"
-    },
-    {
-      "X": "eve",
-      "Y": "carol"
-    },
-    {
-      "X": "eve",
-      "Y": "diana"
-    },
-    {
-      "X": "eve",
-      "Y": "edmund"
-    },
-    {
-      "X": "eve",
-      "Y": "george"
-    },
-    {
-      "X": "eve",
-      "Y": "henry"
-    },
-    {
-      "X": "frank",
-      "Y": "alice"
-    },
-    {
-      "X": "frank",
-      "Y": "bob"
-    },
-    {
-      "X": "frank",
-      "Y": "carol"
-    },
-    {
-      "X": "frank",
-      "Y": "diana"
-    },
-    {
-      "X": "frank",
-      "Y": "edmund"
-    },
-    {
-      "X": "frank",
-      "Y": "george"
-    },
-    {
-      "X": "frank",
-      "Y": "henry"
-    },
-    {
-      "X": "alice",
-      "Y": "diana"
-    },
-    {
-      "X": "alice",
-      "Y": "edmund"
-    },
-    {
-      "X": "alice",
-      "Y": "eve"
-    },
-    {
-      "X": "alice",
-      "Y": "frank"
-    },
-    {
-      "X": "alice",
-      "Y": "george"
-    },
-    {
-      "X": "alice",
-      "Y": "henry"
-    },
-    {
-      "X": "bob",
-      "Y": "diana"
-    },
-    {
-      "X": "bob",
-      "Y": "edmund"
-    },
-    {
-      "X": "bob",
-      "Y": "eve"
-    },
-    {
-      "X": "bob",
-      "Y": "frank"
-    },
-    {
-      "X": "bob",
-      "Y": "george"
-    },
-    {
-      "X": "bob",
-      "Y": "henry"
-    },
-    {
-      "X": "henry",
-      "Y": "alice"
-    },
-    {
-      "X": "henry",
-      "Y": "bob"
-    },
-    {
-      "X": "henry",
-      "Y": "carol"
-    },
-    {
-      "X": "henry",
-      "Y": "diana"
-    },
-    {
-      "X": "henry",
-      "Y": "edmund"
-    },
-    {
-      "X": "henry",
-      "Y": "eve"
-    },
-    {
-      "X": "henry",
-      "Y": "frank"
-    },
-    {
-      "X": "henry",
-      "Y": "george"
-    },
-    {
-      "X": "carol",
-      "Y": "diana"
-    },
-    {
-      "X": "carol",
-      "Y": "edmund"
-    },
-    {
-      "X": "carol",
-      "Y": "eve"
-    },
-    {
-      "X": "carol",
-      "Y": "frank"
-    },
-    {
-      "X": "carol",
-      "Y": "george"
-    },
-    {
-      "X": "carol",
-      "Y": "henry"
     }
   ]
 ]

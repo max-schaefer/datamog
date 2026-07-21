@@ -78,5 +78,4 @@ state(X, Y, U, U, U, T) :-
 ?- state("s", "s", "s", "s", "s", T).
 
 # What is the fastest crossing?
-fastest(min(T)) :- state("s", "s", "s", "s", "s", T).
-?- fastest(T).
+output predicate fastest(min(T)) :- state("s", "s", "s", "s", "s", T).

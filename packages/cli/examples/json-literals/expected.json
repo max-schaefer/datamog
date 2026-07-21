@@ -3,6 +3,43 @@
     {
       "Id": 1,
       "J": {
+        "name": "alice",
+        "tags": [
+          "employee",
+          "alice"
+        ]
+      }
+    },
+    {
+      "Id": 2,
+      "J": {
+        "name": "bob",
+        "tags": [
+          "employee",
+          "bob"
+        ]
+      }
+    },
+    {
+      "Id": 3,
+      "J": {
+        "name": "carol",
+        "tags": [
+          "employee",
+          "carol"
+        ]
+      }
+    }
+  ],
+  [
+    {
+      "J": []
+    }
+  ],
+  [
+    {
+      "Id": 1,
+      "J": {
         "id": 1,
         "name": "alice",
         "salary": 100000
@@ -23,34 +60,6 @@
         "name": "carol",
         "salary": 110000
       }
-    }
-  ],
-  [
-    {
-      "Id": 1,
-      "J": {
-        "name": "alice",
-        "tags": ["employee", "alice"]
-      }
-    },
-    {
-      "Id": 2,
-      "J": {
-        "name": "bob",
-        "tags": ["employee", "bob"]
-      }
-    },
-    {
-      "Id": 3,
-      "J": {
-        "name": "carol",
-        "tags": ["employee", "carol"]
-      }
-    }
-  ],
-  [
-    {
-      "J": []
     }
   ]
 ]

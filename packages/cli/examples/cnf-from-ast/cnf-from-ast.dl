@@ -120,7 +120,6 @@ falsifiable() :- falsifies(_, _).
 
 theorem() :- nvars(_), not falsifiable().
 
-counterexample(A, V, B) :- falsifies(A, C), eval(A, V, B).
+output predicate counterexample(A, V, B) :- falsifies(A, C), eval(A, V, B).
 
 ?- theorem().
-?- counterexample(A, V, Value).

@@ -1,13 +1,7 @@
 [
   [
     {
-      "N": "alice"
-    },
-    {
-      "N": "carol"
-    },
-    {
-      "N": "frank"
+      "N": "greg"
     },
     {
       "N": "helen"
@@ -15,7 +9,13 @@
   ],
   [
     {
-      "N": "greg"
+      "N": "alice"
+    },
+    {
+      "N": "carol"
+    },
+    {
+      "N": "frank"
     },
     {
       "N": "helen"

@@ -37,11 +37,8 @@ suffix(Cons(_, T), S) :- suffix(T, S).
 
 # Demonstrations on the list [1, 2].
 demo_append(C) :- append(Cons(1, Cons(2, Nil())), Cons(2, Nil()), C).
-demo_reverse(R) :- reverse(Cons(1, Cons(2, Nil())), R).
-demo_member(X) :- member(X, Cons(1, Cons(2, Nil()))).
-demo_suffix(S) :- suffix(Cons(1, Cons(2, Nil())), S).
+output predicate demo_reverse(R) :- reverse(Cons(1, Cons(2, Nil())), R).
+output predicate demo_member(X) :- member(X, Cons(1, Cons(2, Nil()))).
+output predicate demo_suffix(S) :- suffix(Cons(1, Cons(2, Nil())), S).
 
 ?- demo_append(C).
-?- demo_reverse(R).
-?- demo_member(X).
-?- demo_suffix(S).

@@ -1,50 +1,6 @@
 [
   [
     {
-      "X": "frame"
-    },
-    {
-      "X": "wheel"
-    },
-    {
-      "X": "chain_stay"
-    },
-    {
-      "X": "down_tube"
-    },
-    {
-      "X": "fork"
-    },
-    {
-      "X": "head_tube"
-    },
-    {
-      "X": "seat_mast"
-    },
-    {
-      "X": "seat_stay"
-    },
-    {
-      "X": "top_tube"
-    },
-    {
-      "X": "hub"
-    },
-    {
-      "X": "nipple"
-    },
-    {
-      "X": "rim"
-    },
-    {
-      "X": "spoke"
-    },
-    {
-      "X": "tire"
-    }
-  ],
-  [
-    {
       "Part": "top_tube",
       "Time": 6
     },
@@ -92,6 +48,50 @@
   [
     {
       "Time": 15
+    }
+  ],
+  [
+    {
+      "X": "frame"
+    },
+    {
+      "X": "wheel"
+    },
+    {
+      "X": "chain_stay"
+    },
+    {
+      "X": "down_tube"
+    },
+    {
+      "X": "fork"
+    },
+    {
+      "X": "head_tube"
+    },
+    {
+      "X": "seat_mast"
+    },
+    {
+      "X": "seat_stay"
+    },
+    {
+      "X": "top_tube"
+    },
+    {
+      "X": "hub"
+    },
+    {
+      "X": "nipple"
+    },
+    {
+      "X": "rim"
+    },
+    {
+      "X": "spoke"
+    },
+    {
+      "X": "tire"
     }
   ]
 ]

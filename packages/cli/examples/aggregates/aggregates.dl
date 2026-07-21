@@ -1,34 +1,36 @@
-# Aggregates — student scores
+# Aggregates: student scores
 #
 # Demonstrates aggregate functions: count, sum, avg, min, max, concat.
+# Each queried predicate is an `output predicate`, so it prints when the
+# program runs.
 
 extensional scores(student: string, subject: string, score: integer).
 
 # Average score per student
-student_avg(Student, avg(Score)) :- scores(Student, _, Score).
+output predicate student_avg(Student, avg(Score)) :- scores(Student, _, Score).
 
 # Number of subjects each student took
-num_subjects(Student, count(Subject)) :- scores(Student, Subject, _).
+output predicate num_subjects(Student, count(Subject)) :- scores(Student, Subject, _).
 
 # Total score per student
-total_score(Student, sum(Score)) :- scores(Student, _, Score).
+output predicate total_score(Student, sum(Score)) :- scores(Student, _, Score).
 
 # Highest and lowest score per student
-best_score(Student, max(Score)) :- scores(Student, _, Score).
-worst_score(Student, min(Score)) :- scores(Student, _, Score).
+output predicate best_score(Student, max(Score)) :- scores(Student, _, Score).
+output predicate worst_score(Student, min(Score)) :- scores(Student, _, Score).
 
 # Overall: total number of records
-record_count(count(*)) :- scores(_, _, _).
+output predicate record_count(count(*)) :- scores(_, _, _).
 
 # Students whose worst score is above 80
-strong(Student) :- worst_score(Student, W), W > 80.
+output predicate strong(Student) :- worst_score(Student, W), W > 80.
 
-# concat — comma-joined list of subjects taken per student.
+# concat: comma-joined list of subjects taken per student.
 # The translator emits an explicit `ORDER BY` on every backend, so
 # this string is deterministic regardless of where the rule runs.
-subjects(Student, concat(Subject)) :- scores(Student, Subject, _).
+output predicate subjects(Student, concat(Subject)) :- scores(Student, Subject, _).
 
-# list — collect the per-subject (subject, score) records as object
+# list: collect the per-subject (subject, score) records as object
 # `value`s, one array per student. This is the closest the language
 # gets to a list comprehension: build a `value` in a non-aggregate
 # rule, then aggregate it. Per-element order is determined by the
@@ -36,14 +38,4 @@ subjects(Student, concat(Subject)) :- scores(Student, Subject, _).
 # sees the same array.
 records(Student, {"subject": Subject, "score": Score}) :-
     scores(Student, Subject, Score).
-all_records(Student, list(R)) :- records(Student, R).
-
-?- student_avg(Student, Avg).
-?- num_subjects(Student, N).
-?- total_score(Student, Total).
-?- best_score(Student, Best).
-?- worst_score(Student, Worst).
-?- record_count(N).
-?- strong(Student).
-?- subjects(Student, S).
-?- all_records(Student, R).
+output predicate all_records(Student, list(R)) :- records(Student, R).

@@ -25,9 +25,8 @@ honours(N) :-
 
 # Edge cases: a learner is borderline if they were either right at the
 # lower threshold (==) or just one off the upper one.
-borderline(N) :-
+output predicate borderline(N) :-
     grade(N, S, _),
     (S == 80) || (S == 94).
 
 ?- honours(N).
-?- borderline(N).

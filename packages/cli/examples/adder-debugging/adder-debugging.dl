@@ -60,7 +60,6 @@ suspect(W, "a half-sum x XOR y that does not feed an AND") :-
 
 # --- the answer: the swapped wires, distinct, sorted and comma-joined ---
 swapped(W) :- suspect(W, _).
-answer(concat(W)) :- swapped(W).
+output predicate answer(concat(W)) :- swapped(W).
 
 ?- suspect(W, Why).
-?- answer(Names).

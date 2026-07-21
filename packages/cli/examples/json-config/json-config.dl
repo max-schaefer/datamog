@@ -6,23 +6,20 @@ extensional config(blob: value).
 
 # Pull a few top-level scalar fields out as primitive SQL types.
 app_name(N) :- config(C), N = as_string(C["name"]).
-app_version(V) :- config(C), V = as_string(C["version"]).
+output predicate app_version(V) :- config(C), V = as_string(C["version"]).
 
 # Iterate the `features` object: each key is a feature name, each
 # value is a json boolean. Project the enabled features only.
-enabled_feature(Name) :-
+output predicate enabled_feature(Name) :-
     config(C),
     object_entry(C["features"], Name, Flag),
     as_boolean(Flag) = true.
 
 # Walk the `endpoints` array and project (index, path) for every
 # endpoint, coercing the path leaf to string.
-endpoint(I, Path) :-
+output predicate endpoint(I, Path) :-
     config(C),
     array_element(C["endpoints"], I, E),
     Path = as_string(E["path"]).
 
 ?- app_name(N).
-?- app_version(V).
-?- enabled_feature(F).
-?- endpoint(I, P).

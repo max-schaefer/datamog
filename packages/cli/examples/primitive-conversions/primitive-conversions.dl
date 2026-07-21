@@ -12,15 +12,15 @@ extensional formats(name: string, i: integer, r: float, b: boolean).
 # Parse the string into the target type. Failed parses surface as NULL and
 # propagate naturally through the rest of the rule body.
 parsed_int(R, N)  :- inputs("int",  R), N = to_integer(R).
-parsed_float(R, N) :- inputs("float", R), N = to_float(R).
-parsed_bool(R, B) :- inputs("bool", R), B = to_boolean(R).
+output predicate parsed_float(R, N) :- inputs("float", R), N = to_float(R).
+output predicate parsed_bool(R, B) :- inputs("bool", R), B = to_boolean(R).
 
 # Format primitive values back to strings. The native and Postgres
 # backends render integer-valued floats without a `.0` suffix
 # (`String(1.0) = '1'`); SQLite renders them as `'1.0'`. The example
 # data avoids that case by using floats with non-zero fractional
 # parts, so the expected output is identical across backends.
-formatted(Name, S_INT, S_REAL, S_BOOL) :-
+output predicate formatted(Name, S_INT, S_REAL, S_BOOL) :-
     formats(Name, I, R, B),
     S_INT  = to_string(I),
     S_REAL = to_string(R),
@@ -33,14 +33,14 @@ formatted(Name, S_INT, S_REAL, S_BOOL) :-
 # a value, and subscripting it returns the lifted element. Round-
 # tripping back through the matching `as_*` recovers the original
 # primitive — exercised by the `lifted_round_trip` rule below.
-lifted(Name, JI, JR, JB, JS) :-
+output predicate lifted(Name, JI, JR, JB, JS) :-
     formats(Name, I, R, B),
     JI = [I][0],
     JR = [R][0],
     JB = [B][0],
     JS = [Name][0].
 
-lifted_round_trip(Name, I, R, B, S) :-
+output predicate lifted_round_trip(Name, I, R, B, S) :-
     lifted(Name, JI, JR, JB, JS),
     I = as_integer(JI),
     R = as_float(JR),
@@ -48,8 +48,3 @@ lifted_round_trip(Name, I, R, B, S) :-
     S = as_string(JS).
 
 ?- parsed_int(R, N).
-?- parsed_float(R, N).
-?- parsed_bool(R, B).
-?- formatted(Name, SI, SR, SB).
-?- lifted(Name, JI, JR, JB, JS).
-?- lifted_round_trip(Name, I, R, B, S).

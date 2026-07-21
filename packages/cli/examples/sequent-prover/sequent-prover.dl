@@ -125,5 +125,6 @@ open_branch(S) :- reach(S), not compound(S), not axiom(S).
 counterexample(S, P, "true")  :- open_branch(S), mem(S, "L", N), node_var(N, P).
 counterexample(S, P, "false") :- open_branch(S), mem(S, "R", N), node_var(N, P).
 
+output predicate countermodel(Branch, Var, Value) :- counterexample(Branch, Var, Value).
+
 ?- theorem().
-?- counterexample(Branch, Var, Value).

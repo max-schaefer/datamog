@@ -18,14 +18,12 @@ total(count(*)) :- char_at(_, _).
 freq(C, count(*)) :- char_at(_, C).
 
 # Probability of each character. Multiply by 1.0 to force floating-point division.
-prob(C, P) :- freq(C, N), total(T), P = (N * 1.0) / T.
+output predicate prob(C, P) :- freq(C, N), total(T), P = (N * 1.0) / T.
 
 # Per-character contribution to entropy: -p * log2(p).
 contribution(C, X) :- prob(C, P), X = -1.0 * P * ln(P) / ln(2).
 
 # Total entropy in bits.
-entropy(sum(X)) :- contribution(_, X).
+output predicate entropy(sum(X)) :- contribution(_, X).
 
 ?- freq(C, N).
-?- prob(C, P).
-?- entropy(H).

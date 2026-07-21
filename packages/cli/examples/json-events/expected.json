@@ -2,69 +2,37 @@
   [
     {
       "Id": 1,
-      "M": "GET",
-      "P": "/v1/users",
-      "S": 200
+      "Path": "/v1/users"
     },
     {
       "Id": 2,
-      "M": "POST",
-      "P": "/v1/users",
-      "S": 201
-    },
-    {
-      "Id": 3,
-      "M": "GET",
-      "P": "/v2/posts",
-      "S": 200
+      "Path": "/v1/users"
     },
     {
       "Id": 4,
-      "M": "GET",
-      "P": "/v1/health",
-      "S": 200
-    },
-    {
-      "Id": 5,
-      "M": "DELETE",
-      "P": "/v1/users/42",
-      "S": 404
+      "Path": "/v1/health"
     }
   ],
   [
     {
       "Id": 1,
-      "P": "/v1/users"
+      "Key": "x-trace",
+      "Value": "abc"
     },
     {
       "Id": 2,
-      "P": "/v1/users"
+      "Key": "x-trace",
+      "Value": "def"
+    },
+    {
+      "Id": 2,
+      "Key": "content-type",
+      "Value": "application/json"
     },
     {
       "Id": 4,
-      "P": "/v1/health"
-    }
-  ],
-  [
-    {
-      "Id": 1,
-      "K": "x-trace",
-      "V": "abc"
-    },
-    {
-      "Id": 2,
-      "K": "x-trace",
-      "V": "def"
-    },
-    {
-      "Id": 2,
-      "K": "content-type",
-      "V": "application/json"
-    },
-    {
-      "Id": 4,
-      "K": "x-internal",
-      "V": "true"
+      "Key": "x-internal",
+      "Value": "true"
     }
   ],
   [
@@ -92,143 +60,175 @@
   [
     {
       "Id": 1,
-      "F": "id",
-      "T": "number"
+      "Field": "id",
+      "Type": "number"
     },
     {
       "Id": 1,
-      "F": "path",
-      "T": "string"
+      "Field": "path",
+      "Type": "string"
     },
     {
       "Id": 1,
-      "F": "tags",
-      "T": "array"
+      "Field": "tags",
+      "Type": "array"
     },
     {
       "Id": 1,
-      "F": "method",
-      "T": "string"
+      "Field": "method",
+      "Type": "string"
     },
     {
       "Id": 1,
-      "F": "status",
-      "T": "number"
+      "Field": "status",
+      "Type": "number"
     },
     {
       "Id": 1,
-      "F": "headers",
-      "T": "object"
+      "Field": "headers",
+      "Type": "object"
     },
     {
       "Id": 2,
-      "F": "id",
-      "T": "number"
+      "Field": "id",
+      "Type": "number"
     },
     {
       "Id": 2,
-      "F": "path",
-      "T": "string"
+      "Field": "path",
+      "Type": "string"
     },
     {
       "Id": 2,
-      "F": "tags",
-      "T": "array"
+      "Field": "tags",
+      "Type": "array"
     },
     {
       "Id": 2,
-      "F": "method",
-      "T": "string"
+      "Field": "method",
+      "Type": "string"
     },
     {
       "Id": 2,
-      "F": "status",
-      "T": "number"
+      "Field": "status",
+      "Type": "number"
     },
     {
       "Id": 2,
-      "F": "headers",
-      "T": "object"
+      "Field": "headers",
+      "Type": "object"
     },
     {
       "Id": 3,
-      "F": "id",
-      "T": "number"
+      "Field": "id",
+      "Type": "number"
     },
     {
       "Id": 3,
-      "F": "path",
-      "T": "string"
+      "Field": "path",
+      "Type": "string"
     },
     {
       "Id": 3,
-      "F": "tags",
-      "T": "array"
+      "Field": "tags",
+      "Type": "array"
     },
     {
       "Id": 3,
-      "F": "method",
-      "T": "string"
+      "Field": "method",
+      "Type": "string"
     },
     {
       "Id": 3,
-      "F": "status",
-      "T": "number"
+      "Field": "status",
+      "Type": "number"
     },
     {
       "Id": 3,
-      "F": "headers",
-      "T": "object"
+      "Field": "headers",
+      "Type": "object"
     },
     {
       "Id": 4,
-      "F": "id",
-      "T": "number"
+      "Field": "id",
+      "Type": "number"
     },
     {
       "Id": 4,
-      "F": "path",
-      "T": "string"
+      "Field": "path",
+      "Type": "string"
     },
     {
       "Id": 4,
-      "F": "tags",
-      "T": "array"
+      "Field": "tags",
+      "Type": "array"
     },
     {
       "Id": 4,
-      "F": "method",
-      "T": "string"
+      "Field": "method",
+      "Type": "string"
     },
     {
       "Id": 4,
-      "F": "status",
-      "T": "number"
+      "Field": "status",
+      "Type": "number"
     },
     {
       "Id": 4,
-      "F": "headers",
-      "T": "object"
+      "Field": "headers",
+      "Type": "object"
     },
     {
       "Id": 5,
-      "F": "id",
-      "T": "number"
+      "Field": "id",
+      "Type": "number"
     },
     {
       "Id": 5,
-      "F": "path",
-      "T": "string"
+      "Field": "path",
+      "Type": "string"
     },
     {
       "Id": 5,
-      "F": "method",
-      "T": "string"
+      "Field": "method",
+      "Type": "string"
     },
     {
       "Id": 5,
-      "F": "status",
-      "T": "number"
+      "Field": "status",
+      "Type": "number"
+    }
+  ],
+  [
+    {
+      "Id": 1,
+      "M": "GET",
+      "P": "/v1/users",
+      "S": 200
+    },
+    {
+      "Id": 2,
+      "M": "POST",
+      "P": "/v1/users",
+      "S": 201
+    },
+    {
+      "Id": 3,
+      "M": "GET",
+      "P": "/v2/posts",
+      "S": 200
+    },
+    {
+      "Id": 4,
+      "M": "GET",
+      "P": "/v1/health",
+      "S": 200
+    },
+    {
+      "Id": 5,
+      "M": "DELETE",
+      "P": "/v1/users/42",
+      "S": 404
     }
   ]
 ]

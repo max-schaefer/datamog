@@ -20,7 +20,7 @@ request(Id, Method, Path, Status) :-
 
 # String-comparison + range filter on coerced values: Phase A could
 # project these but couldn't compare them to literals.
-ok_v1_request(Id, Path) :-
+output predicate ok_v1_request(Id, Path) :-
     request(Id, _, Path, Status),
     Status >= 200,
     Status < 300,
@@ -28,7 +28,7 @@ ok_v1_request(Id, Path) :-
 
 # Iterate the headers object and project (event-id, key, value-as-string)
 # for header values that are JSON strings.
-event_string_header(Id, Key, Value) :-
+output predicate event_string_header(Id, Key, Value) :-
     event(E),
     Id = as_integer(E["id"]),
     object_entry(E["headers"], Key, V),
@@ -38,21 +38,17 @@ event_string_header(Id, Key, Value) :-
 # no `tags` field yield NULL, which `as_integer` then keeps as NULL — but
 # the IDB is integer-typed so we want a real integer. Use the json
 # length builtin and coerce; events without tags simply don't appear.
-tag_count(Id, N) :-
+output predicate tag_count(Id, N) :-
     event(E),
     Id = as_integer(E["id"]),
     N = length(E["tags"]).
 
 # Type breakdown: list each top-level field's name and its `value`-leaf
 # type. Uses every Phase A/B/C primitive in one rule.
-field_types(Id, Field, Type) :-
+output predicate field_types(Id, Field, Type) :-
     event(E),
     Id = as_integer(E["id"]),
     object_entry(E, Field, V),
     Type = type_of(V).
 
 ?- request(Id, M, P, S).
-?- ok_v1_request(Id, P).
-?- event_string_header(Id, K, V).
-?- tag_count(Id, N).
-?- field_types(Id, F, T).

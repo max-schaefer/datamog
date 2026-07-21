@@ -2,96 +2,96 @@
   [
     {
       "Student": "alice",
-      "Avg": 91.66666666666667
+      "avg": 91.66666666666667
     },
     {
       "Student": "bob",
-      "Avg": 78.33333333333333
+      "avg": 78.33333333333333
     },
     {
       "Student": "carol",
-      "Avg": 92
+      "avg": 92
     },
     {
       "Student": "dave",
-      "Avg": 71.66666666666667
+      "avg": 71.66666666666667
     }
   ],
   [
     {
       "Student": "alice",
-      "N": 3
+      "count": 3
     },
     {
       "Student": "bob",
-      "N": 3
+      "count": 3
     },
     {
       "Student": "carol",
-      "N": 3
+      "count": 3
     },
     {
       "Student": "dave",
-      "N": 3
+      "count": 3
     }
   ],
   [
     {
       "Student": "alice",
-      "Total": 275
+      "sum": 275
     },
     {
       "Student": "bob",
-      "Total": 235
+      "sum": 235
     },
     {
       "Student": "carol",
-      "Total": 276
+      "sum": 276
     },
     {
       "Student": "dave",
-      "Total": 215
+      "sum": 215
     }
   ],
   [
     {
       "Student": "alice",
-      "Best": 95
+      "max": 95
     },
     {
       "Student": "bob",
-      "Best": 85
+      "max": 85
     },
     {
       "Student": "carol",
-      "Best": 96
+      "max": 96
     },
     {
       "Student": "dave",
-      "Best": 80
+      "max": 80
     }
   ],
   [
     {
       "Student": "alice",
-      "Worst": 88
+      "min": 88
     },
     {
       "Student": "bob",
-      "Worst": 72
+      "min": 72
     },
     {
       "Student": "carol",
-      "Worst": 89
+      "min": 89
     },
     {
       "Student": "dave",
-      "Worst": 65
+      "min": 65
     }
   ],
   [
     {
-      "N": 12
+      "count": 12
     }
   ],
   [
@@ -105,25 +105,25 @@
   [
     {
       "Student": "alice",
-      "S": "english,math,science"
+      "concat": "english,math,science"
     },
     {
       "Student": "bob",
-      "S": "english,math,science"
+      "concat": "english,math,science"
     },
     {
       "Student": "carol",
-      "S": "english,math,science"
+      "concat": "english,math,science"
     },
     {
       "Student": "dave",
-      "S": "english,math,science"
+      "concat": "english,math,science"
     }
   ],
   [
     {
       "Student": "alice",
-      "R": [
+      "list": [
         {
           "score": 88,
           "subject": "science"
@@ -140,7 +140,7 @@
     },
     {
       "Student": "bob",
-      "R": [
+      "list": [
         {
           "score": 72,
           "subject": "english"
@@ -157,7 +157,7 @@
     },
     {
       "Student": "carol",
-      "R": [
+      "list": [
         {
           "score": 89,
           "subject": "english"
@@ -174,7 +174,7 @@
     },
     {
       "Student": "dave",
-      "R": [
+      "list": [
         {
           "score": 65,
           "subject": "math"

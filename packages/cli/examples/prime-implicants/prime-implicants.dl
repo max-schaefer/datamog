@@ -42,12 +42,10 @@ prime(S) :- term(S), not covered(S).
 # A prime covers a minterm when they agree on every non-dash position.
 mismatch(P, M, I) :- prime(P), minterm(M), len(N), I in [0 .. N - 1], P[I] != "-", P[I] != M[I].
 mismatch_any(P, M) :- mismatch(P, M, _).
-covers(P, M) :- prime(P), minterm(M), not mismatch_any(P, M).
+output predicate covers(P, M) :- prime(P), minterm(M), not mismatch_any(P, M).
 
 # A prime is essential when it is the only one covering some minterm.
 cover_count(M, count(P)) :- covers(P, M).
-essential(P) :- covers(P, M), cover_count(M, 1).
+output predicate essential(P) :- covers(P, M), cover_count(M, 1).
 
 ?- prime(S).
-?- covers(P, M).
-?- essential(P).

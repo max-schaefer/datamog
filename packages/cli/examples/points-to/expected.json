@@ -1,40 +1,6 @@
 [
   [
     {
-      "Var": "p",
-      "Location": "x"
-    },
-    {
-      "Var": "q",
-      "Location": "y"
-    },
-    {
-      "Var": "r",
-      "Location": "z"
-    },
-    {
-      "Var": "a",
-      "Location": "x"
-    },
-    {
-      "Var": "c",
-      "Location": "y"
-    },
-    {
-      "Var": "a",
-      "Location": "z"
-    },
-    {
-      "Var": "b",
-      "Location": "x"
-    },
-    {
-      "Var": "b",
-      "Location": "z"
-    }
-  ],
-  [
-    {
       "X": "p",
       "Y": "a"
     },
@@ -81,6 +47,40 @@
     {
       "X": "b",
       "Y": "r"
+    }
+  ],
+  [
+    {
+      "Var": "p",
+      "Location": "x"
+    },
+    {
+      "Var": "q",
+      "Location": "y"
+    },
+    {
+      "Var": "r",
+      "Location": "z"
+    },
+    {
+      "Var": "a",
+      "Location": "x"
+    },
+    {
+      "Var": "c",
+      "Location": "y"
+    },
+    {
+      "Var": "a",
+      "Location": "z"
+    },
+    {
+      "Var": "b",
+      "Location": "x"
+    },
+    {
+      "Var": "b",
+      "Location": "z"
     }
   ]
 ]

@@ -71,5 +71,6 @@ counterexample(P, Q) :- eval_root(P, Q, "F").
 has_counterexample("yes") :- counterexample(_, _).
 is_tautology("yes") :- bool("T"), not has_counterexample("yes").
 
+output predicate tautology_result(Answer) :- is_tautology(Answer).
+
 ?- eval_root(P, Q, Value).
-?- is_tautology(Answer).

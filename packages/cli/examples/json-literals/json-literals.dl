@@ -21,13 +21,11 @@ employee_record(Id, J) :-
 # Mix a primitive with an already-`value`-typed expression: the inner
 # array literal is itself a `value` and passes through to the outer
 # object.
-employee_tagged(Id, J) :-
+output predicate employee_tagged(Id, J) :-
     employee(Id, Name, _),
     J = {"name": Name, "tags": ["employee", Name]}.
 
 # An empty array literal is a perfectly fine `value`.
-nothing(J) :- J = [].
+output predicate nothing(J) :- J = [].
 
 ?- employee_record(Id, J).
-?- employee_tagged(Id, J).
-?- nothing(J).

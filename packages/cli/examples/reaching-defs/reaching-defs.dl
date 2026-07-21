@@ -25,12 +25,9 @@ kill("b2", "d2").
 
 # A definition reaches a block if it is generated there,
 # or it reaches a predecessor and is not killed there.
-reaches(D, U) :- gen(U, D).
-reaches(D, V) :- cfg(U, V), reaches(D, U), not kill(U, D).
+output predicate reaches(D, U) :- gen(U, D).
+output predicate reaches(D, V) :- cfg(U, V), reaches(D, U), not kill(U, D).
 
 # Query the control-flow graph on its own. Switch the playground's
 # results panel to the Mermaid view to see the CFG as a graph.
 ?- cfg(From, To).
-
-# Query the reaching definitions: which definition reaches which block.
-?- reaches(Def, Block).

@@ -1,6 +1,11 @@
 [
   [
     {
+      "concat": "and2,hs2,prop3,z03"
+    }
+  ],
+  [
+    {
       "W": "and2",
       "Why": "a half-sum x XOR y that does not feed an AND"
     },
@@ -15,11 +20,6 @@
     {
       "W": "z03",
       "Why": "a sum bit z.. not produced by an XOR"
-    }
-  ],
-  [
-    {
-      "Names": "and2,hs2,prop3,z03"
     }
   ]
 ]

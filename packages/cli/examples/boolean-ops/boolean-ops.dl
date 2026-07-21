@@ -12,11 +12,11 @@ user("carol", true,  false).
 user("dave",  false, false).
 
 admin_or_active(N) :- user(N, A, I), A || I.
-both_admin_and_active(N) :- user(N, A, I), A && I.
+output predicate both_admin_and_active(N) :- user(N, A, I), A && I.
 
 # Logical not. `!(A && I)` is "not both admin and active" — locked
 # out of admin actions even though they may be active users.
-locked(N) :- user(N, A, I), !(A && I).
+output predicate locked(N) :- user(N, A, I), !(A && I).
 
 # Boolean columns also round-trip cleanly across backends — the
 # executor coerces SQLite's 0/1 boolean storage back into JS
@@ -24,7 +24,7 @@ locked(N) :- user(N, A, I), !(A && I).
 # native evaluator's exactly.
 status(N, A && I, A || I) :- user(N, A, I).
 
+# Project the status relation as a named result.
+output predicate user_status(N, BothAdminActive, AnyPriv) :- status(N, BothAdminActive, AnyPriv).
+
 ?- admin_or_active(N).
-?- both_admin_and_active(N).
-?- locked(N).
-?- status(N, BothAdminActive, AnyPriv).

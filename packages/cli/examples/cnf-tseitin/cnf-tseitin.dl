@@ -131,7 +131,6 @@ theorem() :- nvars(_), not has_model().
 
 # Report a counterexample over the original propositional variables only
 # (indices below nprop); the rest are Tseitin's auxiliary variables.
-counterexample(A, V, B) :- model(A), eval(A, V, B), nprop(P), V < P.
+output predicate counterexample(A, V, B) :- model(A), eval(A, V, B), nprop(P), V < P.
 
 ?- theorem().
-?- counterexample(A, V, Value).

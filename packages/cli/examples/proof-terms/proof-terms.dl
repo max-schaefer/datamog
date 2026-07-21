@@ -24,4 +24,4 @@ num_list(n + 1)[Cons] :- num(Car), n <= 2, num_list(n).
 # is indexed by length, so `Xs : num_list(Len)` also binds that index, pairing
 # each list with the length it is a proof of.
 ?- S : suit.
-?- Xs : num_list(Len).
+output predicate num_lists(Len, Xs) :- Xs : num_list(Len).

@@ -23,7 +23,7 @@ faster(Part, Time) :-
   Time1 < Time.
 
 # Fastest delivery: no one is faster
-fastest(Part, Time) :-
+output predicate fastest(Part, Time) :-
   part_cost(Part, _, _, Time),
   not faster(Part, Time).
 
@@ -43,6 +43,7 @@ how_soon(AssPart, Time) :-
   time_for_basic(AssPart, _, Time),
   not larger(AssPart, Time).
 
+# How soon can we build the bike specifically?
+output predicate bike_build_time(Time) :- how_soon("bike", Time).
+
 ?- all_subparts("bike", X).
-?- fastest(Part, Time).
-?- how_soon("bike", Time).

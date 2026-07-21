@@ -81,7 +81,6 @@ falsifiable() :- falsifies(_, _).
 theorem() :- nvars(_), not falsifiable().
 
 # Expand falsifying assignment A into a table showing the value B for each variable V.
-counterexample(A, V, B) :- falsifies(A, C), eval(A, V, B).
+output predicate counterexample(A, V, B) :- falsifies(A, C), eval(A, V, B).
 
 ?- theorem().
-?- counterexample(A, V, Value).

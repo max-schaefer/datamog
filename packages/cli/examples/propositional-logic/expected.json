@@ -1,29 +1,29 @@
 [
   [
     {
-      "P": "F",
-      "Q": "F",
-      "Value": "T"
-    },
-    {
-      "P": "F",
-      "Q": "T",
-      "Value": "T"
-    },
-    {
-      "P": "T",
-      "Q": "F",
-      "Value": "T"
-    },
-    {
-      "P": "T",
-      "Q": "T",
-      "Value": "T"
+      "Answer": "yes"
     }
   ],
   [
     {
-      "Answer": "yes"
+      "P": "F",
+      "Q": "F",
+      "Value": "T"
+    },
+    {
+      "P": "F",
+      "Q": "T",
+      "Value": "T"
+    },
+    {
+      "P": "T",
+      "Q": "F",
+      "Value": "T"
+    },
+    {
+      "P": "T",
+      "Q": "T",
+      "Value": "T"
     }
   ]
 ]

@@ -138,10 +138,8 @@ satisfies(A, C) :- clause_lit(C, V, Pol), eval(A, V, Pol).
 falsifies(A, C) :- assignment(A), clause(C), not satisfies(A, C).
 falsifiable() :- falsifies(_, _).
 
-theorem() :- nvars(_), not falsifiable().
+output predicate theorem() :- nvars(_), not falsifiable().
 
-counterexample(A, V, B) :- falsifies(A, C), eval(A, V, B).
+output predicate counterexample(A, V, B) :- falsifies(A, C), eval(A, V, B).
 
 ?- root(Ast).
-?- theorem().
-?- counterexample(A, V, Value).

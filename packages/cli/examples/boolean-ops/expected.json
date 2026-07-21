@@ -2,17 +2,6 @@
   [
     {
       "N": "alice"
-    },
-    {
-      "N": "bob"
-    },
-    {
-      "N": "carol"
-    }
-  ],
-  [
-    {
-      "N": "alice"
     }
   ],
   [
@@ -46,6 +35,17 @@
       "N": "dave",
       "BothAdminActive": false,
       "AnyPriv": false
+    }
+  ],
+  [
+    {
+      "N": "alice"
+    },
+    {
+      "N": "bob"
+    },
+    {
+      "N": "carol"
     }
   ]
 ]
