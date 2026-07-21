@@ -157,18 +157,21 @@ export class IncrementalSession {
   private checkRedefinition(stmts: Statement[]): void {
     // Within a single chunk, multiple rules for one new predicate are fine
     // (and standard Datalog). The redefinition check fires only when a
-    // statement names a predicate that was already materialised in a
-    // *previous* chunk.
+    // statement names a predicate defined in a *previous* chunk. That set is
+    // the committed AST (`this.statements`), not the backend-applied sets:
+    // the AST is rolled back when a chunk throws mid-apply, so a predicate
+    // declared before a failing statement can still be re-introduced later
+    // rather than wedging the session (the applied sets are not rolled back).
+    const defined = new Set<string>();
+    for (const stmt of this.statements) {
+      if (stmt.$type === "ExtDecl") defined.add(stmt.predicate);
+      else if (stmt.$type === "Rule") defined.add(stmt.head.predicate);
+    }
     for (const stmt of stmts) {
       if (stmt.$type === "ExtDecl") {
-        if (this.appliedTables.has(stmt.predicate) || this.appliedViews.has(stmt.predicate)) {
-          throw redefinitionError(stmt.predicate, stmt);
-        }
+        if (defined.has(stmt.predicate)) throw redefinitionError(stmt.predicate, stmt);
       } else if (stmt.$type === "Rule") {
-        const head = stmt.head.predicate;
-        if (this.appliedTables.has(head) || this.appliedViews.has(head)) {
-          throw redefinitionError(head, stmt);
-        }
+        if (defined.has(stmt.head.predicate)) throw redefinitionError(stmt.head.predicate, stmt);
       }
     }
   }

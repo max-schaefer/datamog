@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { create as createSqlite } from "datamog-backend-sqlite";
 import { IncrementalSession } from "../src/incremental.ts";
+import type { ExtensionalLoader } from "../src/loader.ts";
 
 describe("IncrementalSession", () => {
   test("a session can ask several `?-` queries in turn (queries are transient)", async () => {
@@ -51,6 +52,36 @@ describe("IncrementalSession", () => {
       expect(r1.queries.map((q) => q.label)).toEqual(["default"]);
       const r2 = await session.addStatements("foo(9).");
       expect(r2.queries.map((q) => q.label)).toEqual([]);
+    } finally {
+      await sqlite.close();
+    }
+  });
+
+  test("Regression: a mid-chunk failure does not wedge an earlier declaration", async () => {
+    // applySql mutates `appliedTables` in place, but the AST commit is rolled
+    // back when a later statement in the chunk throws. `checkRedefinition`
+    // read the (non-rolled-back) `appliedTables`, so a predicate declared
+    // before a failing statement could afterwards be neither re-declared nor
+    // referenced. Base the redefinition check on the committed AST instead.
+    const sqlite = await createSqlite();
+    try {
+      const failingLoader: ExtensionalLoader = {
+        name: "fails-for-b",
+        canLoad: async (decl) => decl.predicate === "b",
+        load: async () => {
+          throw new Error("simulated loader failure");
+        },
+      };
+      const session = new IncrementalSession(sqlite, [failingLoader]);
+      await expect(
+        session.addStatements("extensional a(x: integer).\nextensional b(y: integer)."),
+      ).rejects.toThrow(/simulated loader failure/);
+      // `a` was fully applied before `b` failed; the session must still let a
+      // later chunk re-declare and use it rather than wedging until `:reset`.
+      const r = await session.addStatements(
+        "extensional a(x: integer).\nreachable(X) :- a(X).\n?- reachable(X).",
+      );
+      expect(r.queries).toHaveLength(1);
     } finally {
       await sqlite.close();
     }
