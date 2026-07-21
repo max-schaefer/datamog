@@ -120,20 +120,16 @@ describe("CLI arg validation", () => {
     ).toEqual([{ kind: "info", message: "backend: sqlite" }, { kind: "done" }]);
   });
 
-  test("Regression: machine-readable output formats reject programs with no query", async () => {
-    // The CLI error message says non-table formats require exactly one
-    // query, but the validation only rejected `queryCount > 1`. A
-    // program with zero queries exited successfully and printed nothing,
-    // which is indistinguishable from an empty result stream for jsonl /
-    // csv consumers. Reject zero queries with the same clear diagnostic
-    // used for the multi-query case.
+  test("a program with no default output and no named outputs is rejected", async () => {
+    // With single-output evaluation, a program that has neither a `?-`
+    // default nor any `output predicate` has nothing to evaluate, so
+    // running it is an error rather than silent empty output.
     const dl = "/tmp/datamog-cli-no-query.dl";
     await Bun.write(dl, "p(1).\n");
     try {
-      const result = await runCli(["--output-format", "jsonl", dl]);
+      const result = await runCli([dl]);
       expect(result.exitCode).toBe(1);
-      expect(result.stderr).toContain("requires exactly one query clause");
-      expect(result.stderr).toContain("found 0");
+      expect(result.stderr).toContain("no default output");
     } finally {
       await Promise.allSettled([Bun.file(dl).unlink?.()]);
     }
@@ -155,13 +151,11 @@ describe("CLI arg validation", () => {
     }
   });
 
-  test("Regression: duplicate --extensional for the same predicate is rejected with a clear error", async () => {
-    // `--extensional p=a.csv --extensional p=b.csv` previously silently
-    // used the first mapping (since `ExplicitFileLoader.canLoad` matches
-    // by predicate name and the executor stops at the first hit). The
-    // user's second flag had no effect — easy to mistake for "the
-    // second value won" if they were trying to override. Surface as an
-    // explicit error.
+  test("duplicate input flag for the same predicate is rejected with a clear error", async () => {
+    // `--p a.csv --p b.csv` would otherwise silently use the first mapping
+    // (ExplicitSourceLoader.canLoad matches by predicate name and the
+    // executor stops at the first hit), so the second flag would have no
+    // effect. Surface it as an explicit error.
     const a = "/tmp/datamog-cli-args-a.csv";
     const b = "/tmp/datamog-cli-args-b.csv";
     const dl = "/tmp/datamog-cli-args.dl";
@@ -169,7 +163,7 @@ describe("CLI arg validation", () => {
     await Bun.write(b, "x\n2\n");
     await Bun.write(dl, "extensional p(x: integer).\n?- p(X).\n");
     try {
-      const result = await runCli(["--extensional", `p=${a}`, "--extensional", `p=${b}`, dl]);
+      const result = await runCli([dl, "--p", a, "--p", b]);
       expect(result.exitCode).toBe(1);
       expect(result.stderr).toContain("specified twice");
       expect(result.stderr).toContain("'p'");
@@ -183,39 +177,76 @@ describe("CLI arg validation", () => {
     }
   });
 
-  test("Regression: --extensional rejects unknown predicate names", async () => {
-    // A misspelled mapping name used to silently no-op: no declared
-    // extensional predicate matched the explicit loader, so the EDB stayed
-    // empty and the command exited successfully with empty results.
+  test("an input flag naming an unknown predicate is rejected", async () => {
+    // A misspelled input flag used to silently no-op: no declared input
+    // predicate matched, so the EDB stayed empty and the command exited
+    // successfully with empty results.
     const csv = "/tmp/datamog-cli-unknown-ext.csv";
     const dl = "/tmp/datamog-cli-unknown-ext.dl";
     await Bun.write(csv, "x\n1\n");
     await Bun.write(dl, "extensional p(x: integer).\n?- p(X).\n");
     try {
-      const result = await runCli(["--extensional", `typo=${csv}`, dl]);
+      const result = await runCli([dl, "--typo", csv]);
       expect(result.exitCode).toBe(1);
-      expect(result.stderr).toContain("unknown extensional predicate 'typo'");
-      expect(result.stderr).toContain("Available extensional predicates: p");
+      expect(result.stderr).toContain("--typo is not an input predicate");
+      expect(result.stderr).toContain("Available: p");
     } finally {
       await Promise.allSettled([Bun.file(csv).unlink?.(), Bun.file(dl).unlink?.()]);
     }
   });
 
-  test("Regression: --extensional supports whole-file JSON sources", async () => {
-    // Directory auto-discovery supports `<predicate>.json`, but the
-    // explicit file-mapping path only accepted `.csv`, `.jsonl`, and
-    // `.mmd`. Users trying to override a JSON config path with
-    // `--extensional cfg=/tmp/config.json` got an unsupported-format
-    // error even though the same source shape was a documented format.
+  test("an input flag supports whole-file JSON sources", async () => {
+    // The explicit input source accepts the same `.json` whole-file shape
+    // as directory auto-discovery, not just `.csv`/`.jsonl`/`.mmd`.
     const dir = await mkdtemp(join(tmpdir(), "datamog-cli-json-"));
     const dl = join(dir, "program.dl");
     const json = join(dir, "config.json");
     await Bun.write(dl, "extensional cfg(blob: value).\n?- cfg(X).\n");
     await Bun.write(json, '{"b":2,"a":1}');
     try {
-      const result = await runCli(["--output-format", "jsonl", "--extensional", `cfg=${json}`, dl]);
+      const result = await runCli(["--output-format", "jsonl", dl, "--cfg", json]);
       expect(result.exitCode).toBe(0);
       expect(result.stdout.trim()).toBe('{"X":{"a":1,"b":2}}');
+    } finally {
+      await rm(dir, { recursive: true });
+    }
+  });
+
+  test("the output positional selects a named output; a kebab flag aliases the exact name", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "datamog-cli-out-"));
+    const dl = join(dir, "program.dl");
+    const csv = join(dir, "road_network.csv");
+    await Bun.write(csv, "src,dst\na,b\nb,c\n");
+    await Bun.write(
+      dl,
+      "extensional road_network(src: string, dst: string).\n" +
+        "output predicate ends(D) :- road_network(_, D).\n" +
+        "?- road_network(S, D).\n",
+    );
+    try {
+      // Named output selected by the positional.
+      const named = await runCli(["--output-format", "jsonl", dl, "ends"]);
+      expect(named.exitCode).toBe(0);
+      expect(named.stdout.trim().split("\n").sort()).toEqual(['{"D":"b"}', '{"D":"c"}']);
+      // Kebab flag aliases the snake_case input `road_network`.
+      const kebab = await runCli(["--output-format", "jsonl", dl, "ends", "--road-network", csv]);
+      expect(kebab.exitCode).toBe(0);
+      expect(kebab.stdout.trim().split("\n").sort()).toEqual(['{"D":"b"}', '{"D":"c"}']);
+    } finally {
+      await rm(dir, { recursive: true });
+    }
+  });
+
+  test("an unknown output positional is rejected, listing the available outputs", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "datamog-cli-badout-"));
+    const dl = join(dir, "program.dl");
+    await Bun.write(dl, "p(1).\noutput predicate ends(X) :- p(X).\n?- p(X).\n");
+    try {
+      const result = await runCli([dl, "nope"]);
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain("Unknown output 'nope'");
+      expect(result.stderr).toContain("ends");
+      expect(result.stderr).toContain("default");
     } finally {
       await rm(dir, { recursive: true });
     }

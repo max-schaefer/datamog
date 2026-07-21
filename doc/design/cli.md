@@ -1,6 +1,6 @@
 # Design proposal: CLI runner redesign
 
-Status: proposal (nothing implemented yet).
+Status: implemented (see `packages/cli/src/main.ts`).
 
 Rework the batch CLI so that a program's **input predicates** are supplied as
 like-named flags and its **output** is chosen by a positional argument. This is

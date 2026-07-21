@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { dirname, extname, resolve } from "node:path";
-import type { ExtDecl, Program } from "datamog-core";
+import type { ExtDecl } from "datamog-core";
 import { analyze, findInfiniteRisks, inferTypes } from "datamog-core";
 import { CsvLoader, parseCsvContent } from "datamog-csv";
 import {
@@ -28,45 +28,42 @@ import { bigintSafeReplacer, formatCellAsString, prettifyProofRows } from "./out
 import { runRepl } from "./repl-driver.ts";
 
 function usage(exitCode = 1): never {
-  console.error("Usage: datamog [options] [program.dl] [data-directory]");
-  console.error("       datamog --repl [--json] [options]");
+  console.error("Usage: datamog [global options] <program.dl> [output] [--<input> <source>]...");
+  console.error("       datamog --repl [--json] [global options]");
   console.error();
-  console.error("  program.dl       Path to a Datamog (.dl) source file");
-  console.error("  data-directory   Directory containing data files for extensional predicates");
-  console.error("                   (defaults to the directory containing the .dl file)");
-  console.error("  no program.dl    Start an interactive REPL");
+  console.error("  <program.dl>   Path to a Datamog (.dl) source file");
+  console.error("  [output]       Output predicate to evaluate: an `output predicate` name, or");
+  console.error("                 `default`. Defaults to the program's `?-` default output.");
+  console.error("  no program.dl  Start an interactive REPL");
   console.error();
-  console.error("Options:");
+  console.error("Input flags (after the program):");
+  console.error("  --<input> <source>   Supply data for input predicate <input> from a file or");
+  console.error("                       URL (.csv/.jsonl/.json/.mmd), a Google Sheets URL, or a");
   console.error(
-    "  --repl                     Start an interactive REPL (default with no .dl file)",
+    "                       GitHub shorthand github:OWNER/REPO/PATH[#REF] (gh: alias).",
   );
-  console.error("  --json                     In REPL mode, emit ndjson events on stdout");
-  console.error("  --data-dir <path>          Directory loaders read from in --repl mode");
-  console.error("                             (defaults to the current working directory)");
-  console.error(
-    "  --extensional name=source  Map a predicate to a file or URL (.csv/.jsonl/.json/.mmd),",
-  );
-  console.error(
-    "                             a Google Sheets URL (public sheets work without auth), or a",
-  );
-  console.error(
-    "                             GitHub shorthand github:OWNER/REPO/PATH[#REF] (gh: alias;",
-  );
-  console.error("                             REF defaults to HEAD)");
-  console.error(
-    "  --output-format <format>   Output format: table (default), csv, jsonl, jsonl-flat,",
-  );
-  console.error("                             mermaid, or ascii-graph");
-  console.error("  --csv-no-header            CSV files have no header row");
-  console.error("  --dry-run                  Print generated SQL without executing");
-  console.error("  --warn-finiteness          Print a warning for each predicate column whose");
-  console.error("                             values may grow unboundedly across iterations");
-  console.error(
-    "  --backend <backend>        Backend: postgres, sqlite, sqljs, native, or seminaive",
-  );
+  console.error("                       A kebab-case flag (--road-network) aliases the exact");
+  console.error("                       predicate name (road_network) when unambiguous.");
+  console.error("  --input name=source  Same, for an input whose name is not a valid flag.");
+  console.error("                       An input with no flag auto-loads from");
+  console.error("                       <input>.{csv,jsonl,json,mmd} in the data directory.");
+  console.error();
+  console.error("Global options (before the program):");
+  console.error("  --output-format <format>   table (default), csv, jsonl, jsonl-flat, mermaid,");
+  console.error("                             or ascii-graph");
+  console.error("  --backend <backend>        postgres, sqlite, sqljs, native, or seminaive");
   console.error(
     "                             (default: postgres if DATABASE_URL is set, else sqlite)",
   );
+  console.error("  --data-dir <path>          Directory to auto-load inputs from (default: the");
+  console.error("                             program's directory; working directory in --repl)");
+  console.error("  --all                      Evaluate every output, not just one (table only)");
+  console.error("  --dry-run                  Print generated SQL without executing");
+  console.error("  --warn-finiteness          Print a warning for each predicate column whose");
+  console.error("                             values may grow unboundedly across iterations");
+  console.error("  --csv-no-header            CSV inputs have no header row");
+  console.error("  --repl                     Start an interactive REPL (default with no program)");
+  console.error("  --json                     In REPL mode, emit ndjson events on stdout");
   console.error("  -h, --help                 Show this help message");
   console.error();
   console.error("Environment:");
@@ -174,7 +171,8 @@ export function explicitSourceFormat(source: string): ExplicitSourceFormat | und
 }
 
 /**
- * Loader for an explicit source → predicate mapping via --extensional.
+ * Loader for an explicit source → predicate mapping supplied by an input flag
+ * (`--<input> <source>` or `--input name=source`).
  */
 export class ExplicitSourceLoader implements ExtensionalLoader {
   readonly name: string;
@@ -264,26 +262,59 @@ export class ExplicitSourceLoader implements ExtensionalLoader {
   }
 }
 
-function parseExtensionalArg(arg: string): { name: string; source: string } {
+function parseInputArg(arg: string): { name: string; source: string } {
   const eqIdx = arg.indexOf("=");
   if (eqIdx === -1) {
-    console.error(`Invalid --extensional: expected name=source, got '${arg}'`);
+    console.error(`Invalid --input: expected name=source, got '${arg}'`);
     process.exit(1);
   }
   const name = arg.slice(0, eqIdx);
   const source = arg.slice(eqIdx + 1);
-  // An empty name silently no-ops downstream (canLoad never matches a real
-  // predicate), so the user sees their data not loaded with no diagnostic.
-  // Surface it here.
   if (name === "") {
-    console.error(`Invalid --extensional: name is empty in '${arg}'`);
+    console.error(`Invalid --input: name is empty in '${arg}'`);
     process.exit(1);
   }
   if (source === "") {
-    console.error(`Invalid --extensional: source is empty in '${arg}'`);
+    console.error(`Invalid --input: source is empty in '${arg}'`);
     process.exit(1);
   }
   return { name, source };
+}
+
+/** Value of a value-taking flag, or exit with a diagnostic if it is missing. */
+function requireValue(args: string[], idx: number, flag: string): string {
+  const value = args[idx];
+  if (value === undefined) {
+    console.error(`${flag} requires a value`);
+    process.exit(1);
+  }
+  return value;
+}
+
+/**
+ * Resolve a `--<flag>` after the program to one of the program's input
+ * predicate names: an exact match, else a unique match after normalising both
+ * sides (lowercase, strip `-`/`_`) so `--road-network` reaches `road_network`
+ * or `roadNetwork`. Ambiguity or no match is a diagnostic exit.
+ */
+function resolveInputFlag(flagName: string, inputNames: string[]): string {
+  if (inputNames.includes(flagName)) return flagName;
+  const norm = (s: string) => s.toLowerCase().replace(/[-_]/g, "");
+  const target = norm(flagName);
+  const matches = inputNames.filter((n) => norm(n) === target);
+  if (matches.length === 1) return matches[0]!;
+  if (matches.length > 1) {
+    console.error(
+      `--${flagName} is ambiguous; it matches ${matches.join(", ")}. Use the exact predicate name.`,
+    );
+    process.exit(1);
+  }
+  console.error(
+    inputNames.length > 0
+      ? `--${flagName} is not an input predicate. Available: ${inputNames.join(", ")}.`
+      : `--${flagName} is not an input predicate; the program declares none.`,
+  );
+  process.exit(1);
 }
 
 function resolveGSheetAuth(): GSheetAuth | undefined {
@@ -316,7 +347,7 @@ function buildExplicitLoaders(
     const prev = seen.get(name);
     if (prev !== undefined) {
       console.error(
-        `--extensional for predicate '${name}' specified twice (first '${prev}', then '${source}')`,
+        `Input source for predicate '${name}' specified twice (first '${prev}', then '${source}')`,
       );
       process.exit(1);
     }
@@ -331,7 +362,7 @@ function buildExplicitLoaders(
     try {
       source = expandGitHubShorthand(rawSource);
     } catch (e) {
-      console.error(`Invalid --extensional ${name}=${rawSource}: ${(e as Error).message}`);
+      console.error(`Invalid source for input '${name}' (${rawSource}): ${(e as Error).message}`);
       process.exit(1);
     }
 
@@ -346,7 +377,7 @@ function buildExplicitLoaders(
       const url = httpUrlFor(source);
       const ext = extname(url ? url.pathname : source).toLowerCase();
       console.error(
-        `Unsupported source format '${ext}' for --extensional ${name}=${source} (expected ${EXPLICIT_SOURCE_FORMATS.join(", ")})`,
+        `Unsupported source format '${ext}' for input '${name}' (${source}) (expected ${EXPLICIT_SOURCE_FORMATS.join(", ")})`,
       );
       process.exit(1);
     }
@@ -362,25 +393,18 @@ function buildExplicitLoaders(
   return loaders;
 }
 
-function validateExtensionalMappings(
+function validateInputMappings(
   mappings: { name: string; source: string }[],
-  program: Program,
+  inputNames: string[],
 ): void {
-  if (mappings.length === 0) return;
-  const extNames = new Set(
-    program.statements
-      .filter((stmt): stmt is ExtDecl => stmt.$type === "ExtDecl")
-      .map((stmt) => stmt.predicate),
-  );
-
+  const names = new Set(inputNames);
   for (const { name } of mappings) {
-    if (extNames.has(name)) continue;
-    console.error(`--extensional references unknown extensional predicate '${name}'`);
-    if (extNames.size === 0) {
-      console.error("Program declares no extensional predicates.");
-    } else {
-      console.error(`Available extensional predicates: ${[...extNames].join(", ")}`);
-    }
+    if (names.has(name)) continue;
+    console.error(
+      names.size > 0
+        ? `Input '${name}' is not an input predicate. Available: ${[...names].join(", ")}.`
+        : `Input '${name}' is not an input predicate; the program declares none.`,
+    );
     process.exit(1);
   }
 }
@@ -453,37 +477,33 @@ function csvEscape(value: string): string {
 async function main() {
   const args = process.argv.slice(2);
 
-  let dlPath: string | undefined;
+  let programPath: string | undefined;
   let dataDir: string | undefined;
   let dryRun = false;
   let csvNoHeader = false;
   let warnFiniteness = false;
+  let allOutputs = false;
   let backendOverride: BackendName | undefined;
   let outputFormat: OutputFormat = "table";
   let replMode = false;
   let jsonMode = false;
-  const extMappings: { name: string; source: string }[] = [];
 
-  for (let i = 0; i < args.length; i++) {
+  // Phase 1: global options precede the program. Stop at the first bare token,
+  // which is the program path; everything after it is program-specific (the
+  // output positional and per-input flags) and is parsed once the program's
+  // inputs and outputs are known. Globals come first so an option is never
+  // mistaken for a flag naming an input predicate.
+  let i = 0;
+  for (; i < args.length; i++) {
     const arg = args[i]!;
-    if (arg === "--dry-run") {
-      dryRun = true;
-    } else if (arg === "--csv-no-header") {
-      csvNoHeader = true;
-    } else if (arg === "--warn-finiteness") {
-      warnFiniteness = true;
-    } else if (arg === "--repl") {
-      replMode = true;
-    } else if (arg === "--json") {
-      jsonMode = true;
-    } else if (arg === "--data-dir") {
-      const value = args[++i];
-      if (!value) {
-        console.error("--data-dir requires a path");
-        process.exit(1);
-      }
-      dataDir = value;
-    } else if (arg === "--backend") {
+    if (arg === "--dry-run") dryRun = true;
+    else if (arg === "--csv-no-header") csvNoHeader = true;
+    else if (arg === "--warn-finiteness") warnFiniteness = true;
+    else if (arg === "--all") allOutputs = true;
+    else if (arg === "--repl") replMode = true;
+    else if (arg === "--json") jsonMode = true;
+    else if (arg === "--data-dir") dataDir = requireValue(args, ++i, "--data-dir");
+    else if (arg === "--backend") {
       const value = args[++i];
       if (!isBackendName(value)) {
         console.error(`Invalid backend: ${value} (expected ${BACKEND_NAMES.join(", ")})`);
@@ -497,40 +517,27 @@ async function main() {
         process.exit(1);
       }
       outputFormat = value;
-    } else if (arg === "--extensional") {
-      const value = args[++i];
-      if (!value) {
-        console.error("--extensional requires an argument (name=source)");
-        process.exit(1);
-      }
-      extMappings.push(parseExtensionalArg(value));
-    } else if (arg.startsWith("--extensional=")) {
-      extMappings.push(parseExtensionalArg(arg.slice("--extensional=".length)));
     } else if (arg === "--help" || arg === "-h") {
       usage(0);
     } else if (arg.startsWith("-")) {
-      console.error(`Unknown option: ${arg}`);
+      console.error(`Unknown option: ${arg} (global options must come before the program)`);
       usage();
-    } else if (!dlPath) {
-      dlPath = arg;
-    } else if (!dataDir) {
-      dataDir = arg;
     } else {
-      console.error(`Unexpected argument: ${arg}`);
-      usage();
+      programPath = arg;
+      break;
     }
   }
+  // Tokens after the program: an optional output positional, then input flags.
+  const rest = programPath !== undefined ? args.slice(i + 1) : [];
 
-  const shouldRunRepl = replMode || !dlPath;
-
-  if (shouldRunRepl) {
-    if (dlPath) {
-      console.error("--repl does not take a .dl file argument");
+  if (replMode || programPath === undefined) {
+    if (programPath !== undefined) {
+      console.error("--repl does not take a program file");
       process.exit(1);
     }
-    if (dryRun || warnFiniteness || outputFormat !== "table") {
+    if (dryRun || warnFiniteness || allOutputs || outputFormat !== "table") {
       console.error(
-        "REPL mode is incompatible with --dry-run / --warn-finiteness / --output-format",
+        "REPL mode is incompatible with --dry-run / --warn-finiteness / --all / --output-format",
       );
       process.exit(1);
     }
@@ -540,13 +547,12 @@ async function main() {
       console.error("Error: DATABASE_URL environment variable is required for --backend postgres");
       process.exit(1);
     }
-    const explicitLoaders = buildExplicitLoaders(extMappings, !csvNoHeader);
     await runRepl({
       backendName,
       jsonMode,
       dataDir: dataDir ? resolve(dataDir) : process.cwd(),
       csvHasHeader: !csvNoHeader,
-      explicitLoaders,
+      explicitLoaders: [],
       createBackend: () => createBackend(backendName),
     });
     return;
@@ -557,47 +563,110 @@ async function main() {
     process.exit(1);
   }
 
-  const programPath = dlPath;
-  if (!programPath) {
-    usage();
-  }
-
   const dlFile = Bun.file(resolve(programPath));
   if (!(await dlFile.exists())) {
     console.error(`File not found: ${programPath}`);
     process.exit(1);
   }
-
   dataDir = dataDir ? resolve(dataDir) : dirname(resolve(programPath));
   const source = await dlFile.text();
-  let parsedForCli: Program | undefined;
-  const parseForCli = () => {
-    if (!parsedForCli) parsedForCli = parse(source);
-    return parsedForCli;
-  };
-  const backendName: BackendName =
-    backendOverride ?? (process.env.DATABASE_URL ? "postgres" : "sqlite");
+  const program = parse(source);
 
-  if (extMappings.length > 0) validateExtensionalMappings(extMappings, parseForCli());
+  // Discover the program's inputs and outputs. The `output` marker and `?-`
+  // queries are all visible in the parse, before analysis.
+  const inputNames: string[] = [];
+  const outputPreds = new Set<string>();
+  let hasDefault = false;
+  for (const stmt of program.statements) {
+    if (stmt.$type === "ExtDecl") inputNames.push(stmt.predicate);
+    else if (stmt.$type === "Rule") {
+      if (stmt.output) outputPreds.add(stmt.head.predicate);
+    } else if (stmt.$type === "Query") hasDefault = true;
+  }
+  const outputNames = [...outputPreds];
 
-  // Check query count for machine-readable formats
-  if (outputFormat !== "table") {
-    const program = parseForCli();
-    const queryCount = program.statements.filter((s) => s.$type === "Query").length;
-    if (queryCount !== 1) {
+  // Phase 2: the output positional (if any) and the per-input flags.
+  let output: string | undefined;
+  const inputMappings: { name: string; source: string }[] = [];
+  const flagMappings: { flagName: string; source: string }[] = [];
+  let j = 0;
+  if (rest[0] !== undefined && !rest[0].startsWith("-")) {
+    output = rest[0];
+    j = 1;
+  }
+  for (; j < rest.length; j++) {
+    const arg = rest[j]!;
+    if (arg === "--input") {
+      inputMappings.push(parseInputArg(requireValue(rest, ++j, "--input")));
+    } else if (arg.startsWith("--input=")) {
+      inputMappings.push(parseInputArg(arg.slice("--input=".length)));
+    } else if (arg.startsWith("--")) {
+      const eq = arg.indexOf("=");
+      if (eq !== -1) {
+        flagMappings.push({ flagName: arg.slice(2, eq), source: arg.slice(eq + 1) });
+      } else {
+        const flagName = arg.slice(2);
+        const value = rest[++j];
+        if (value === undefined || value.startsWith("-")) {
+          console.error(
+            `--${flagName} requires a source (a path, URL, gh: shorthand, or Google Sheets URL)`,
+          );
+          process.exit(1);
+        }
+        flagMappings.push({ flagName, source: value });
+      }
+    } else {
       console.error(
-        `--output-format ${outputFormat} requires exactly one query clause, but found ${queryCount}`,
+        `Unexpected argument: ${arg} (the output must come directly after the program)`,
+      );
+      usage();
+    }
+  }
+  for (const { flagName, source } of flagMappings) {
+    inputMappings.push({ name: resolveInputFlag(flagName, inputNames), source });
+  }
+  validateInputMappings(inputMappings, inputNames);
+
+  // Resolve which output to evaluate.
+  if (allOutputs && output !== undefined) {
+    console.error("--all cannot be combined with an explicit output");
+    process.exit(1);
+  }
+  const selected = output ?? "default";
+  if (!allOutputs) {
+    if (selected === "default" && !hasDefault) {
+      console.error(
+        outputNames.length > 0
+          ? `Program has no default output (a \`?-\` query). Name an output (${outputNames.join(", ")}) or use --all.`
+          : "Program has no default output (a `?-` query) and no named outputs.",
+      );
+      process.exit(1);
+    }
+    if (selected !== "default" && !outputNames.includes(selected)) {
+      const available = [...outputNames, ...(hasDefault ? ["default"] : [])];
+      console.error(
+        available.length > 0
+          ? `Unknown output '${selected}'. Available: ${available.join(", ")}.`
+          : `Unknown output '${selected}'. The program declares no outputs.`,
       );
       process.exit(1);
     }
   }
+  if (allOutputs && outputFormat !== "table") {
+    console.error(
+      `--output-format ${outputFormat} cannot be combined with --all (it produces several results)`,
+    );
+    process.exit(1);
+  }
+
+  const backendName: BackendName =
+    backendOverride ?? (process.env.DATABASE_URL ? "postgres" : "sqlite");
 
   if (dryRun) {
-    const analyzed = inferTypes(analyze(parseForCli()));
+    const analyzed = inferTypes(analyze(program));
     if (warnFiniteness) emitFinitenessWarnings(analyzed);
     const sqlDialect = await createSqlDialect(backendName);
     const translation = translate(analyzed, sqlDialect);
-
     for (const stmt of translation.createTables) {
       console.log(stmt);
       console.log();
@@ -606,18 +675,17 @@ async function main() {
       console.log(stmt);
       console.log();
     }
-    for (const stmt of translation.queries) {
-      console.log(stmt);
-      console.log();
-    }
+    analyzed.queries.forEach((query, idx) => {
+      if (allOutputs || (query.outputName ?? "default") === selected) {
+        console.log(translation.queries[idx]!);
+        console.log();
+      }
+    });
     return;
   }
 
   if (warnFiniteness) {
-    // Outside of --dry-run, the executor parses internally; we redo the
-    // parse+analyse pair here so the warnings appear before any SQL or
-    // table output. It's quick on tutorial-sized programs.
-    emitFinitenessWarnings(inferTypes(analyze(parseForCli())));
+    emitFinitenessWarnings(inferTypes(analyze(program)));
   }
 
   if (backendName === "postgres" && !process.env.DATABASE_URL) {
@@ -625,15 +693,14 @@ async function main() {
     process.exit(1);
   }
 
-  const explicitLoaders = buildExplicitLoaders(extMappings, !csvNoHeader);
+  const explicitLoaders = buildExplicitLoaders(inputMappings, !csvNoHeader);
   const backend = await createBackend(backendName);
   const executor = new DatamogExecutor(backend, [
     ...explicitLoaders,
     new CsvLoader({ directory: dataDir, hasHeader: !csvNoHeader }),
-    // The JSONL loader's single-json-column case also matches `.jsonl`
-    // files, so place the JSON file loader earlier — its `canLoad`
-    // checks for a `.json` (singular) file specifically, so the two
-    // don't compete on the same predicate.
+    // The JSONL loader's single-json-column case also matches `.jsonl` files,
+    // so place the JSON file loader earlier — its `canLoad` checks for a
+    // `.json` (singular) file specifically, so the two don't compete.
     new JsonLoader({ directory: dataDir }),
     new JsonlLoader({ directory: dataDir }),
     new MermaidLoader({ directory: dataDir }),
@@ -641,14 +708,15 @@ async function main() {
 
   try {
     const results = await executor.execute(source);
+    const chosen = allOutputs
+      ? results
+      : results.filter((r) => (r.label ?? "default") === selected);
 
     if (outputFormat === "mermaid" || outputFormat === "ascii-graph") {
-      for (const result of results) {
+      for (const result of chosen) {
         if (result.rows.length > 0) {
           const colCount = Object.keys(result.rows[0]!).length;
-          // 2 columns => `src --> dst`; 3 columns => `src -- label --> dst`
-          // (matches the playground's 3-column support and the Mermaid loader,
-          // which already accepts a binary or ternary edge predicate).
+          // 2 columns => `src --> dst`; 3 columns => `src -- label --> dst`.
           if (colCount !== 2 && colCount !== 3) {
             console.error(
               `--output-format ${outputFormat} requires a binary or ternary predicate (2 or 3 columns), but got ${colCount}`,
@@ -659,9 +727,9 @@ async function main() {
       }
     }
 
-    for (const result of results) {
-      // Named outputs print under the output predicate's name. Otherwise the
-      // native backend yields no SQL, so fall back to the Datalog query text.
+    for (const result of chosen) {
+      // Named outputs print under the output predicate's name; the `?-` default
+      // prints under "default".
       const header = result.label ?? (result.sql === "" ? (result.source ?? "") : result.sql);
       await printResult(header, result.rows, outputFormat);
     }
