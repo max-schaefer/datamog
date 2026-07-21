@@ -87,7 +87,7 @@ describe.skipIf(!HAS_DATABASE_URL)("postgres backend (DATABASE_URL)", () => {
       derived(N, B) :- flag(N, B).
       comparison(N, B) :- flag(N, _), B = (N == "alice").
       ?- derived(N, B).
-      ?- comparison(N, B).
+      output predicate cmp(N, B) :- comparison(N, B).
     `);
     const sortByName = (rows: Record<string, unknown>[]) =>
       [...rows].sort((a, b) => (a.N as string).localeCompare(b.N as string));
@@ -118,9 +118,9 @@ describe.skipIf(!HAS_DATABASE_URL)("postgres backend (DATABASE_URL)", () => {
       filter_compute(X) :- t(X), Y = 1 / X, Y == null.
       neq_logical(X)    :- t(X), Y = 1 / X, Y <> null.
       ?- maybe_null(X, Y, IsNull, EqEq).
-      ?- filter_logical(X).
-      ?- filter_compute(X).
-      ?- neq_logical(X).
+      output predicate fl(X) :- filter_logical(X).
+      output predicate fc(X) :- filter_compute(X).
+      output predicate nl(X) :- neq_logical(X).
     `);
     const sorted = (rows: Record<string, unknown>[]) =>
       [...rows].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
@@ -151,7 +151,7 @@ describe.skipIf(!HAS_DATABASE_URL)("postgres backend (DATABASE_URL)", () => {
       pi(R, N) :- raw_int(R),  N = to_integer(R).
       pr(R, N) :- raw_float(R), N = to_float(R).
       pb(R, B) :- raw_bool(R), B = to_boolean(R).
-      ?- pi(R, N). ?- pr(R, N). ?- pb(R, B).
+      ?- pi(R, N). output predicate opr(R, N) :- pr(R, N). output predicate opb(R, B) :- pb(R, B).
     `);
     const sorted = (rows: Record<string, unknown>[]) =>
       [...rows].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
@@ -295,7 +295,7 @@ describe.skipIf(!HAS_DATABASE_URL)("postgres backend (DATABASE_URL)", () => {
         Has = has_key(V, "x").
       iter(V, IsNull) :- data(J), array_element(J, 0, V), IsNull = (V = null).
       ?- sub(V, IsNull, Kind, Encoded, Has).
-      ?- iter(V, IsNull).
+      output predicate oiter(V, IsNull) :- iter(V, IsNull).
     `);
     expect(results[0]!.rows).toEqual([
       { V: null, IsNull: true, Kind: null, Encoded: null, Has: null },
@@ -324,7 +324,7 @@ describe.skipIf(!HAS_DATABASE_URL)("postgres backend (DATABASE_URL)", () => {
       cat(concat(J)) :- data(J).
       vals(list(J)) :- data(J).
       ?- cat(C).
-      ?- vals(L).
+      output predicate ovals(L) :- vals(L).
     `);
     expect(results[0]!.rows).toEqual([{ C: '["￿"],["😀"]' }]);
     expect(results[1]!.rows).toEqual([{ L: [["￿"], ["😀"]] }]);
@@ -342,8 +342,8 @@ describe.skipIf(!HAS_DATABASE_URL)("postgres backend (DATABASE_URL)", () => {
       slice_start(W, S):- words(W), I = 1 / 0, S = W[I:3].
       slice_end(W, S)  :- words(W), J = 1 / 0, S = W[1:J].
       ?- sub(W, S).
-      ?- slice_start(W, S).
-      ?- slice_end(W, S).
+      output predicate ss(W, S) :- slice_start(W, S).
+      output predicate se(W, S) :- slice_end(W, S).
     `);
     expect(results[0]!.rows).toEqual([{ W: "hello", S: null }]);
     expect(results[1]!.rows).toEqual([{ W: "hello", S: null }]);
@@ -370,7 +370,7 @@ describe.skipIf(!HAS_DATABASE_URL)("postgres backend (DATABASE_URL)", () => {
         array_element(D, _, P),
         Name = as_string(P["name"]).
       ?- shape(T, N).
-      ?- item(Name).
+      output predicate oitem(Name) :- item(Name).
     `);
     // Before the fix: T = 'string', N = the text length, item = no rows.
     expect(results[0]!.rows).toEqual([{ T: "array", N: 2 }]);

@@ -34,8 +34,8 @@ describe("Titanic playground example", () => {
       expect(seenUrls).toEqual([expandGitHubShorthand(TITANIC_CSV_URL)]);
       expect(results).toHaveLength(4);
       expect(sortRows(results[0]!.rows)).toEqual([
-        { N: 2, Rate: 1, Sex: "female" },
-        { N: 1, Rate: 0, Sex: "male" },
+        { Sex: "female", avg: 1, count: 2 },
+        { Sex: "male", avg: 0, count: 1 },
       ]);
     } finally {
       await backend.close();

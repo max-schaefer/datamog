@@ -44,8 +44,8 @@ describe("output predicates", () => {
       // The output decl precedes the ?- query in source, so it comes first.
       expect(results[0]!.label).toBe("reachable_from_1");
       expect(sortRows(results[0]!.rows)).toEqual([{ N: 2 }, { N: 3 }, { N: 4 }]);
-      // The plain query carries no label; its columns are the body variables.
-      expect(results[1]!.label).toBeUndefined();
+      // The `?-` query is the default output; its columns are the body variables.
+      expect(results[1]!.label).toBe("default");
       expect(sortRows(results[1]!.rows)).toEqual([
         { A: 1, B: 2 },
         { A: 2, B: 3 },
@@ -70,6 +70,19 @@ describe("output predicates", () => {
         { X: 1, Y: 3 },
         { X: 2, Y: 3 },
       ]);
+    }
+  });
+
+  test("rejects a file with more than one default output", async () => {
+    // Two `?-` queries both define the `default` output, which is a clash.
+    const sqlite = await createSqlite();
+    try {
+      const exec = new DatamogExecutor(sqlite);
+      await expect(exec.execute("p(1). p(2). ?- p(X). ?- p(Y).")).rejects.toThrow(
+        /at most one default output/i,
+      );
+    } finally {
+      await sqlite.close();
     }
   });
 });

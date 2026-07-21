@@ -295,10 +295,25 @@ export function analyze(program: Program): AnalyzedProgram {
         }
         break;
       }
-      case "Query":
-        queries.push(stmt);
+      case "Query": {
+        // A `?-` query is the module's default output.
+        const q = stmt as Query;
+        q.outputName = "default";
+        queries.push(q);
         break;
+      }
     }
+  }
+
+  // At most one default output per file. A `?-` query and an
+  // `output predicate default` both define it, and there can be only one.
+  const defaults = queries.filter((q) => q.outputName === "default");
+  if (defaults.length > 1) {
+    const pos = nodePos(defaults[1]!);
+    throw new AnalyzerError(
+      "A file has at most one default output (a `?-` query, or `output predicate default`); it is defined more than once here",
+      ...(pos ?? []),
+    );
   }
 
   // Check no predicate is both EDB and IDB

@@ -225,7 +225,7 @@ describe("native backend — aggregates", () => {
       cat(concat(J)) :- data(J).
       vals(list(J)) :- data(J).
       ?- cat(C).
-      ?- vals(L).
+      output predicate vl(L) :- vals(L).
     `);
     expect(results[0]).toEqual([{ C: '["￿"],["😀"]' }]);
     expect(results[1]).toEqual([{ L: [["￿"], ["😀"]] }]);
@@ -473,16 +473,12 @@ describe("native backend — body elements", () => {
     const results = await run(`
       n(1). n(2). n(3). n(4). n(5).
       lt(X, Y) :- n(X), n(Y), X < Y, X = 2.
-      le(X, Y) :- n(X), n(Y), X <= Y, X = 2.
-      gt(X, Y) :- n(X), n(Y), X > Y, X = 4.
-      ge(X, Y) :- n(X), n(Y), X >= Y, X = 4.
-      ne(X, Y) :- n(X), n(Y), X != Y, X = 3.
 
       ?- lt(X, Y).
-      ?- le(X, Y).
-      ?- gt(X, Y).
-      ?- ge(X, Y).
-      ?- ne(X, Y).
+      output predicate le(X, Y) :- n(X), n(Y), X <= Y, X = 2.
+      output predicate gt(X, Y) :- n(X), n(Y), X > Y, X = 4.
+      output predicate ge(X, Y) :- n(X), n(Y), X >= Y, X = 4.
+      output predicate ne(X, Y) :- n(X), n(Y), X != Y, X = 3.
     `);
     expect(sortRows(results[0]!)).toEqual([
       { X: 2, Y: 3 },
@@ -555,11 +551,11 @@ describe("native backend — body elements", () => {
     expect(sortRows(results[0]!)).toEqual([{ X: 3, Y: 7 }]);
   });
 
-  test("multiple queries run independently and in declaration order", async () => {
+  test("default plus named outputs run in declaration order", async () => {
     const results = await run(`
       p(1). p(2). p(3).
       ?- p(1).
-      ?- p(X).
+      output predicate px(X) :- p(X).
     `);
     expect(results.length).toBe(2);
     expect(results[0]).toEqual([{}]);
@@ -632,7 +628,7 @@ describe("native backend — built-in functions", () => {
       cmp(L, G) :- L = ("😀" < "￿"), G = ("😀" > "￿").
       agg(min(S), max(S), concat(S), list(S)) :- s(S).
       ?- cmp(L, G).
-      ?- agg(Min, Max, Joined, Listed).
+      output predicate ag(Min, Max, Joined, Listed) :- agg(Min, Max, Joined, Listed).
     `);
     expect(results[0]).toEqual([{ L: false, G: true }]);
     expect(results[1]).toEqual([{ Min: "￿", Max: "😀", Joined: "￿,😀", Listed: ["￿", "😀"] }]);
@@ -976,7 +972,7 @@ describe("native backend — aggregate edges", () => {
       cnt(count(Y)) :- q(_, Y).
       star(count(*)) :- q(_, _).
       ?- cnt(N).
-      ?- star(N).
+      output predicate st(N) :- star(N).
     `);
     expect(results[0]).toEqual([{ N: 0 }]);
     expect(results[1]).toEqual([{ N: 3 }]);
@@ -1437,13 +1433,10 @@ describe("native backend — NULL semantics (§5.4)", () => {
         IsNull = (Y = null),
         EqEq = (Y == null).
 
-      filter_logical(X) :- t(X), Y = 1 / X, Y = null.
-      filter_compute(X) :- t(X), Y = 1 / X, Y == null.
-      neq_logical(X)    :- t(X), Y = 1 / X, Y <> null.
       ?- maybe_null(X, Y, IsNull, EqEq).
-      ?- filter_logical(X).
-      ?- filter_compute(X).
-      ?- neq_logical(X).
+      output predicate filter_logical(X) :- t(X), Y = 1 / X, Y = null.
+      output predicate filter_compute(X) :- t(X), Y = 1 / X, Y == null.
+      output predicate neq_logical(X)    :- t(X), Y = 1 / X, Y <> null.
     `);
     // For X=0, Y is null. For X=1,2, Y is integer (integer/integer
     // truncates: 1/1=1, 1/2=0). `IsNull = (Y = null)` is null-aware so
@@ -1474,10 +1467,10 @@ describe("native backend — NULL semantics (§5.4)", () => {
       maxs(G, max(Y))           :- t(G, V), Y = 1 / V.
       cats(G, concat(Y))  :- t(G, V), Y = 1 / V.
       ?- sums(G, T).
-      ?- avgs(G, T).
-      ?- mins(G, T).
-      ?- maxs(G, T).
-      ?- cats(G, T).
+      output predicate av(G, T) :- avgs(G, T).
+      output predicate mn(G, T) :- mins(G, T).
+      output predicate mx(G, T) :- maxs(G, T).
+      output predicate ct(G, T) :- cats(G, T).
     `);
     // Group 2: 1/1=1, 1/2=0 (integer division truncates), so sum=1,
     // avg=0.5, min=0, max=1, concat="0,1".

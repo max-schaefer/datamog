@@ -258,16 +258,11 @@ describe("seminaive backend — body elements", () => {
     const results = await run(`
       n(1). n(2). n(3). n(4). n(5).
       lt(X, Y) :- n(X), n(Y), X < Y, X = 2.
-      le(X, Y) :- n(X), n(Y), X <= Y, X = 2.
-      gt(X, Y) :- n(X), n(Y), X > Y, X = 4.
-      ge(X, Y) :- n(X), n(Y), X >= Y, X = 4.
-      ne(X, Y) :- n(X), n(Y), X != Y, X = 3.
-
       ?- lt(X, Y).
-      ?- le(X, Y).
-      ?- gt(X, Y).
-      ?- ge(X, Y).
-      ?- ne(X, Y).
+      output predicate le(X, Y) :- n(X), n(Y), X <= Y, X = 2.
+      output predicate gt(X, Y) :- n(X), n(Y), X > Y, X = 4.
+      output predicate ge(X, Y) :- n(X), n(Y), X >= Y, X = 4.
+      output predicate ne(X, Y) :- n(X), n(Y), X != Y, X = 3.
     `);
     expect(sortRows(results[0]!)).toEqual([
       { X: 2, Y: 3 },
@@ -340,11 +335,11 @@ describe("seminaive backend — body elements", () => {
     expect(sortRows(results[0]!)).toEqual([{ X: 3, Y: 7 }]);
   });
 
-  test("multiple queries run independently and in declaration order", async () => {
+  test("default plus named outputs run in declaration order", async () => {
     const results = await run(`
       p(1). p(2). p(3).
       ?- p(1).
-      ?- p(X).
+      output predicate q(X) :- p(X).
     `);
     expect(results.length).toBe(2);
     expect(results[0]).toEqual([{}]);
@@ -547,7 +542,7 @@ describe("seminaive backend — aggregate edges", () => {
       cnt(count(Y)) :- q(_, Y).
       star(count(*)) :- q(_, _).
       ?- cnt(N).
-      ?- star(N).
+      output predicate s(N) :- star(N).
     `);
     expect(results[0]).toEqual([{ N: 0 }]);
     expect(results[1]).toEqual([{ N: 3 }]);

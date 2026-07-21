@@ -19,7 +19,7 @@ function sortRows(rows: Record<string, unknown>[]): Record<string, unknown>[] {
   return [...rows].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
 }
 
-async function executeOnSqliteAndNative(source: string): Promise<Record<string, unknown>[][]> {
+async function executeOnSqliteAndNative(source: string): Promise<Record<string, unknown>[][][]> {
   const sqlite = await createSqlite();
   try {
     const sqliteResults = await new DatamogExecutor(sqlite).execute(source);
@@ -177,7 +177,7 @@ describe("DatamogExecutor", () => {
         ?- later(X).
         seed(1).
         later(X) :- seed(X).
-        ?- seed(X).
+        output predicate so(X) :- seed(X).
       `);
       expect(results).toHaveLength(2);
       expect(results[0]!.rows).toEqual([{ X: 1 }]);
@@ -194,7 +194,7 @@ describe("DatamogExecutor", () => {
       renamed(X) :- base(Y), Y = X.
       incremented(Y) :- base(X), X + 1 = Y.
       ?- renamed(X).
-      ?- incremented(Y).
+      output predicate inc(Y) :- incremented(Y).
     `)) {
       expect(sortRows(rows[0]!)).toEqual([{ X: 1 }, { X: 2 }]);
       expect(sortRows(rows[1]!)).toEqual([{ Y: 2 }, { Y: 3 }]);
@@ -216,7 +216,7 @@ describe("DatamogExecutor", () => {
         derived(N, B) :- flag(N, B).
         comparison(N, B) :- flag(N, _), B = (N == "alice").
         ?- derived(N, B).
-        ?- comparison(N, B).
+        output predicate cmp(N, B) :- comparison(N, B).
       `);
       // Boolean column carried through from a fact: true/false stays.
       expect(results[0]!.rows).toEqual([
@@ -254,9 +254,9 @@ describe("DatamogExecutor", () => {
         filter_compute(X) :- t(X), Y = 1 / X, Y == null.
         neq_logical(X)    :- t(X), Y = 1 / X, Y <> null.
         ?- maybe_null(X, Y, IsNull, EqEq).
-        ?- filter_logical(X).
-        ?- filter_compute(X).
-        ?- neq_logical(X).
+        output predicate fl(X) :- filter_logical(X).
+        output predicate fc(X) :- filter_compute(X).
+        output predicate nl(X) :- neq_logical(X).
       `);
       expect(sortRows(results[0]!.rows)).toEqual([
         { X: 0, Y: null, IsNull: true, EqEq: null },
@@ -279,8 +279,8 @@ describe("DatamogExecutor", () => {
       literal_match(X) :- maybe(X, null).
       self_join(X1, X2) :- maybe(X1, Y), maybe(X2, Y).
       ?- maybe(X, Y).
-      ?- literal_match(X).
-      ?- self_join(X1, X2).
+      output predicate lm(X) :- literal_match(X).
+      output predicate sj(X1, X2) :- self_join(X1, X2).
     `;
 
     for (const results of await executeOnSqliteAndNative(program)) {
@@ -389,12 +389,12 @@ describe("DatamogExecutor", () => {
       wrong_obj(I, V) :- data(J), array_element(J, I, V).
       wrong_arr(K, V) :- data(J), A = J["arr"], object_entry(A, K, V).
       ?- entries(K, V).
-      ?- only_a(V).
-      ?- value_two(K).
-      ?- elems(I, V).
-      ?- second(V).
-      ?- wrong_obj(I, V).
-      ?- wrong_arr(K, V).
+      output predicate oa(V) :- only_a(V).
+      output predicate vt(K) :- value_two(K).
+      output predicate el(I, V) :- elems(I, V).
+      output predicate sec(V) :- second(V).
+      output predicate wo(I, V) :- wrong_obj(I, V).
+      output predicate wa(K, V) :- wrong_arr(K, V).
     `;
 
     for (const results of await executeOnSqliteAndNative(program)) {
@@ -437,8 +437,8 @@ describe("DatamogExecutor", () => {
         slice_start(W, S):- words(W), I = 1 / 0, S = W[I:3].
         slice_end(W, S)  :- words(W), J = 1 / 0, S = W[1:J].
         ?- sub(W, S).
-        ?- slice_start(W, S).
-        ?- slice_end(W, S).
+        output predicate ss(W, S) :- slice_start(W, S).
+        output predicate se(W, S) :- slice_end(W, S).
       `);
       expect(results[0]!.rows).toEqual([{ W: "hello", S: null }]);
       expect(results[1]!.rows).toEqual([{ W: "hello", S: null }]);
@@ -665,7 +665,7 @@ describe("DatamogExecutor", () => {
       cat(concat(J)) :- data(J).
       vals(list(J)) :- data(J).
       ?- cat(C).
-      ?- vals(L).
+      output predicate vl(L) :- vals(L).
     `;
     const expectedConcat = '["￿"],["😀"]';
     const expectedList = [["￿"], ["😀"]];
@@ -756,7 +756,7 @@ describe("DatamogExecutor", () => {
       data([1, 2]).
       matches_5(X) :- data(X), X == 5.
       ?- matches_5(X).
-      ?- data(X).
+      output predicate da(X) :- data(X).
     `;
 
     const sqlite = await createSqlite();
@@ -841,7 +841,7 @@ describe("DatamogExecutor", () => {
       matched(X) :- ints(X), vals(X).
       iter(K, V) :- ints(X), object_entry(X, K, V).
       ?- matched(X).
-      ?- iter(K, V).
+      output predicate it(K, V) :- iter(K, V).
     `;
     const [sqliteRows, nativeRows] = await executeOnSqliteAndNative(program);
     expect(sqliteRows[0]).toEqual([{ X: 5 }]);
@@ -862,8 +862,8 @@ describe("DatamogExecutor", () => {
       vs(V) :- ev(P), V = values(P).
       ser(S) :- ev(P), S = to_json(P).
       ?- ks(K).
-      ?- vs(V).
-      ?- ser(S).
+      output predicate ovs(V) :- vs(V).
+      output predicate oser(S) :- ser(S).
     `;
     const expectedKeys = ["id", "method"];
     const expectedValues = [1, "GET"];
@@ -962,7 +962,7 @@ describe("DatamogExecutor", () => {
       ks(K) :- ev(P), K = keys(P).
       vs(V) :- ev(P), V = values(P).
       ?- ks(K).
-      ?- vs(V).
+      output predicate ovs(V) :- vs(V).
     `;
     const expectedKeys = ["￿", "😀"];
     const expectedValues = [2, 1];
@@ -993,7 +993,7 @@ describe("DatamogExecutor", () => {
       ks(K) :- arr(P), K = keys(P).
       vs(V) :- arr(P), V = values(P).
       ?- ks(K).
-      ?- vs(V).
+      output predicate ovs(V) :- vs(V).
     `;
 
     const sqlite = await createSqlite();
@@ -1087,8 +1087,8 @@ describe("DatamogExecutor", () => {
         ser(S) :- unioned(J), S = to_json(J).
         nested_ser(S) :- nested(J), S = to_json(J).
         ?- unioned(J).
-        ?- ser(S).
-        ?- nested_ser(S).
+        output predicate oser(S) :- ser(S).
+        output predicate ons(S) :- nested_ser(S).
       `);
       expect(results[0]!.rows).toHaveLength(1);
       expect(results[1]!.rows).toEqual([{ S: '{"a":1,"b":2}' }]);
@@ -1202,7 +1202,7 @@ describe("DatamogExecutor", () => {
       r(X) :- X = Y[0], Y = [[1], [2]].
       s(X) :- X = Y[0:1], Y = [[1], [2]].
       ?- r(X).
-      ?- s(X).
+      output predicate so(X) :- s(X).
     `;
 
     const sqlite = await createSqlite();
@@ -1552,7 +1552,7 @@ describe("DatamogExecutor", () => {
       r(N) :- N = as_integer(-7.0).
       bad(N) :- N = as_integer(1.5).
       ?- r(N).
-      ?- bad(N).
+      output predicate ob(N) :- bad(N).
     `)) {
       expect((rows[0] as { N: number }[]).map((r) => r.N).sort((a, b) => a - b)).toEqual([-7, 3]);
       expect(rows[1]).toEqual([{ N: null }]);
