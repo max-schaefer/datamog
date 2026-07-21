@@ -27,6 +27,13 @@ export class PostgresSqlDialect implements SqlDialect {
     // structural equality under `=`, `DISTINCT`, and `UNION`. The text
     // `json` type would compare textually and silently break joins.
     if (type === "value") return "JSONB";
+    // Postgres `REAL` is single-precision float4 (~7 digits), but Datamog
+    // floats are 64-bit doubles everywhere else (sqlite `REAL` is 8-byte,
+    // native is a JS number) and every Postgres runtime float op already
+    // casts to `double precision`. Store float columns as float8 too, so a
+    // loaded double keeps full precision and equality/join/dedup match the
+    // other backends instead of silently truncating.
+    if (type === "float") return "DOUBLE PRECISION";
     return SQL_TYPE_MAP[type];
   }
 

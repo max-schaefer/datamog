@@ -1249,7 +1249,7 @@ Datamog has five basic types:
 |-----------|-----------------------|-------------------------------------------|
 | `string`    | Unicode strings       | `TEXT`                                    |
 | `integer` | Whole numbers         | `INTEGER`                                 |
-| `float`    | Floating-point numbers| `REAL`                                    |
+| `float`    | Floating-point numbers| `DOUBLE PRECISION` (Postgres) / `REAL` (SQLite/sql.js, 8-byte) |
 | `boolean` | True/false values     | `BOOLEAN`                                 |
 | `value`   | union of `null` / `boolean` / `integer` / `float` / `string` / array / object | `JSONB` (Postgres) / `TEXT` (SQLite/sql.js) |
 

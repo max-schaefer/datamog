@@ -43,7 +43,10 @@ describe("translator", () => {
     const sql = norm(result.createTables[0]!);
     expect(sql).toContain('"a" TEXT NOT NULL');
     expect(sql).toContain('"b" INTEGER NOT NULL');
-    expect(sql).toContain('"c" REAL NOT NULL');
+    // Float columns are float8 on Postgres: `REAL` is single-precision
+    // float4, which would truncate the 64-bit doubles the other backends
+    // store and break cross-backend equality/join on full-precision values.
+    expect(sql).toContain('"c" DOUBLE PRECISION NOT NULL');
     expect(sql).toContain('"d" BOOLEAN NOT NULL');
   });
 
