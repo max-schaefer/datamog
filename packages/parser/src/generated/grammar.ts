@@ -229,6 +229,25 @@ export const DatamogGrammar = (): Grammar => loadedDatamogGrammar ?? (loadedData
         "$type": "Group",
         "elements": [
           {
+            "$type": "Group",
+            "elements": [
+              {
+                "$type": "Assignment",
+                "feature": "output",
+                "operator": "?=",
+                "terminal": {
+                  "$type": "Keyword",
+                  "value": "output"
+                }
+              },
+              {
+                "$type": "Keyword",
+                "value": "predicate"
+              }
+            ],
+            "cardinality": "?"
+          },
+          {
             "$type": "Assignment",
             "feature": "head",
             "operator": "=",

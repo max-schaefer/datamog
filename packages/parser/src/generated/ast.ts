@@ -57,6 +57,8 @@ export type DatamogKeywordNames =
     | "integer"
     | "not"
     | "null"
+    | "output"
+    | "predicate"
     | "string"
     | "true"
     | "value"
@@ -437,6 +439,7 @@ export interface Rule extends langium.AstNode {
     ctorArgs: Array<Expression>;
     ctorParens: boolean;
     head: HeadAtom;
+    output: boolean;
     ruleName?: Identifier;
 }
 
@@ -446,6 +449,7 @@ export const Rule = {
     ctorArgs: 'ctorArgs',
     ctorParens: 'ctorParens',
     head: 'head',
+    output: 'output',
     ruleName: 'ruleName'
 } as const;
 
@@ -869,6 +873,10 @@ export class DatamogAstReflection extends langium.AbstractAstReflection {
                 },
                 head: {
                     name: Rule.head
+                },
+                output: {
+                    name: Rule.output,
+                    defaultValue: false
                 },
                 ruleName: {
                     name: Rule.ruleName

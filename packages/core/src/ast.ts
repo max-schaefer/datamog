@@ -10,6 +10,7 @@ import type {
   NullLiteral,
   NumberLiteral,
   HeadAtom as ParserHeadAtom,
+  Query as ParserQuery,
   Rule as ParserRule,
   Slice,
   StringLiteral,
@@ -35,7 +36,6 @@ export type {
   ObjectEntry,
   ObjectLiteral,
   Program,
-  Query,
   RangeAtom,
   Slice,
   PrimitiveType,
@@ -86,6 +86,13 @@ export type HeadTerm = AggregateCall | Expression;
 // the synthesised AggregateCall nodes.
 export type HeadAtom = Omit<ParserHeadAtom, "args"> & { args: HeadTerm[] };
 export type Rule = Omit<ParserRule, "head"> & { head: HeadAtom };
+
+// Widen Query to carry the name of the output predicate it was synthesised for.
+// The analyzer turns each `output predicate` rule into a synthetic query over
+// that predicate and pushes it onto the program's query list; this field records
+// the predicate name so backends can label the result. Undefined for an ordinary
+// `?-` query.
+export type Query = ParserQuery & { outputName?: string };
 
 export type { AggregateFunction, BinaryOp } from "datamog-parser";
 

@@ -201,6 +201,10 @@ export function analyze(program: Program): AnalyzedProgram {
   const rules = new Map<string, Rule[]>();
   const arities = new Map<string, number>();
   const queries: Query[] = [];
+  // Track which output predicates have already had their implicit query
+  // emitted, so a predicate with several `output`-marked rules yields one
+  // result, not one per rule.
+  const emittedOutputs = new Set<string>();
 
   // Classify statements
   for (const stmt of program.statements) {
@@ -251,6 +255,34 @@ export function analyze(program: Program): AnalyzedProgram {
         } else {
           rules.set(stmt.head.predicate, [stmt]);
           arities.set(stmt.head.predicate, stmt.head.args.length);
+        }
+        // An `output predicate` rule additionally exposes its predicate as a
+        // printed result: synthesise an implicit `?- pred(V1, …, Vn)` query and
+        // push it at this source position so it interleaves with real `?-`
+        // queries in order. One query per output predicate, not per rule.
+        if (stmt.output && !emittedOutputs.has(stmt.head.predicate)) {
+          emittedOutputs.add(stmt.head.predicate);
+          const usedNames = new Set<string>();
+          const projVars = stmt.head.args.map((arg, i) => {
+            let name = arg.$type === "Variable" ? arg.name : `col${i + 1}`;
+            while (usedNames.has(name)) name = `${name}_`;
+            usedNames.add(name);
+            return { $type: "Variable", name };
+          });
+          queries.push({
+            $type: "Query",
+            outputName: stmt.head.predicate,
+            body: [
+              {
+                $type: "Literal",
+                predicate: stmt.head.predicate,
+                negated: false,
+                parens: true,
+                args: projVars,
+              },
+            ],
+            $cstNode: stmt.head.$cstNode,
+          } as unknown as Query);
         }
         break;
       }

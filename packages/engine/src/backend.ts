@@ -7,6 +7,9 @@ export interface QueryResult {
   sql: string;
   /** The original Datalog query source text, if available. */
   source?: string;
+  /** For a named output (an `output predicate` rule), the output predicate's
+   *  name, used as the display header. Undefined for a plain `?-` query. */
+  label?: string;
   rows: Record<string, unknown>[];
 }
 

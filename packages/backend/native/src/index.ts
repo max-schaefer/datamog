@@ -138,7 +138,9 @@ export function createEvaluatorBackend<E extends DatalogEvaluator>(
 
       const results: QueryResult[] = [];
       for (const query of analyzed.queries) {
-        results.push(ev.runQuery(query));
+        const result = ev.runQuery(query);
+        if (query.outputName) result.label = query.outputName;
+        results.push(result);
       }
       return results;
     },

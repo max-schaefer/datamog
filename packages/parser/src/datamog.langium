@@ -35,7 +35,13 @@ PrimitiveType returns string:
 // what the proof term carries (typically captured sub-proofs) and leave
 // intermediate variables out. `ctorParens` records that the argument list was
 // written, distinguishing explicit `[Ctor()]` (nullary) from bare `[Ctor]`.
+// A rule prefixed `output predicate` is a named output: it defines its
+// predicate exactly like any rule and additionally exposes the predicate as a
+// printed result, run like an implicit `?- head` query. Types are inferred, so
+// the head takes ordinary variable arguments and reads like the intensional it
+// is. A predicate is an output if any of its rules carries the marker.
 Rule:
+    (output?='output' 'predicate')?
     head=HeadAtom
         ('[' ruleName=Identifier (ctorParens?='(' (ctorArgs+=Expression (',' ctorArgs+=Expression)*)? ')')? ']')?
         (':' '-' body+=BodyElement (',' body+=BodyElement)*)? '.';

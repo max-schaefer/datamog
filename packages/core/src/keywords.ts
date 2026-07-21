@@ -9,7 +9,16 @@
 // these lists.
 
 /** Reserved-word keywords that can't be used as identifiers. */
-export const RESERVED_KEYWORDS = ["extensional", "not", "in", "true", "false", "null"] as const;
+export const RESERVED_KEYWORDS = [
+  "extensional",
+  "output",
+  "predicate",
+  "not",
+  "in",
+  "true",
+  "false",
+  "null",
+] as const;
 
 /** Built-in primitive types declarable on extensional columns. */
 export const BUILTIN_TYPE_NAMES = ["string", "integer", "float", "boolean", "value"] as const;

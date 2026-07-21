@@ -88,7 +88,7 @@ export class DatamogExecutor {
           return out;
         });
         const source = queries[i]?.$cstNode?.text;
-        return { sql: querySql, source, rows };
+        return { sql: querySql, source, label: queries[i]?.outputName, rows };
       }),
     );
 

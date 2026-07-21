@@ -660,8 +660,9 @@ async function main() {
     }
 
     for (const result of results) {
-      // Native backend yields no SQL — fall back to the Datalog query text.
-      const header = result.sql === "" ? (result.source ?? "") : result.sql;
+      // Named outputs print under the output predicate's name. Otherwise the
+      // native backend yields no SQL, so fall back to the Datalog query text.
+      const header = result.label ?? (result.sql === "" ? (result.source ?? "") : result.sql);
       await printResult(header, result.rows, outputFormat);
     }
   } finally {
