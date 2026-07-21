@@ -87,12 +87,12 @@ export type HeadTerm = AggregateCall | Expression;
 export type HeadAtom = Omit<ParserHeadAtom, "args"> & { args: HeadTerm[] };
 export type Rule = Omit<ParserRule, "head"> & { head: HeadAtom };
 
-// Widen Query to carry the name of the output predicate it was synthesised for.
-// The analyzer turns each `output predicate` rule into a synthetic query over
-// that predicate and pushes it onto the program's query list; this field records
-// the predicate name so backends can label the result. Undefined for an ordinary
-// `?-` query.
-export type Query = ParserQuery & { outputName?: string };
+// Widen Query to carry its output name and provenance.
+// `outputName` labels the result: the predicate name for an `output predicate`,
+// "default" for a `?-` query. `isOutput` marks the synthetic queries the
+// analyzer derives from `output predicate` rules (as opposed to a `?-` query);
+// the REPL uses it to emit each output once while re-running the transient `?-`.
+export type Query = ParserQuery & { outputName?: string; isOutput?: boolean };
 
 export type { AggregateFunction, BinaryOp } from "datamog-parser";
 

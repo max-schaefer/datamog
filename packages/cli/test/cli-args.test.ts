@@ -254,6 +254,38 @@ describe("CLI arg validation", () => {
     }
   });
 
+  test("Regression: a value flag rejects a following option instead of swallowing it", async () => {
+    // `--data-dir --dry-run prog.dl` used to consume `--dry-run` as the data
+    // directory, so `--dry-run` was silently dropped and the program ran for
+    // real. A value that looks like another flag is rejected.
+    const dl = "/tmp/datamog-cli-datadir.dl";
+    await Bun.write(dl, "p(1).\n?- p(X).\n");
+    try {
+      const result = await runCli(["--data-dir", "--dry-run", dl]);
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain("--data-dir requires a value");
+    } finally {
+      await Promise.allSettled([Bun.file(dl).unlink?.()]);
+    }
+  });
+
+  test("Regression: `output predicate default` is the selectable default output", async () => {
+    // The analyzer treats an `output predicate` named `default` as the file's
+    // default output (labelled "default"), but the CLI's parse-scan only set
+    // `hasDefault` for a `?-` query, so `datamog prog.dl` wrongly reported
+    // "no default output".
+    const dir = await mkdtemp(join(tmpdir(), "datamog-cli-defout-"));
+    const dl = join(dir, "program.dl");
+    await Bun.write(dl, "e(1).\ne(2).\noutput predicate default(X) :- e(X).\n");
+    try {
+      const result = await runCli(["--output-format", "jsonl", dl]);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.trim().split("\n").sort()).toEqual(['{"X":1}', '{"X":2}']);
+    } finally {
+      await rm(dir, { recursive: true });
+    }
+  });
+
   test("an unknown output positional is rejected, listing the available outputs", async () => {
     const dir = await mkdtemp(join(tmpdir(), "datamog-cli-badout-"));
     const dl = join(dir, "program.dl");

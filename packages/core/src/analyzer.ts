@@ -281,6 +281,7 @@ export function analyze(program: Program): AnalyzedProgram {
           queries.push({
             $type: "Query",
             outputName: stmt.head.predicate,
+            isOutput: true,
             body: [
               {
                 $type: "Literal",

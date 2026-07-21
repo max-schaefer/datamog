@@ -216,9 +216,10 @@ export class IncrementalSession {
     for (let i = 0; i < analyzed.queries.length; i++) {
       const q = analyzed.queries[i]!;
       const name = q.outputName;
-      // A named output emits once, keyed by name. The `?-` default (name
-      // "default") is transient and always runs.
-      if (name && name !== "default") {
+      // An `output predicate` emits once, keyed by name: it comes from a
+      // persistent rule the analyzer re-synthesises every chunk. A `?-` query
+      // (including one named "default") is transient and always runs.
+      if (q.isOutput && name) {
         if (this.appliedOutputs.has(name)) continue;
         this.appliedOutputs.add(name);
       }
@@ -277,7 +278,7 @@ export class IncrementalSession {
     for (let i = 0; i < analyzed.queries.length; i++) {
       const q = analyzed.queries[i]!;
       const name = q.outputName;
-      if (name && name !== "default") {
+      if (q.isOutput && name) {
         if (this.appliedOutputs.has(name)) continue;
         this.appliedOutputs.add(name);
       }

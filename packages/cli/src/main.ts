@@ -284,7 +284,11 @@ function parseInputArg(arg: string): { name: string; source: string } {
 /** Value of a value-taking flag, or exit with a diagnostic if it is missing. */
 function requireValue(args: string[], idx: number, flag: string): string {
   const value = args[idx];
-  if (value === undefined) {
+  // Reject a following option (`--data-dir --dry-run`): the values these flags
+  // take are names, dirs, or enums, never `-`-leading, so a `-`-leading token
+  // is a forgotten value, not the value itself. Otherwise the next flag is
+  // silently swallowed and its effect lost.
+  if (value === undefined || value.startsWith("-")) {
     console.error(`${flag} requires a value`);
     process.exit(1);
   }
@@ -589,7 +593,12 @@ async function main() {
   for (const stmt of program.statements) {
     if (stmt.$type === "ExtDecl") inputNames.push(stmt.predicate);
     else if (stmt.$type === "Rule") {
-      if (stmt.output) outputPreds.add(stmt.head.predicate);
+      // The analyzer treats an `output predicate` named `default` as the
+      // file's default output (like a `?-`), not a named output.
+      if (stmt.output) {
+        if (stmt.head.predicate === "default") hasDefault = true;
+        else outputPreds.add(stmt.head.predicate);
+      }
     } else if (stmt.$type === "Query") hasDefault = true;
   }
   const outputNames = [...outputPreds];
