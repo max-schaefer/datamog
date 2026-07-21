@@ -302,11 +302,10 @@ describe("CLI arg validation", () => {
   });
 
   test("Regression: explicit extensional loader supports HTTP URL sources", async () => {
-    // Explicit sources used to be resolved as local filesystem paths, so
-    // `--extensional p=https://host/data.csv` became a mangled path and
-    // failed before the CSV parser saw any content. HTTP(S) sources now
-    // fetch text first and then route through the same format-specific
-    // parsers as local explicit files.
+    // An HTTP(S) explicit source (`--input p=https://host/data.csv`) is
+    // fetched as text first and then routed through the same format-specific
+    // parsers as a local explicit file, rather than being resolved as a
+    // local filesystem path (which would mangle the URL into a bogus path).
     const oldFetch = globalThis.fetch;
     const source = "https://example.test/parents.csv?download=1";
     const seenUrls: string[] = [];
