@@ -43,7 +43,7 @@
 // contains if any internal edge (or self-loop) carries the PLUS label.
 
 import type { AnalyzedProgram } from "./analyzer.ts";
-import { isAnonymousVar } from "./analyzer.ts";
+import { BUILTIN_BODY_ATOMS, isAnonymousVar } from "./analyzer.ts";
 import type { Equality, Expression, HeadTerm, Literal, Rule } from "./ast.ts";
 
 export interface FinitenessDiagnostic {
@@ -235,7 +235,26 @@ function processRule(
   // --- Body: each positive atom feeds variables (or is constrained by exprs).
   for (const elem of rule.body) {
     if (elem.$type === "Literal" && !elem.negated) {
-      processBodyAtom(elem, ri, push);
+      const builtin = BUILTIN_BODY_ATOMS.get(elem.predicate);
+      if (builtin) {
+        // A value-iteration builtin (object_entry/array_element) binds its
+        // output positions from the source value, so flow must run
+        // source -> outputs. Extraction yields a strictly smaller sub-value,
+        // so the edge is not PLUS (a pure-extraction cycle stays unflagged);
+        // a recursion that re-wraps the output picks up its PLUS edge from
+        // the wrapping equality/head. Modelling it as a plain predicate
+        // instead severs the flow and hides genuine infinite recursion.
+        const sources = new Set<string>();
+        collectVars(elem.args[builtin.sourceArg]!, sources);
+        for (const { index } of builtin.boundArgs) {
+          const out = elem.args[index];
+          if (out?.$type === "Variable" && !isAnonymousVar(out.name)) {
+            for (const s of sources) push(varNode(ri, s), varNode(ri, out.name), false);
+          }
+        }
+      } else {
+        processBodyAtom(elem, ri, push);
+      }
     } else if (elem.$type === "Equality") {
       for (const binding of equalityBindingCandidates(elem)) {
         const v = binding.variable;

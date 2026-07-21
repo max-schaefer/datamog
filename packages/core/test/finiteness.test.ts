@@ -254,4 +254,35 @@ describe("finiteness of proof terms", () => {
     `;
     expect(flagged(source)).toEqual([]);
   });
+
+  test("Regression: flags recursion that re-wraps a value extracted via object_entry", () => {
+    // `object_entry`/`array_element` were modelled as plain predicates, so the
+    // source->output dataflow was severed and a recursion that extracts an
+    // inner value then re-wraps it deeper was not flagged (it loops forever on
+    // native / hangs the playground). The source->output flow must be modelled.
+    expect(
+      flagged(`seed({"n": 0}).
+        g(V) :- seed(V).
+        g(W) :- g(V), object_entry(V, K, Inner), W = {"n": [Inner]}.
+        ?- g(W).`),
+    ).toContain("g.1");
+    expect(
+      flagged(`seed([0]).
+        g(V) :- seed(V).
+        g(W) :- g(V), array_element(V, K, Inner), W = [Inner].
+        ?- g(W).`),
+    ).toContain("g.1");
+  });
+
+  test("does not flag pure extraction via object_entry (extraction shrinks the value)", () => {
+    // Recursively extracting sub-values without re-wrapping terminates (each
+    // extracted value is strictly smaller), so it must not be flagged: the
+    // source->output edge is not value-producing.
+    expect(
+      flagged(`seed({"a": {"b": 1}}).
+        g(V) :- seed(V).
+        g(Inner) :- g(V), object_entry(V, K, Inner).
+        ?- g(X).`),
+    ).toEqual([]);
+  });
 });
