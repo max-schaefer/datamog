@@ -18,7 +18,7 @@ export interface RunReplOptions {
   jsonMode: boolean;
   dataDir: string;
   csvHasHeader: boolean;
-  /** Loaders contributed by `--extensional` flags. Non-directory loaders that
+  /** Loaders contributed by `--input` flags. Non-directory loaders that
    *  match a single predicate by name. */
   explicitLoaders: ExtensionalLoader[];
   /** Build a fresh backend. Called once on startup and again on every

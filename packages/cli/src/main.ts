@@ -336,7 +336,7 @@ function buildExplicitLoaders(
   mappings: { name: string; source: string }[],
   csvHasHeader: boolean,
 ): ExtensionalLoader[] {
-  // Reject `--extensional p=a --extensional p=b` — the duplicate would
+  // Reject the same input mapped twice (`--p a --p b`) — the duplicate would
   // silently no-op (the first loader wins, since `ExplicitSourceLoader.canLoad`
   // matches by predicate name and the executor stops at the first hit).
   // Without this check the user has no signal that the second flag had no
@@ -487,6 +487,11 @@ async function main() {
   let outputFormat: OutputFormat = "table";
   let replMode = false;
   let jsonMode = false;
+  // Data sources for input predicates. `--input name=source` is self-describing
+  // (it names its own predicate), so it is a global usable before the program
+  // and in --repl; the `--<input> source` sugar (resolved after the program)
+  // adds to the same list.
+  const inputMappings: { name: string; source: string }[] = [];
 
   // Phase 1: global options precede the program. Stop at the first bare token,
   // which is the program path; everything after it is program-specific (the
@@ -502,6 +507,10 @@ async function main() {
     else if (arg === "--all") allOutputs = true;
     else if (arg === "--repl") replMode = true;
     else if (arg === "--json") jsonMode = true;
+    else if (arg === "--input")
+      inputMappings.push(parseInputArg(requireValue(args, ++i, "--input")));
+    else if (arg.startsWith("--input="))
+      inputMappings.push(parseInputArg(arg.slice("--input=".length)));
     else if (arg === "--data-dir") dataDir = requireValue(args, ++i, "--data-dir");
     else if (arg === "--backend") {
       const value = args[++i];
@@ -552,7 +561,7 @@ async function main() {
       jsonMode,
       dataDir: dataDir ? resolve(dataDir) : process.cwd(),
       csvHasHeader: !csvNoHeader,
-      explicitLoaders: [],
+      explicitLoaders: buildExplicitLoaders(inputMappings, !csvNoHeader),
       createBackend: () => createBackend(backendName),
     });
     return;
@@ -585,9 +594,9 @@ async function main() {
   }
   const outputNames = [...outputPreds];
 
-  // Phase 2: the output positional (if any) and the per-input flags.
+  // Phase 2: the output positional (if any) and the per-input flags. Input
+  // mappings from phase 1 (`--input`) accumulate with these.
   let output: string | undefined;
-  const inputMappings: { name: string; source: string }[] = [];
   const flagMappings: { flagName: string; source: string }[] = [];
   let j = 0;
   if (rest[0] !== undefined && !rest[0].startsWith("-")) {

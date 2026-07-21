@@ -212,6 +212,23 @@ describe("CLI arg validation", () => {
     }
   });
 
+  test("--input before the program supplies data (it is a global flag)", async () => {
+    // `--input name=source` names its own predicate, so it works before the
+    // program (and, elsewhere, in --repl, which datamog-magic relies on).
+    const dir = await mkdtemp(join(tmpdir(), "datamog-cli-input-"));
+    const dl = join(dir, "program.dl");
+    const csv = join(dir, "src.csv");
+    await Bun.write(dl, "extensional p(x: integer).\n?- p(X).\n");
+    await Bun.write(csv, "x\n7\n");
+    try {
+      const result = await runCli(["--output-format", "jsonl", "--input", `p=${csv}`, dl]);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.trim()).toBe('{"X":7}');
+    } finally {
+      await rm(dir, { recursive: true });
+    }
+  });
+
   test("the output positional selects a named output; a kebab flag aliases the exact name", async () => {
     const dir = await mkdtemp(join(tmpdir(), "datamog-cli-out-"));
     const dl = join(dir, "program.dl");

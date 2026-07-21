@@ -87,7 +87,7 @@ CELLS: list[dict] = [
         "The playground has a built-in Titanic example that pulls the CSV straight from pandas' GitHub raw URL. We can wire the same data into a notebook with `%datamog_init` (a *line* magic — one `%`, fits on a single line). We use the `gh:OWNER/REPO/PATH` shorthand, which Datamog expands to the `raw.githubusercontent.com` URL (the ref defaults to the repo's default branch):",
     ),
     code(
-        "%datamog_init --backend sqlite --extensional passenger=gh:pandas-dev/pandas/doc/data/titanic.csv",
+        "%datamog_init --backend sqlite --input passenger=gh:pandas-dev/pandas/doc/data/titanic.csv",
     ),
     md(
         "`%datamog_init` shuts down any existing subprocess and queues a fresh one with the new flags. The next `%%datamog` cell spawns it.",
@@ -162,7 +162,7 @@ CELLS: list[dict] = [
         "",
         "| Magic | What it does |",
         "| ----- | ------------ |",
-        "| `%datamog_init [flags]` | Shut down the existing subprocess (if any), reconfigure, and queue a fresh one. Flags: `--backend`, `--data-dir`, `--cwd`, `--cmd`, `--extensional name=source` (repeatable). |",
+        "| `%datamog_init [flags]` | Shut down the existing subprocess (if any), reconfigure, and queue a fresh one. Flags: `--backend`, `--data-dir`, `--cwd`, `--cmd`, `--input name=source` (repeatable). |",
         "| `%datamog_reset` | Send `:reset` to the REPL — discards all accumulated declarations / rules / data without restarting the subprocess. |",
         "| `%datamog_close` | Terminate the subprocess. The next `%%datamog` cell will spawn a fresh one with the most recent `_init` config. |",
     ),

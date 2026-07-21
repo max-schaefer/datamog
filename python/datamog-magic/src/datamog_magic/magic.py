@@ -47,12 +47,13 @@ def _build_init_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--cwd", help="Working directory for the subprocess.")
     p.add_argument(
-        "--extensional",
+        "--input",
+        dest="inputs",
         action="append",
         default=[],
         metavar="name=source",
         help=(
-            "Map an extensional predicate to a file or URL (.csv, .jsonl, .json, .mmd, "
+            "Map an input predicate to a file or URL (.csv, .jsonl, .json, .mmd, "
             "or a Google Sheets URL). Repeatable. Forwarded to the CLI verbatim."
         ),
     )
@@ -72,15 +73,15 @@ class DatamogMagics(Magics):
     def __init__(self, shell=None) -> None:  # type: ignore[no-untyped-def]
         super().__init__(shell)
         self._proc: Optional[DatamogProcess] = None
-        # `extensional` is a list (zero or more `name=source` mappings)
-        # threaded into the subprocess via repeated `--extensional`
-        # flags. The other entries are scalar config.
+        # `inputs` is a list (zero or more `name=source` mappings) threaded
+        # into the subprocess via repeated `--input` flags. The other entries
+        # are scalar config.
         self._config: dict[str, object] = {
             "backend": None,
             "data_dir": None,
             "cmd": None,
             "cwd": None,
-            "extensional": [],
+            "inputs": [],
         }
 
     # --- magics ----------------------------------------------------------
@@ -156,15 +157,15 @@ class DatamogMagics(Magics):
             return
         cmd = args.cmd.split() if args.cmd else None
         extra_args: list[str] = []
-        for mapping in args.extensional:
-            extra_args.extend(["--extensional", mapping])
+        for mapping in args.inputs:
+            extra_args.extend(["--input", mapping])
         self.shutdown()
         self._config = {
             "backend": args.backend,
             "data_dir": args.data_dir,
             "cmd": shlex.join(cmd) if cmd else None,
             "cwd": args.cwd,
-            "extensional": list(args.extensional),
+            "inputs": list(args.inputs),
         }
         # Spawning is still lazy — a user who does `%datamog_init` and
         # never runs a cell shouldn't pay for a process they don't use.
@@ -201,11 +202,11 @@ class DatamogMagics(Magics):
 
     def _proc_or_start(self) -> DatamogProcess:
         if self._proc is None:
-            extensional = self._config["extensional"]
+            inputs = self._config["inputs"]
             extra_args: list[str] = []
-            if isinstance(extensional, list):
-                for mapping in extensional:
-                    extra_args.extend(["--extensional", str(mapping)])
+            if isinstance(inputs, list):
+                for mapping in inputs:
+                    extra_args.extend(["--input", str(mapping)])
             self._proc = DatamogProcess(
                 backend=_optstr(self._config.get("backend")),
                 data_dir=_optstr(self._config.get("data_dir")),
@@ -220,9 +221,9 @@ class DatamogMagics(Magics):
             v = self._config[key]
             if v is not None:
                 parts.append(f"{key}={v}")
-        ext = self._config.get("extensional") or []
-        if isinstance(ext, list) and ext:
-            parts.append(f"extensional=[{', '.join(map(str, ext))}]")
+        inputs = self._config.get("inputs") or []
+        if isinstance(inputs, list) and inputs:
+            parts.append(f"inputs=[{', '.join(map(str, inputs))}]")
         cwd = self._config["cwd"] or str(Path.cwd())
         if "cwd" not in {p.split("=", 1)[0] for p in parts}:
             parts.append(f"cwd={cwd}")
@@ -264,7 +265,7 @@ def _user_ns(magics: Magics) -> Optional[dict[str, Any]]:
 def _optstr(value: object) -> Optional[str]:
     """Narrow `_config[...]` lookups (typed `object`) back down to `str | None`.
 
-    The config dict mixes string scalars with a list of extensional
+    The config dict mixes string scalars with a list of input
     mappings, so its declared value type is `object`. Constructor args
     on `DatamogProcess` are typed precisely; this helper bridges the
     two without sprinkling casts at call sites.

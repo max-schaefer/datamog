@@ -97,8 +97,11 @@ A flag `--X` after the program resolves to an input predicate as follows:
 
 A predicate can be backtick-quoted with characters no `--flag` can express. For
 those, a general `--input <name>=<source>` accepts the exact predicate name. It
-also serves as the escape hatch when an input name collides with a global option
-(see below). `--<input>` is sugar over `--input` for the common case; the old
+also serves as the escape hatch when an input name collides with a global
+option. Because it names its own predicate, `--input name=source` is itself a
+global option (it may appear before the program) and is the way to supply data
+in `--repl` mode, where there is no program to attach `--<input>` flags to.
+`--<input>` is sugar over `--input` for the common case; the old
 `--extensional name=source` spelling is dropped.
 
 ## Evaluation
@@ -126,10 +129,11 @@ the query for the selected output (or, with `--all`, every output's query).
 
 ## REPL
 
-The REPL is unchanged by this proposal. It has no program at launch, so it
-cannot know the input predicates, and there is no output positional. It keeps
-`--data-dir`, `--backend`, and `--json`, loads inputs by the directory
-convention as declarations arrive, and drops the `--extensional` flag.
+The REPL has no program at launch, so it cannot know the input predicates and
+there is no output positional or `--<input>` sugar. It keeps `--data-dir`,
+`--backend`, `--json`, and `--input name=source` (the self-describing form,
+which datamog-magic uses to supply data); un-mapped inputs load by the directory
+convention as declarations arrive. The `--extensional` spelling is dropped.
 
 ## What changes from today
 
