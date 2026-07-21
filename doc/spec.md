@@ -150,7 +150,7 @@ Two groups of words are reserved. **Lexical keywords** cannot appear as a bare
 identifier in any position (predicate, column, or variable):
 
 ```
-extensional    not    in    true    false    null
+extensional    output    predicate    not    in    true    false    null
 string    integer    float    boolean    value
 ```
 
@@ -271,9 +271,12 @@ Statement   ::= ExtDecl | Rule | Query
 ```
 
 Programs are analysed as a whole. Extensional declarations, rules, and
-queries may be freely interleaved, and a query may reference predicates
-declared or defined later in the file. Query results are reported in source
-order.
+queries may be freely interleaved, and a rule or query may reference
+predicates declared or defined later in the file.
+
+A program produces one result per **output**: the single `?-` query (the
+**default output**, §2.4) and each `output predicate` rule (a **named
+output**, §2.3). Results are reported in source order.
 
 ### 2.2 Extensional Declarations
 
@@ -300,7 +303,7 @@ the generated table permit runtime `NULL` values.
 ### 2.3 Rules
 
 ```
-Rule        ::= HeadAtom (':-' BodyElement (',' BodyElement)*)? '.'
+Rule        ::= ('output' 'predicate')? HeadAtom (':-' BodyElement (',' BodyElement)*)? '.'
 HeadAtom    ::= Identifier '(' (HeadTerm (',' HeadTerm)*)? ')'
 HeadTerm    ::= AggregateCall | Expression
 ```
@@ -325,6 +328,22 @@ ancestor(X, Y) :- parent(X, Y).
 ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
 ```
 
+A rule prefixed with `output predicate` defines its predicate exactly as an
+ordinary rule does, and additionally exposes the predicate as a **named
+output**: when the program runs, that predicate's whole relation is reported
+as a result, labelled with the predicate name. Types are inferred as for any
+derived predicate, so the head takes ordinary variable (or aggregate)
+arguments; a predicate is an output if any of its rules carries the marker.
+
+```
+output predicate reachable(X) :- edge("start", X).
+output predicate class_totals(Class, sum(Fee)) :- enrolment(_, Class, Fee).
+```
+
+Named outputs are how a program reports more than one result: a file may
+contain at most one `?-` query (§2.4), so any additional results are written
+as `output predicate` rules.
+
 ### 2.4 Queries
 
 ```
@@ -338,6 +357,12 @@ in the body becomes one output column, in source order of first
 mention. `_` is a wildcard and is never projected. Repeated use of
 the same named variable across positions constrains those positions
 to be equal (just as in rule bodies).
+
+The `?-` query is the program's **default output**, and a file may contain
+**at most one** of them (a second `?-`, or a `?-` together with an
+`output predicate default`, is rejected). Additional results are expressed as
+named outputs (`output predicate`, §2.3). The examples below illustrate query
+*forms*; each is a separate single-query program.
 
 ```
 ?- ancestor("alice", X).            # all descendants of alice
@@ -2101,13 +2126,10 @@ prime(X) :- num(X), not composite(X).
 ```
 extensional scores(student: string, subject: string, score: integer).
 
-student_avg(Student, avg(Score)) :- scores(Student, _, Score).
-total_score(Student, sum(Score)) :- scores(Student, _, Score).
-best_score(Student, max(Score)) :- scores(Student, _, Score).
-record_count(count(*)) :- scores(_, _, _).
-
-?- student_avg(Student, Avg).
-?- record_count(N).
+output predicate student_avg(Student, avg(Score)) :- scores(Student, _, Score).
+output predicate total_score(Student, sum(Score)) :- scores(Student, _, Score).
+output predicate best_score(Student, max(Score)) :- scores(Student, _, Score).
+output predicate record_count(count(*)) :- scores(_, _, _).
 ```
 
 ### String Operations
@@ -2180,15 +2202,13 @@ char_at(I, C) :- text_input(S), I in [0 .. length(S) - 1], C = S[I].
 total(count(*)) :- char_at(_, _).
 freq(C, count(*)) :- char_at(_, C).
 
-prob(C, P) :- freq(C, N), total(T), P = (N * 1.0) / T.
+output predicate prob(C, P) :- freq(C, N), total(T), P = (N * 1.0) / T.
 
 contribution(C, X) :- prob(C, P), X = -1.0 * P * ln(P) / ln(2).
 
-entropy(sum(X)) :- contribution(_, X).
+output predicate entropy(sum(X)) :- contribution(_, X).
 
 ?- freq(C, N).
-?- prob(C, P).
-?- entropy(H).
 ```
 
 ## 10 Error Categories
