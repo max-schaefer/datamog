@@ -117,7 +117,7 @@ export class UrlCsvLoader implements ExtensionalLoader {
   async load(decl: ExtDecl, backend: Backend): Promise<LoadResult> {
     // Accept the `gh:OWNER/REPO/PATH` shorthand (and `github:`) here too,
     // so a CSV-URL field can use the same concise form as the CLI's
-    // `--extensional`. Plain http(s) URLs pass through untouched.
+    // `--input`. Plain http(s) URLs pass through untouched.
     const rawUrl = expandGitHubShorthand(this.csvUrls.get(decl.predicate)!.trim());
     const url = new URL(rawUrl);
     if (url.protocol !== "http:" && url.protocol !== "https:") {

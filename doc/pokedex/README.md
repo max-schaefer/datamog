@@ -60,7 +60,7 @@ Three features of this shape drive the whole design:
 ## Loading: the whole array as one `value`
 
 Declare a single-`value`-column extensional predicate and bind it to the
-URL with `--extensional`:
+URL with the like-named `--pokedex` input flag (after the program):
 
 ```prolog
 extensional pokedex(data: value).
@@ -68,8 +68,8 @@ extensional pokedex(data: value).
 
 ```bash
 bun run datamog \
-  --extensional pokedex=gh:Purukitto/pokemon-data.json/pokedex.json \
-  doc/pokedex/pokedex.dl
+  doc/pokedex/pokedex.dl \
+  --pokedex gh:Purukitto/pokemon-data.json/pokedex.json
 ```
 
 `gh:OWNER/REPO/PATH` is Datamog's GitHub shorthand: it expands to
@@ -272,11 +272,12 @@ and `pokemon_spa(1, SpA)` — one key everywhere.
 
 ## Running it
 
-Because the program now reads five documents, pass an `--extensional`
-flag for each. The demo lookups at the bottom of
+Because the program now reads five documents, pass an input flag for
+each. The demo lookups at the bottom of
 [`pokedex.dl`](pokedex.dl) are deterministic (Bulbasaur is
-always #1). A file has one `?-` default output, so the first lookup is
-the default and the rest are named outputs:
+always #1). The file has one `?-` default output and six named outputs,
+so `--all` evaluates every one (without it, only the default
+`pokemon(1, Name, HP)` prints):
 
 ```prolog
 ?- pokemon(1, Name, HP).
@@ -289,13 +290,13 @@ output predicate bulbasaur_key(ShowdownId) :- showdown_key(1, ShowdownId).
 ```
 
 ```bash
-bun run datamog \
-  --extensional pokedex=gh:Purukitto/pokemon-data.json/pokedex.json \
-  --extensional types=gh:Purukitto/pokemon-data.json/types.json \
-  --extensional moves=https://play.pokemonshowdown.com/data/moves.json \
-  --extensional learnsets=https://play.pokemonshowdown.com/data/learnsets.json \
-  --extensional showdex=https://play.pokemonshowdown.com/data/pokedex.json \
-  doc/pokedex/pokedex.dl
+bun run datamog --all \
+  doc/pokedex/pokedex.dl \
+  --pokedex gh:Purukitto/pokemon-data.json/pokedex.json \
+  --types gh:Purukitto/pokemon-data.json/types.json \
+  --moves https://play.pokemonshowdown.com/data/moves.json \
+  --learnsets https://play.pokemonshowdown.com/data/learnsets.json \
+  --showdex https://play.pokemonshowdown.com/data/pokedex.json
 ```
 
 Bulbasaur comes back as Grass/Poison with Sp. Attack 65, Fighting is

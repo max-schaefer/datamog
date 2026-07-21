@@ -102,7 +102,9 @@ function args, iteration sources, IDB column unification).
 | ---------------------- | ---------------------------------------------- |
 | `--dry-run`            | print generated SQL instead of executing       |
 | `--backend <name>`     | pick a backend (`sqlite`, `sqljs`, `postgres`, `native`, `seminaive`) |
-| `--extensional n=src`  | load EDB `n` from a CSV/JSONL/JSON/MMD file or HTTP(S) URL, Google Sheets, or a GitHub `gh:owner/repo/path` shorthand |
+| `--data-dir <path>`    | base directory loaders read from (defaults to the program's directory) |
+| `--all`                | evaluate every output (default `?-` plus every named output) instead of a single one |
+| `--<input> src`        | supply input predicate `<input>` from a CSV/JSONL/JSON/MMD file or HTTP(S) URL, Google Sheets, or a GitHub `gh:owner/repo/path` shorthand (placed after the program; `--input n=src` for names no flag can express) |
 | `--output-format F`    | output format (`table`, `csv`, `jsonl`, ...)   |
 | `--csv-no-header`      | treat CSV files as headerless                  |
 | `--warn-finiteness`    | warn about predicate columns that may grow unboundedly |

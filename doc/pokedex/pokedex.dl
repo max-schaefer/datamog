@@ -16,15 +16,16 @@
 # `num` field (see showdown_key / learns below).
 #
 # Run it (all five sources fetched live over HTTPS). The two GitHub
-# sources use the `gh:OWNER/REPO/PATH` shorthand (ref defaults to HEAD):
+# sources use the `gh:OWNER/REPO/PATH` shorthand (ref defaults to HEAD).
+# The program has a `?-` default plus named outputs, so `--all` evaluates
+# every one (drop it to see just the default):
 #
-#   bun run datamog \
-#     --extensional pokedex=gh:Purukitto/pokemon-data.json/pokedex.json \
-#     --extensional types=gh:Purukitto/pokemon-data.json/types.json \
-#     --extensional moves=https://play.pokemonshowdown.com/data/moves.json \
-#     --extensional learnsets=https://play.pokemonshowdown.com/data/learnsets.json \
-#     --extensional showdex=https://play.pokemonshowdown.com/data/pokedex.json \
-#     doc/pokedex/pokedex.dl
+#   bun run datamog --all doc/pokedex/pokedex.dl \
+#     --pokedex gh:Purukitto/pokemon-data.json/pokedex.json \
+#     --types gh:Purukitto/pokemon-data.json/types.json \
+#     --moves https://play.pokemonshowdown.com/data/moves.json \
+#     --learnsets https://play.pokemonshowdown.com/data/learnsets.json \
+#     --showdex https://play.pokemonshowdown.com/data/pokedex.json
 
 extensional pokedex(data: value).     # array of Pokemon species
 extensional types(data: value).       # array of 18 types + effectiveness

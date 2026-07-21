@@ -220,9 +220,9 @@ Loaders currently take one `directory` and bind predicate `p` to `p.csv` in it
 (`packages/engine/src/directory-loader.ts`). With modules, each EDB predicate
 loads from its **owner module's** directory. The resolver builds a
 `Map<predicate, ownerDirectory>` and the directory loaders consult it (or the
-resolver constructs one loader instance per module directory). Explicit
-`--extensional name=source` flags still override by predicate name as they do
-now.
+resolver constructs one loader instance per module directory). Explicit input
+flags (`--<input> source`, or `--input name=source`) still override by predicate
+name as they do now.
 
 ### Diagnostics across files
 

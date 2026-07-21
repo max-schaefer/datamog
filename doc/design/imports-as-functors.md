@@ -190,7 +190,8 @@ State these plainly; they are the cost of expansion.
 `datamog main.dl` treats `main.dl` as the root module:
 
 - Its free inputs (`road`, `flight`) load from `road.csv` / `flight.csv` in
-  `main.dl`'s directory, or via `--extensional name=source` overrides.
+  `main.dl`'s directory, or via `--road` / `--flight` input-flag overrides
+  (`--input name=source` for names no flag can express).
 - Its single unnamed `?-` output prints.
 - Named `output predicate`s can be requested with a flag (for example
   `--output road_reach`); this is the CLI's equivalent of selecting a named

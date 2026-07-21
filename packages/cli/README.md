@@ -25,22 +25,22 @@ bun run datamog --backend native program.dl
 bun run datamog --backend seminaive program.dl
 
 # Specify a separate data directory
-bun run datamog program.dl ./data
+bun run datamog --data-dir ./data program.dl
 
-# Load a predicate from a specific file or HTTP(S) URL
-bun run datamog --extensional parent=/path/to/parents.csv program.dl
-bun run datamog --extensional parent=https://example.com/parents.csv program.dl
+# Load a predicate from a specific file or HTTP(S) URL (input flags follow the program)
+bun run datamog program.dl --parent /path/to/parents.csv
+bun run datamog program.dl --parent https://example.com/parents.csv
 
 # Load a predicate from a Google Sheet (requires GOOGLE_API_KEY)
 GOOGLE_API_KEY=... bun run datamog \
-  --extensional scores=https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit \
-  program.dl
+  program.dl \
+  --scores https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit
 
 # Multiple explicit sources
 bun run datamog \
-  --extensional edges=graph.csv \
-  --extensional weights=weights.jsonl \
-  program.dl
+  program.dl \
+  --edges graph.csv \
+  --weights weights.jsonl
 
 # Preview generated SQL without executing
 bun run datamog --dry-run program.dl
@@ -48,7 +48,7 @@ bun run datamog --dry-run program.dl
 
 ## Loading data
 
-By default, the CLI looks for data files in the data directory (the directory containing the `.dl` file, or an explicit second argument). You can override this for individual predicates with `--extensional name=source`, where `source` is a local path, an HTTP(S) URL ending in a supported extension, a Google Sheets share URL, or a GitHub shorthand (`github:OWNER/REPO/PATH[#REF]`, `gh:` alias; `REF` defaults to `HEAD`).
+By default, the CLI looks for data files in the data directory (the directory containing the `.dl` file, or the directory given by `--data-dir`). You can override an individual input predicate `p` with a like-named flag `--p source` (placed after the program; a kebab flag like `--road-network` aliases the predicate `road_network`), or `--input name=source` for a name no flag can express, where `source` is a local path, an HTTP(S) URL ending in a supported extension, a Google Sheets share URL, or a GitHub shorthand (`github:OWNER/REPO/PATH[#REF]`, `gh:` alias; `REF` defaults to `HEAD`).
 
 Five formats are supported:
 
@@ -83,18 +83,18 @@ Place a file named `<predicate>.mmd` (a Mermaid `graph TD` / `graph LR` block) i
 
 ### Google Sheets
 
-Pass a Google Sheets share URL via `--extensional`:
+Pass a Google Sheets share URL as the input predicate's source:
 
 ```bash
 # Public spreadsheets work without any auth configuration
 bun run datamog \
-  --extensional scores=https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit \
-  program.dl
+  program.dl \
+  --scores https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit
 
 # For private sheets, set GOOGLE_API_KEY or service account credentials
 GOOGLE_API_KEY=... bun run datamog \
-  --extensional scores=https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit \
-  program.dl
+  program.dl \
+  --scores https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit
 ```
 
 The sheet must have a header row with column names matching the `extensional` declaration. Public spreadsheets are fetched via CSV export and require no credentials. For private sheets, set `GOOGLE_API_KEY` or `GOOGLE_SERVICE_ACCOUNT_EMAIL` + `GOOGLE_PRIVATE_KEY`.
@@ -103,8 +103,10 @@ The sheet must have a header row with column names matching the `extensional` de
 
 | Option | Description |
 |--------|-------------|
-| `--extensional name=source` | Map a predicate to a local file or HTTP(S) URL (`.csv`, `.jsonl`, `.json`, `.mmd`), a Google Sheets URL, or a GitHub shorthand `github:OWNER/REPO/PATH[#REF]` (`gh:` alias) |
-| `--data-dir <path>` | Directory loaders read from in `--repl` mode (defaults to the current working directory) |
+| `--<input> source` | Supply data for input predicate `<input>` from a local file or HTTP(S) URL (`.csv`, `.jsonl`, `.json`, `.mmd`), a Google Sheets URL, or a GitHub shorthand `github:OWNER/REPO/PATH[#REF]` (`gh:` alias). Placed after the program; a kebab flag aliases a snake_case predicate |
+| `--input name=source` | Same, with an explicit predicate name (escape hatch for names no flag can express) |
+| `--data-dir <path>` | Base directory loaders read from (defaults to the program's directory; the current working directory in `--repl` mode) |
+| `--all` | Evaluate every output (the default `?-` plus every named output) instead of a single one |
 | `--output-format <format>` | Output format: `table` (default), `csv`, `jsonl`, `jsonl-flat`, `mermaid`, or `ascii-graph` |
 | `--csv-no-header` | CSV files have no header row (columns are matched by position) |
 | `--dry-run` | Print generated SQL without executing |

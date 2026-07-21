@@ -10,14 +10,14 @@ Given a Datamog program that declares an extensional predicate:
 extensional parent(name: string, child: string).
 ```
 
-Point it at a Google Sheet with `--extensional`:
+Point it at a Google Sheet with the predicate's like-named input flag (after the program):
 
 ```bash
 # Public sheet (API key)
-GOOGLE_API_KEY=... bun run datamog --extensional parent=https://docs.google.com/spreadsheets/d/SPREADSHEET_ID program.dl
+GOOGLE_API_KEY=... bun run datamog program.dl --parent https://docs.google.com/spreadsheets/d/SPREADSHEET_ID
 
 # Private sheet (service account)
-GOOGLE_SERVICE_ACCOUNT_EMAIL=... GOOGLE_PRIVATE_KEY=... bun run datamog --extensional parent=https://docs.google.com/spreadsheets/d/SPREADSHEET_ID program.dl
+GOOGLE_SERVICE_ACCOUNT_EMAIL=... GOOGLE_PRIVATE_KEY=... bun run datamog program.dl --parent https://docs.google.com/spreadsheets/d/SPREADSHEET_ID
 ```
 
 The first row of the sheet must contain headers that match the declared column names (e.g. `name`, `child`).
@@ -64,7 +64,7 @@ Each predicate is mapped to a spreadsheet via the `sheets` option:
 }
 ```
 
-When using the CLI with `--extensional`, the spreadsheet ID is extracted from the Google Sheets URL automatically. To select a specific tab, there is currently no CLI flag — the default tab `Sheet1` is used.
+When using the CLI with an input flag, the spreadsheet ID is extracted from the Google Sheets URL automatically. To select a specific tab, there is currently no CLI flag — the default tab `Sheet1` is used.
 
 ## Programmatic API
 

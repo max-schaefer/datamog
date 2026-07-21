@@ -1,6 +1,6 @@
 // `gh:OWNER/REPO/PATH` shorthand for the pandas raw CSV — the playground's
 // CSV-URL loader expands it to https://raw.githubusercontent.com/.../HEAD/...
-// just like the CLI's `--extensional` does.
+// just like the CLI's `--input` does.
 export const TITANIC_CSV_URL = "gh:pandas-dev/pandas/doc/data/titanic.csv";
 
 export const titanicExample = {

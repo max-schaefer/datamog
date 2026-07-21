@@ -10,7 +10,7 @@
  * `github:owner/repo/data.json#v1.2.0`. Sources that aren't a `github:` /
  * `gh:` shorthand are returned unchanged.
  *
- * Shared by the CLI's `--extensional` parsing and the playground's URL
+ * Shared by the CLI's `--input` parsing and the playground's URL
  * loaders so the two surfaces accept identical shorthands.
  */
 export function expandGitHubShorthand(source: string): string {
