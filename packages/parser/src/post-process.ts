@@ -718,10 +718,30 @@ export function postProcess(program: Program): void {
       }
       return false;
     };
+    // A constructor term is a match; matching hoists a proof capture into the
+    // enclosing body. That capture range-restricts the proof variable, which
+    // cannot happen inside a negation (`not X = Ctor(...)`, desugared to a `!`
+    // UnaryExpr, or a negated atom). Hoisting it positively there silently
+    // changes the meaning, so reject it, like a negated proof capture.
+    const hasNegationAncestor = (node: AstNode): boolean => {
+      let cur = node.$container;
+      while (cur) {
+        if (cur.$type === "UnaryExpr" && (cur as { op?: string }).op === "!") return true;
+        if (isLiteral(cur) && cur.negated) return true;
+        cur = cur.$container;
+      }
+      return false;
+    };
 
     const topLevel: FunctionCall[] = [];
     for (const node of streamAll(program)) {
       if (isFunctionCall(node) && seenCtors.has(node.name) && !hasCtorAncestor(node)) {
+        if (hasNegationAncestor(node)) {
+          throw parseErrorAtNode(
+            "A constructor pattern may not appear under negation; match it in a positive body element instead (e.g. capture the proof, then negate a guard on it)",
+            node,
+          );
+        }
         topLevel.push(node);
       }
     }

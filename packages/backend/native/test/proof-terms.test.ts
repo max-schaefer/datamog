@@ -217,6 +217,16 @@ describe("proof terms", () => {
         /negated atom/,
       );
     });
+
+    test("rejects a constructor pattern under negation", async () => {
+      // `not P = Some(3)` hoisted the proof capture positively, silently
+      // meaning "a Some(3) proof exists and P != it" instead of "P is not a
+      // Some(3) match" (so it dropped every row when no Some(3) existed).
+      // Reject it, like a negated proof capture.
+      await expect(
+        run("val(5). val(6).\nopt()[Some] :- val(X).\nr(P) :- P : opt, not P = Some(3).\n?- r(P)."),
+      ).rejects.toThrow(/constructor pattern may not appear under negation/);
+    });
   });
 
   describe("destructuring", () => {
