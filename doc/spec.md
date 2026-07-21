@@ -667,6 +667,14 @@ Index conventions:
   empty value), and `NULL` for `value` subscripts that fall out of
   range.
 
+> **Cross-backend variance.** Strings containing an embedded NUL
+> character (`U+0000`, reachable via `parse_json("\"\\u0000\"")`) are
+> not portable. `length`, subscript, and slice count Unicode code
+> points on the native/seminaive backends, but SQLite/sql.js treat a
+> NUL as a C-string terminator (so `length` and `SUBSTR` stop there),
+> and PostgreSQL's `text`/`jsonb` cannot store `U+0000` at all. Avoid
+> embedded NULs in string data if cross-backend behaviour matters.
+
 #### Function Calls
 
 Only the following built-in functions are allowed. Using an unknown
