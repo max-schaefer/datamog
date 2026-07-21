@@ -263,17 +263,25 @@ export function analyze(program: Program): AnalyzedProgram {
         if (stmt.output && !emittedOutputs.has(stmt.head.predicate)) {
           emittedOutputs.add(stmt.head.predicate);
           const usedNames = new Set<string>();
+          // A proof-carrying rule's head ends with an injected proof term
+          // (an object literal). Read it into a synthetic `$`-name so
+          // `queryProjection` hides it, exactly as a hand-written `?- p(...)`
+          // query hides the proof (spec §8.3), rather than leaking it as a
+          // `colN` output column.
+          const proofColumn = stmt.ruleName !== undefined ? stmt.head.args.length - 1 : -1;
           const projVars = stmt.head.args.map((arg, i) => {
             // Name each output column after the head's variable, or an
             // aggregate's function (`avg`, `count`, ...); fall back to a
             // positional name for any other computed head argument.
             const a = arg as { $type: string; name?: string; func?: string };
             let name =
-              a.$type === "Variable" && a.name
-                ? a.name
-                : a.$type === "AggregateCall" && a.func
-                  ? a.func
-                  : `col${i + 1}`;
+              i === proofColumn
+                ? "$proof"
+                : a.$type === "Variable" && a.name
+                  ? a.name
+                  : a.$type === "AggregateCall" && a.func
+                    ? a.func
+                    : `col${i + 1}`;
             while (usedNames.has(name)) name = `${name}_`;
             usedNames.add(name);
             return { $type: "Variable", name };
