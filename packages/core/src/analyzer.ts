@@ -264,7 +264,16 @@ export function analyze(program: Program): AnalyzedProgram {
           emittedOutputs.add(stmt.head.predicate);
           const usedNames = new Set<string>();
           const projVars = stmt.head.args.map((arg, i) => {
-            let name = arg.$type === "Variable" ? arg.name : `col${i + 1}`;
+            // Name each output column after the head's variable, or an
+            // aggregate's function (`avg`, `count`, ...); fall back to a
+            // positional name for any other computed head argument.
+            const a = arg as { $type: string; name?: string; func?: string };
+            let name =
+              a.$type === "Variable" && a.name
+                ? a.name
+                : a.$type === "AggregateCall" && a.func
+                  ? a.func
+                  : `col${i + 1}`;
             while (usedNames.has(name)) name = `${name}_`;
             usedNames.add(name);
             return { $type: "Variable", name };
