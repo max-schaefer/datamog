@@ -162,6 +162,11 @@ function renderEventsInteractive(events: ReplEvent[]): void {
         console.log(`added rule for ${ev.predicate}/${ev.arity}`);
         break;
       case "result": {
+        // Named outputs print under their name; the transient `?-` default
+        // (label "default") is the user's own query, so it needs no header.
+        if (ev.label && ev.label !== "default") {
+          console.log(`-- ${ev.label}`);
+        }
         if (ev.rows.length === 0) {
           console.log("(no rows)");
         } else {
@@ -169,6 +174,7 @@ function renderEventsInteractive(events: ReplEvent[]): void {
         }
         break;
       }
+
       case "info":
         console.log(ev.message);
         break;

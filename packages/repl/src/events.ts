@@ -41,6 +41,9 @@ export interface ResultEvent {
   sql: string;
   /** Original Datalog source text for the query. */
   source: string | undefined;
+  /** For a named output (`output predicate`), the output predicate's name.
+   *  "default" for the `?-` query; undefined when not tracked. */
+  label?: string;
 }
 
 export interface InfoEvent {

@@ -250,6 +250,7 @@ function toResultEvent(r: QueryResultWithTypes): ReplEvent {
     rows: r.rows,
     sql: r.sql,
     source: r.source,
+    label: r.label,
   };
 }
 

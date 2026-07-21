@@ -2,7 +2,6 @@ import {
   AnalyzerError,
   type PrimitiveType,
   type Program,
-  type Query,
   type Statement,
   type TypedProgram,
   analyze,
@@ -58,7 +57,10 @@ export class IncrementalSession {
   private statements: Statement[] = [];
   private appliedTables = new Set<string>();
   private appliedViews = new Set<string>();
-  private appliedQueries = new WeakSet<Query>();
+  // Named outputs (`output predicate`) come from accumulated rules and are
+  // re-synthesised on every re-analysis; this tracks which have already been
+  // emitted so each prints once, not once per subsequent chunk.
+  private appliedOutputs = new Set<string>();
   private lastTyped: TypedProgram | undefined;
   private loaders: ExtensionalLoader[];
 
@@ -118,7 +120,11 @@ export class IncrementalSession {
       ? await this.applyNative(analyzed, fragment.statements)
       : await this.applySql(analyzed);
 
-    this.statements = merged.statements;
+    // A `?-` query is a one-shot question, not part of the program being
+    // built, so it is not accumulated. Keeping only declarations and rules
+    // lets a session ask many queries in turn without them piling up and
+    // tripping the one-default-output rule.
+    this.statements = merged.statements.filter((s) => s.$type !== "Query");
     this.lastTyped = analyzed;
     return result;
   }
@@ -209,14 +215,25 @@ export class IncrementalSession {
     const queries: QueryResultWithTypes[] = [];
     for (let i = 0; i < analyzed.queries.length; i++) {
       const q = analyzed.queries[i]!;
-      if (this.appliedQueries.has(q)) continue;
-      this.appliedQueries.add(q);
+      const name = q.outputName;
+      // A named output emits once, keyed by name. The `?-` default (name
+      // "default") is transient and always runs.
+      if (name && name !== "default") {
+        if (this.appliedOutputs.has(name)) continue;
+        this.appliedOutputs.add(name);
+      }
       const querySql = translation.queries[i]!;
       const rawRows = await this.backend.execute(querySql);
       const colTypes = translation.queryColumnTypes[i] ?? {};
       const boolCoerced = coerceBooleanColumns(rawRows, colTypes);
       const rows = coerceJsonColumns(boolCoerced, colTypes);
-      queries.push({ sql: querySql, source: q.$cstNode?.text, rows, columnTypes: colTypes });
+      queries.push({
+        sql: querySql,
+        source: q.$cstNode?.text,
+        label: name,
+        rows,
+        columnTypes: colTypes,
+      });
     }
 
     return { declarations, rules, queries };
@@ -259,12 +276,16 @@ export class IncrementalSession {
     const queries: QueryResultWithTypes[] = [];
     for (let i = 0; i < analyzed.queries.length; i++) {
       const q = analyzed.queries[i]!;
-      if (this.appliedQueries.has(q)) continue;
-      this.appliedQueries.add(q);
+      const name = q.outputName;
+      if (name && name !== "default") {
+        if (this.appliedOutputs.has(name)) continue;
+        this.appliedOutputs.add(name);
+      }
       const r = allResults[i];
       // Native backends don't surface a per-query column-type map at this
       // layer — the translator does, but we don't run it for native. Emit
-      // an empty map; consumers infer from row values.
+      // an empty map; consumers infer from row values. `r.label` already
+      // carries the output name (set by evaluateProgram).
       if (r) queries.push({ ...r, columnTypes: {} });
     }
 
