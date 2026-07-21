@@ -556,10 +556,13 @@ export class SqliteSqlDialect implements SqlDialect {
   }
 
   jsonStringify(jsonSql: string): string {
-    // SQLite stores `value`s as canonical JSON TEXT (jsonb key order,
-    // no whitespace) — exactly the form `to_json` should
-    // return, so this is just an identity expression.
-    return `(${jsonSql})`;
+    // SQLite stores `value`s as canonical JSON TEXT (jsonb key order, no
+    // whitespace). Object/array/quoted-string/true/false/null leaves are
+    // already TEXT, but a numeric scalar leaf carries SQLite numeric
+    // affinity, so cast to TEXT to get the canonical decimal text that
+    // `to_json` (spec: returns a string) and `concat` require — otherwise
+    // `to_json(parse_json("42"))` is the number 42, not the text "42".
+    return `CAST(${jsonSql} AS TEXT)`;
   }
 
   toJson(valueSql: string, valueType: PrimitiveType): string {

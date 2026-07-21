@@ -128,6 +128,13 @@ function validateDirectJsonValue(value: unknown, column: ColumnDecl): JsonValue 
   return value;
 }
 
+// Integers are stored in SQL `INTEGER` columns, which are int4 on Postgres
+// (max 2,147,483,647). Both loaders cap accepted integers at 9 digits so any
+// value fits int4 on every backend; a wider value would load on sqlite/native
+// but overflow int4 on Postgres. `coerceValue` enforces this via its regex;
+// `checkValue` (already-typed formats) checks the numeric bound directly.
+const MAX_PORTABLE_INTEGER = 999_999_999;
+
 /**
  * Coerce a string value to the given SQL type, throwing on invalid values.
  * Use for string-based formats like CSV and Google Sheets.
@@ -222,9 +229,18 @@ export function checkValue(value: unknown, type: PrimitiveType, context?: string
       // already rounded any number outside ±(2^53 - 1) to a nearby
       // representable integer, so `Number.isInteger` would happily
       // accept the rounded value and the precision loss never
-      // surfaces. Match the `as_integer.value` builtin's gate
-      // (values.ts:381).
-      if (typeof value === "number" && Number.isSafeInteger(value)) return value;
+      // surfaces.
+      if (typeof value === "number" && Number.isSafeInteger(value)) {
+        // Cap at the portable INTEGER range `coerceValue` enforces, so
+        // JSONL/JSON data that loads on sqlite/native can't silently
+        // overflow int4 on Postgres.
+        if (Math.abs(value) > MAX_PORTABLE_INTEGER) {
+          throw new Error(
+            `Integer ${value} is out of range for an INTEGER column (max ${MAX_PORTABLE_INTEGER})${ctx}`,
+          );
+        }
+        return value;
+      }
       throw new Error(`Expected integer but got ${JSON.stringify(value)}${ctx}`);
     case "float":
       // `Number.isFinite` rather than just `typeof === "number"`:

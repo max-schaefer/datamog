@@ -15,7 +15,8 @@ describe("nullary predicates", () => {
   test("non-recursive nullary view uses a single marker column", () => {
     const r = tr("extensional q(x: integer).\np() :- q(1).\n?- p().");
     const view = r.createViews.find((v) => v.includes('"p"'))!;
-    expect(norm(view)).toContain("SELECT 1 AS col1 FROM");
+    // Single-rule non-recursive views emit `SELECT DISTINCT` so the view is a set.
+    expect(norm(view)).toContain("SELECT DISTINCT 1 AS col1 FROM");
   });
 
   test("negated nullary atom compiles to NOT EXISTS", () => {

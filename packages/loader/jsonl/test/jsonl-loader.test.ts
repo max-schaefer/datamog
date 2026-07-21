@@ -125,6 +125,20 @@ describe("JsonlLoader", () => {
     expect(loader.readRows(decl)).rejects.toThrow(/Expected integer/);
   });
 
+  test("Regression: rejects an integer that overflows a portable INTEGER column", () => {
+    // `checkValue` gated integers only on `Number.isSafeInteger` (2^53),
+    // while `coerceValue` (CSV) caps at 9 digits so the value fits every
+    // backend's INTEGER column (Postgres int4). So a JSONL integer above
+    // ~10^9 loaded on sqlite/native but overflowed int4 on Postgres, a
+    // cross-backend split. Both loaders must reject the same range.
+    const decl = getExtDecl("extensional t(n: integer).");
+    expect(() => parseJsonlContent('{"n": 3000000000}', decl, { source: "t.jsonl" })).toThrow(
+      /integer/i,
+    );
+    // A value inside the portable range still loads.
+    expect(() => parseJsonlContent('{"n": 999999999}', decl, { source: "t.jsonl" })).not.toThrow();
+  });
+
   test("error line number reflects the source file, not the post-filter index", async () => {
     // Regression: blank lines were stripped before line numbering, so
     // a parse/type error on source line 4 was reported as `line 2` if

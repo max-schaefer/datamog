@@ -1734,4 +1734,35 @@ describe("DatamogExecutor", () => {
       await backend.close();
     }
   });
+
+  test("Regression: an aggregate over a projected single-rule IDB view treats it as a set", async () => {
+    // A single-rule non-recursive IDB view was emitted as a lone SELECT (no
+    // UNION, so no dedup). When the rule projected away a body variable the
+    // view held duplicate rows, so an aggregate reading it over-counted on the
+    // SQL backends; the interpreters dedup IDB tuples. IDB relations are sets.
+    const program = `
+      e(1, 5, 100). e(1, 5, 200). e(1, 7, 300).
+      mid(G, X) :- e(G, X, Y).
+      r(G, sum(X), count(X)) :- mid(G, X).
+      ?- r(G, S, C).
+    `;
+    for (const results of await executeOnSqliteAndNative(program)) {
+      expect(sortRows(results[0]!)).toEqual([{ G: 1, S: 12, C: 2 }]);
+    }
+  });
+
+  test("Regression: to_json of a numeric JSON scalar returns canonical text on every backend", async () => {
+    // `to_json` is spec'd to return a `string` (canonical JSON text). On
+    // SQLite a number leaf kept numeric affinity, so `to_json(parse_json(42))`
+    // was the number 42, not the text "42", and failed to dedup/join against
+    // the string "42".
+    const program = `
+      n(X) :- X = to_json(parse_json("42")).
+      n(X) :- X = "42".
+      ?- n(X).
+    `;
+    for (const results of await executeOnSqliteAndNative(program)) {
+      expect(sortRows(results[0]!)).toEqual([{ X: "42" }]);
+    }
+  });
 });

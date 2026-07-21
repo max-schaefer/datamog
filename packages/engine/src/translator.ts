@@ -244,8 +244,13 @@ function translateViews(
     if (!isRecursive) {
       const predicate = stratum[0]!;
       const rules = analyzed.rules.get(predicate)!;
+      // `UNION` already dedups two or more rules, but a single rule is a lone
+      // SELECT that does not: a rule projecting away a body variable would
+      // leave the view a bag, so an aggregate reading it over-counts. Emit
+      // `SELECT DISTINCT` for the single-rule case so every IDB view is a set.
+      const distinct = rules.length === 1;
       const ruleQueries = rules.map((rule) =>
-        translateRule(rule, analyzed, undefined, undefined, dialect),
+        translateRule(rule, analyzed, undefined, undefined, dialect, distinct),
       );
       const unionBody = ruleQueries.join("\n  UNION\n");
       sql.push(dialect.createView(predicate, unionBody));
@@ -319,8 +324,11 @@ function translateRule(
   renameMap: Map<string, string> | undefined,
   tagMap: Map<string, string> | undefined,
   dialect: SqlDialect,
+  distinct = false,
 ): string {
   if (rule.body.length === 0) {
+    // A fact is a single constant row and cannot duplicate, so `distinct`
+    // never matters here.
     return translateFact(rule, analyzed, dialect);
   }
 
@@ -812,7 +820,7 @@ function translateRule(
   // proposition holds. `colList` / `emptyAnchor` use the same `col1` shape, and
   // queries read it via the ground-query probe or NOT EXISTS, never project it.
   const selectList = selectParts.length > 0 ? selectParts.join(", ") : "1 AS col1";
-  const selectClause = markSpan(rule.head, `SELECT ${selectList}`);
+  const selectClause = markSpan(rule.head, `SELECT ${distinct ? "DISTINCT " : ""}${selectList}`);
   let sql = selectClause;
   if (fromParts.length > 0) {
     sql += ` FROM ${fromParts.join(", ")}`;

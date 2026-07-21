@@ -875,8 +875,10 @@ describe("translator", () => {
       renamed(X) :- t(Y), Y = X.
       incremented(Y) :- t(X), X + 1 = Y.
     `);
-    expect(norm(result.createViews[0]!)).toContain('SELECT __b0."x" AS col1');
-    expect(norm(result.createViews[1]!)).toContain('SELECT (__b0."x" + 1) AS col1');
+    // Single-rule views emit `SELECT DISTINCT` so the view is a set even when
+    // the rule projects away a body variable.
+    expect(norm(result.createViews[0]!)).toContain('SELECT DISTINCT __b0."x" AS col1');
+    expect(norm(result.createViews[1]!)).toContain('SELECT DISTINCT (__b0."x" + 1) AS col1');
   });
 
   test("equality-bound value variable keeps value type for subscript", () => {
