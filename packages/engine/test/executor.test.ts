@@ -1784,4 +1784,44 @@ describe("DatamogExecutor", () => {
       expect(sortRows(results[0]!)).toEqual([{ X: "42" }]);
     }
   });
+
+  test("Regression: a quoted identifier with a quote survives mutual-recursion NULL padding", async () => {
+    // `findTopLevelFrom` (the SQLite mutual-recursion NULL-padding helper)
+    // scanned the emitted SELECT tracking `'...'` strings but not `"..."`
+    // identifiers, so a quoted column name containing a `'` desynced the scan.
+    // The FROM splice point was lost and the padded rule emitted
+    // `... FROM "e" AS __b0, NULL` (a syntax error). Native was unaffected.
+    const src = [
+      "extensional e(`o'brien`: string).",
+      "`hi`(V) :- e(V).",
+      "`hi`(V) :- q(V, _).",
+      "q(X, X) :- `hi`(X).",
+      "?- `hi`(A).",
+    ].join("\n");
+    const loader: ExtensionalLoader = {
+      name: "e-loader",
+      async canLoad(d) {
+        return d.predicate === "e";
+      },
+      async load(d, backend) {
+        await insertRows(backend, d, [{ "o'brien": "a" }]);
+        return { rowsLoaded: 1 };
+      },
+    };
+    const sqlite = await createSqlite();
+    try {
+      const sq = (await new DatamogExecutor(sqlite, [loader]).execute(src)).map((q) => q.rows);
+      const { create: createNative } = await import("../../backend/native/src/index.ts");
+      const native = await createNative();
+      try {
+        const na = (await new DatamogExecutor(native, [loader]).execute(src)).map((q) => q.rows);
+        expect(sortRows(sq[0]!)).toEqual([{ A: "a" }]);
+        expect(sortRows(na[0]!)).toEqual([{ A: "a" }]);
+      } finally {
+        await native.close();
+      }
+    } finally {
+      await sqlite.close();
+    }
+  });
 });

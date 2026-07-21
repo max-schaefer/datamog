@@ -54,6 +54,22 @@ function findTopLevelFrom(sql: string): number {
         }
         i++;
       }
+    } else if (ch === '"') {
+      // Skip a double-quoted identifier (`"o'brien"`, `"a(b"`); without this
+      // a `'` or `(` inside a quoted name desyncs the string/paren tracking
+      // and the top-level FROM is missed. Honour the `""` escape.
+      i++;
+      while (i < sql.length) {
+        if (sql[i] === '"') {
+          if (sql[i + 1] === '"') {
+            i += 2;
+            continue;
+          }
+          i++;
+          break;
+        }
+        i++;
+      }
     } else if (depth === 0 && sql.slice(i, i + 6) === " FROM ") {
       return i;
     } else {
