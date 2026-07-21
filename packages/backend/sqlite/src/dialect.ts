@@ -352,31 +352,25 @@ export class SqliteSqlDialect implements SqlDialect {
     return resultType === "integer" ? `CAST(${rounded} AS INTEGER)` : rounded;
   }
 
-  jsonSubscript(receiverSql: string, indexSql: string, indexIsString: boolean): string {
-    // SQLite stores JSON as TEXT. Integer subscripts can use
-    // `json_extract` array paths directly; the translator guards the
-    // negative-index case before reaching this hook.
+  jsonSubscript(receiverSql: string, indexSql: string, _indexIsString: boolean): string {
+    // Iterate the receiver's entries with `json_each` and compare the key
+    // literally, matching Postgres's `->`/`->>` and the native evaluator's
+    // `Object.hasOwn`. This handles both index kinds without branching:
+    // `json_each` keys an object by its text keys and an array by integer
+    // keys, and a comparison across storage classes (a string index vs an
+    // array's integer key, or an integer index vs an object's text key)
+    // never matches, so cross-kind access yields SQL NULL just as the native
+    // evaluator does. A scalar/null receiver has no matching entry.
     //
-    // String-keyed lookup is deliberately *not* emitted as a JSON path.
-    // Even the quoted-label path form (`$."key"`) needs JSON-path
-    // escaping for embedded quotes / backslashes, and building that
-    // correctly in SQL is brittle. Iterate object entries instead and
-    // compare the emitted key literally, matching Postgres's `-> text`
-    // operator and the native evaluator's `Object.hasOwn` for every key
-    // string. Non-object receivers and missing keys yield zero rows, so
-    // the scalar subquery naturally returns SQL NULL.
-    if (indexIsString) {
-      const value = jsonScalarAsCanonical("je.type", "je.value");
-      return `(SELECT ${value}
-        FROM json_each(CASE WHEN json_type(${receiverSql}) = 'object' THEN ${receiverSql} ELSE NULL END) AS je
-        WHERE je.key = ${indexSql}
-        LIMIT 1)`;
-    }
-    const path = `'$[' || CAST(${indexSql} AS TEXT) || ']'`;
-    return jsonScalarAsCanonical(
-      `json_type(${receiverSql}, ${path})`,
-      `json_extract(${receiverSql}, ${path})`,
-    );
+    // Crucially `json_each` references the receiver exactly once, so a chained
+    // `V["a"]["b"]` / `V[0][0]` grows the SQL linearly instead of duplicating
+    // the receiver per level (which overflowed SQLite's parser). The
+    // translator guards negative integer indices before this hook.
+    const value = jsonScalarAsCanonical("je.type", "je.value");
+    return `(SELECT ${value}
+      FROM json_each(${receiverSql}) AS je
+      WHERE je.key = ${indexSql}
+      LIMIT 1)`;
   }
 
   jsonSlice(receiverSql: string, startSql: string | null, endSql: string | null): string {
@@ -395,14 +389,18 @@ export class SqliteSqlDialect implements SqlDialect {
     // evaluator. Without the outer type guard, `json_each({})`
     // reaggregates object entries into `[]` or a value array.
     const start = startSql ?? "0";
-    const end = endSql ?? `json_array_length(${receiverSql})`;
     const value = jsonScalarAsCanonical("je.type", "je.value");
-    return `(CASE WHEN json_type(${receiverSql}) = 'array' THEN
+    // Bind the receiver once (as `r.v`): the array guard, the default end
+    // bound, and json_each would otherwise each re-embed it, so a chained
+    // `V[0][1:3]` grew the SQL exponentially and overflowed the parser.
+    const end = endSql ?? "json_array_length(r.v)";
+    return `(SELECT CASE WHEN json_type(r.v) = 'array' THEN
       COALESCE((SELECT json_group_array(json(${value}))
-        FROM (SELECT type, value FROM json_each(${receiverSql})
+        FROM (SELECT type, value, key FROM json_each(r.v)
               WHERE key >= ${start} AND key < ${end}
               ORDER BY key) AS je), '[]')
-      ELSE NULL END)`;
+      ELSE NULL END
+    FROM (SELECT ${receiverSql} AS v) AS r)`;
   }
 
   jsonIterate(

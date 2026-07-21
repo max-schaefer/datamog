@@ -1751,6 +1751,25 @@ describe("DatamogExecutor", () => {
     }
   });
 
+  test("Regression: deep chained value subscript and slice do not overflow the SQL parser", async () => {
+    // The SQLite dialect re-embedded the receiver in jsonSubscript/jsonSlice,
+    // so a chained V["a"]["a"]["a"]["a"] / V[0][0][0][0] grew the generated SQL
+    // exponentially and overflowed the parser at depth 4. Referencing the
+    // receiver once makes the growth linear. Native references it once already.
+    const obj = `r(Y) :- Y = {"a": {"a": {"a": {"a": 9}}}}["a"]["a"]["a"]["a"].\n?- r(Y).`;
+    for (const results of await executeOnSqliteAndNative(obj)) {
+      expect(results[0]!).toEqual([{ Y: 9 }]);
+    }
+    const arr = "r(Y) :- Y = [[[[7]]]][0][0][0][0].\n?- r(Y).";
+    for (const results of await executeOnSqliteAndNative(arr)) {
+      expect(results[0]!).toEqual([{ Y: 7 }]);
+    }
+    const slc = "r(Y) :- Y = [[[[1, 2, 3, 4]]]][0][0][0][1:3].\n?- r(Y).";
+    for (const results of await executeOnSqliteAndNative(slc)) {
+      expect(results[0]!).toEqual([{ Y: [2, 3] }]);
+    }
+  });
+
   test("Regression: to_json of a numeric JSON scalar returns canonical text on every backend", async () => {
     // `to_json` is spec'd to return a `string` (canonical JSON text). On
     // SQLite a number leaf kept numeric affinity, so `to_json(parse_json(42))`
