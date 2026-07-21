@@ -273,18 +273,19 @@ and `pokemon_spa(1, SpA)` — one key everywhere.
 ## Running it
 
 Because the program now reads five documents, pass an `--extensional`
-flag for each. The queries at the bottom of
+flag for each. The demo lookups at the bottom of
 [`pokedex.dl`](pokedex.dl) are deterministic (Bulbasaur is
-always #1):
+always #1). A file has one `?-` default output, so the first lookup is
+the default and the rest are named outputs:
 
 ```prolog
 ?- pokemon(1, Name, HP).
-?- type(1, Type).
-?- pokemon_spa(1, SpA).
-?- super_effective("Fighting", Defender).
-?- move_category("absorb", Category).
-?- move_priority("quickattack", Priority).
-?- showdown_key(1, ShowdownId).
+output predicate bulbasaur_type(Type) :- type(1, Type).
+output predicate bulbasaur_spa(SpA) :- pokemon_spa(1, SpA).
+output predicate fighting_hits(Defender) :- super_effective("Fighting", Defender).
+output predicate absorb_category(Category) :- move_category("absorb", Category).
+output predicate quickattack_priority(Priority) :- move_priority("quickattack", Priority).
+output predicate bulbasaur_key(ShowdownId) :- showdown_key(1, ShowdownId).
 ```
 
 ```bash

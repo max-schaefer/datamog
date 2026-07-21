@@ -4,7 +4,8 @@ kind: content
 section: "Recursion"
 ---
 
-The same `reach` predicate answers questions in every direction:
+The same `reach` predicate answers questions in every direction. A file
+runs one query; change it to ask each one:
 
 ```datamog
 extensional line(from: string, to: string).
@@ -12,11 +13,12 @@ reach(X, Y) :- line(X, Y).
 reach(X, Y) :- line(X, Z), reach(Z, Y).
 
 ?- reach("Taipei Main Station", Y).             # where can I get to?
-?- reach(X, "Zhongshan").                       # which stations reach Zhongshan?
-?- reach("Taipei Main Station", "Zhongshan").   # yes/no: is Zhongshan reachable?
-?- reach(X, Y).                                 # every reachable pair
 ```
 
 <div class="note">
-We describe <em>what</em> a path is, once, and the engine searches in the direction the question needs.
+We describe <em>what</em> a path is, once, and the engine searches in the
+direction the question needs. Swap in <code>?- reach(X, "Zhongshan").</code>
+(which stations reach Zhongshan?),
+<code>?- reach("Taipei Main Station", "Zhongshan").</code> (yes/no), or
+<code>?- reach(X, Y).</code> (every reachable pair) to ask the others.
 </div>

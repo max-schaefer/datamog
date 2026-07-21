@@ -16,7 +16,6 @@ deep(T["args"][9]["name"]) :- tree(T).   # null: index 9 is off the end
 internal("yes")            :- tree(T), T["name"] = null.   # branch on null
 
 ?- kind(K).
-?- internal(X).
 ```
 
 `null` is one of the `value` shapes, **not** the absence of a row, so every rule still produces a tuple; the last one branches on it with `= null`.

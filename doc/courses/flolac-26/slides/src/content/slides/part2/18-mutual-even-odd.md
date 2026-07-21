@@ -15,10 +15,9 @@ extensional num(n: integer).
 
 even(0).
 even(N) :- num(N), odd(N - 1).
-odd(N)  :- num(N), even(N - 1).
+odd(N) :- num(N), even(N - 1).
 
 ?- even(N).
-?- odd(N).
 ```
 
 - `0` is even.

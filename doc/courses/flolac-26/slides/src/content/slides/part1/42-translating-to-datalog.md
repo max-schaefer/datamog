@@ -19,5 +19,8 @@ val(0).  val(1).
 assignment(P, Q, R) :- val(P), val(Q), val(R).
 
 ?- assignment(1, 0, 0).   # p = true, q = false, r = false is an assignment
-?- assignment(1, Q, R).   # all 4 assignments where p = true
 ```
+
+<div class="note">
+A file runs one query; change it to ask another. Swap in <code>?- assignment(1, Q, R).</code> for all 4 assignments where p = true.
+</div>

@@ -16,7 +16,6 @@ left(T["args"][0])              :- tree(T).   # {"type": "var", "name": "p"}
 left_name(T["args"][0]["name"]) :- tree(T).   # "p"
 
 ?- kind(K).
-?- left_name(N).
 ```
 
 <div class="note">

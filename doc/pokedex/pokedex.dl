@@ -119,10 +119,12 @@ learns(Id, Move) :-
 
 # --- Targeted, deterministic demo queries ----------------------------
 # (Bulbasaur is #1: Grass / Poison, Sp. Attack 65, ability Overgrow.)
+# A file has one `?-` default output; the remaining demo lookups are
+# named outputs, printed under their own names.
 ?- pokemon(1, Name, HP).
-?- type(1, Type).
-?- pokemon_spa(1, SpA).
-?- super_effective("Fighting", Defender).
-?- move_category("absorb", Category).
-?- move_priority("quickattack", Priority).
-?- showdown_key(1, ShowdownId).
+output predicate bulbasaur_type(Type) :- type(1, Type).
+output predicate bulbasaur_spa(SpA) :- pokemon_spa(1, SpA).
+output predicate fighting_hits(Defender) :- super_effective("Fighting", Defender).
+output predicate absorb_category(Category) :- move_category("absorb", Category).
+output predicate quickattack_priority(Priority) :- move_priority("quickattack", Priority).
+output predicate bulbasaur_key(ShowdownId) :- showdown_key(1, ShowdownId).

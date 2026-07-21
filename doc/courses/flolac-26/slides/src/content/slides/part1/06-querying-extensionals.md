@@ -10,10 +10,10 @@ Query extensional predicates with the `?-` syntax: **check** whether a tuple is 
 extensional pokemon(id: integer, name: string, hp: integer).
 
 ?- pokemon(1, "Bulbasaur", 45).   # check: yes
-?- pokemon(1, "Bulbasaur", 60).   # check: no
-?- pokemon(Id, "Bulbasaur", 45).  # look up Bulbasaur's ID by name and HP
-?- pokemon(Id, "Bulbasaur", HP).  # look up Bulbasaur's ID and HP
-?- pokemon(Id, "Bulbasaur", _).   # look up Bulbasaur's ID ignoring HP
 ```
+
+<div class="note">
+A file runs one query; change it to ask another. Swap in <code>?- pokemon(1, "Bulbasaur", 60).</code> (check: no), <code>?- pokemon(Id, "Bulbasaur", 45).</code> (look up the ID by name and HP), <code>?- pokemon(Id, "Bulbasaur", HP).</code> (look up ID and HP), or <code>?- pokemon(Id, "Bulbasaur", _).</code> (look up the ID, ignoring HP).
+</div>
 
 <span class="aside">Variables are upper-case by convention; `_` is the special "don't-care" variable.</span>
