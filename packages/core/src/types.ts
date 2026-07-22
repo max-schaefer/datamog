@@ -31,6 +31,15 @@ export interface TypedProgram extends AnalyzedProgram {
  * expression type rules. Uses a fixed-point iteration for recursive predicates.
  */
 export function inferTypes(analyzed: AnalyzedProgram): TypedProgram {
+  try {
+    return inferTypesImpl(analyzed);
+  } catch (e) {
+    if (e instanceof AnalyzerError) e.file ??= analyzed.sourceFile;
+    throw e;
+  }
+}
+
+function inferTypesImpl(analyzed: AnalyzedProgram): TypedProgram {
   // Internal representation allows undefined for unknown positions
   const types = new Map<string, (PrimitiveType | undefined)[]>();
 

@@ -64,6 +64,15 @@ export interface TranslationResult {
 }
 
 export function translate(analyzed: TypedProgram, dialect: SqlDialect): TranslationResult {
+  try {
+    return translateImpl(analyzed, dialect);
+  } catch (e) {
+    if (e instanceof AnalyzerError) e.file ??= analyzed.sourceFile;
+    throw e;
+  }
+}
+
+function translateImpl(analyzed: TypedProgram, dialect: SqlDialect): TranslationResult {
   const createTables = translateTables(analyzed, dialect);
   const viewResult = translateViews(analyzed, dialect);
   const queryResult = translateQueries(analyzed, dialect);

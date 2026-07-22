@@ -197,7 +197,10 @@ function renderEventsInteractive(events: ReplEvent[]): void {
           ev.line !== undefined && ev.column !== undefined
             ? ` at line ${ev.line}, column ${ev.column}`
             : "";
-        console.error(`error (${ev.phase}): ${ev.message}${loc}`);
+        // A live REPL chunk has no file; `ev.file` is set only once a chunk
+        // can reference other files (modules).
+        const where = ev.file ? ` in ${ev.file}` : "";
+        console.error(`error (${ev.phase}): ${ev.message}${loc}${where}`);
         break;
       }
       case "done":

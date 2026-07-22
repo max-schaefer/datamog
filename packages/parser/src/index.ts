@@ -141,13 +141,13 @@ export function parseLenient(source: string): Program {
   return program;
 }
 
-export function parse(source: string): Program {
+export function parse(source: string, file?: string): Program {
   const result = parser.parse<Program>(source);
   if (result.lexerErrors.length > 0) {
     const err = result.lexerErrors[0]!;
     const line = err.line ?? 1;
     const col = err.column ?? 1;
-    throw new ParseError(err.message, line, col, lineColumnToOffset(source, line, col));
+    throw new ParseError(err.message, line, col, lineColumnToOffset(source, line, col), file);
   }
   if (result.parserErrors.length > 0) {
     const err = result.parserErrors[0]!;
@@ -165,11 +165,18 @@ export function parse(source: string): Program {
       !Number.isFinite(col)
     ) {
       const [l, c] = endOfSource(source);
-      throw new ParseError(err.message, l, c, lineColumnToOffset(source, l, c));
+      throw new ParseError(err.message, l, c, lineColumnToOffset(source, l, c), file);
     }
-    throw new ParseError(err.message, line, col, lineColumnToOffset(source, line, col));
+    throw new ParseError(err.message, line, col, lineColumnToOffset(source, line, col), file);
   }
   const program = result.value;
-  postProcess(program);
+  // `postProcess` throws `ParseError`s (via `parseErrorAtNode`) that only know
+  // their node position, so stamp the source file here at the parse boundary.
+  try {
+    postProcess(program);
+  } catch (e) {
+    if (e instanceof ParseError) e.file ??= file;
+    throw e;
+  }
   return program;
 }

@@ -1824,4 +1824,24 @@ describe("DatamogExecutor", () => {
       await sqlite.close();
     }
   });
+
+  test("a translation error carries the source file threaded through execute", async () => {
+    // The file flows execute() -> prepare() -> parse/analyze and onto the
+    // analysed program, so a translate-time rejection (non-linear recursion,
+    // SQL-only) names its file. File-less execution leaves it undefined.
+    const src = "e(1, 2).\np(X, Y) :- e(X, Y).\np(X, Y) :- p(X, Z), p(Z, Y).\n?- p(X, Y).";
+    const errFile = async (file?: string): Promise<string | undefined> => {
+      const sqlite = await createSqlite();
+      try {
+        await new DatamogExecutor(sqlite).execute(src, file);
+        return "NO ERROR";
+      } catch (e) {
+        return (e as { file?: string }).file;
+      } finally {
+        await sqlite.close();
+      }
+    };
+    expect(await errFile("prog.dl")).toBe("prog.dl");
+    expect(await errFile()).toBeUndefined();
+  });
 });

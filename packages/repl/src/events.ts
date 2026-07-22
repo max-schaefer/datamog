@@ -75,6 +75,9 @@ export interface ErrorEvent {
   line?: number;
   /** 1-based column within the chunk (or command argument), if known. */
   column?: number;
+  /** Source file the error is in, if the input came from one. Undefined for
+   *  a live REPL chunk; set once a chunk can reference other files (modules). */
+  file?: string;
 }
 
 export interface DoneEvent {

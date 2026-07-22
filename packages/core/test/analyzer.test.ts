@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { parse } from "datamog-parser";
-import { analyze } from "../src/analyzer.ts";
+import { type AnalyzerError, analyze } from "../src/analyzer.ts";
 import { inferTypes } from "../src/types.ts";
 
 describe("analyzer", () => {
@@ -694,6 +694,37 @@ describe("analyzer", () => {
       // Only 'p' is a float dependency of 'r'. Without skipping built-ins,
       // 'object_entry' would show up in the deps set and be misclassified.
       expect(result.dependencies.get("r")).toEqual(new Set(["p"]));
+    });
+  });
+
+  describe("source file on errors", () => {
+    // Source positions generalise to name their file (for the module system):
+    // the file threads through parse -> analyze -> inferTypes and lands on any
+    // error each stage throws. File-less input (a REPL chunk / stdin) leaves it
+    // undefined.
+    const analyzeFileOf = (src: string, file?: string): string | undefined => {
+      try {
+        analyze(parse(src, file), file);
+      } catch (e) {
+        return (e as AnalyzerError).file;
+      }
+      return "NO ERROR";
+    };
+
+    test("an analyzer error carries the source file", () => {
+      // `X` in the head is not bound by any positive body atom -> unsafe.
+      expect(analyzeFileOf("p(X) :- q(Y).", "prog.dl")).toBe("prog.dl");
+      expect(analyzeFileOf("p(X) :- q(Y).")).toBeUndefined();
+    });
+
+    test("a type-inference error carries the source file", () => {
+      const src = 'extensional w(x: string).\nbad(X) :- w(X), X in ["a" .. "z"].';
+      try {
+        inferTypes(analyze(parse(src, "prog.dl"), "prog.dl"));
+        throw new Error("expected a type error");
+      } catch (e) {
+        expect((e as AnalyzerError).file).toBe("prog.dl");
+      }
     });
   });
 });

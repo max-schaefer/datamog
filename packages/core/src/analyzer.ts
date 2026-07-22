@@ -126,6 +126,11 @@ export class AnalyzerError extends Error {
    * error squiggly, mirroring the finiteness-warning case.
    */
   cycle?: NegationCycle;
+  /** Source file the error is in. Undefined for file-less input (a REPL
+   *  chunk, stdin, an in-memory editor buffer). Stamped by `analyze` /
+   *  `inferTypes` from the program's `sourceFile`; a merged multi-file
+   *  program can set it per statement. */
+  file?: string;
 
   constructor(message: string, offset?: number, end?: number, cycle?: NegationCycle) {
     super(message);
@@ -157,6 +162,10 @@ export interface AnalyzedProgram {
   nonLinearPredicates: Set<string>;
   /** Predicates grouped into strata (SCCs) in dependency order. */
   sortedStrata: string[][];
+  /** Source file the program was parsed from, threaded through so downstream
+   *  errors (type inference, translation) can name it. Undefined for file-less
+   *  input (a REPL chunk, stdin, an in-memory buffer). */
+  sourceFile?: string;
 }
 
 /** Collect all variable names from an expression tree. */
@@ -196,7 +205,16 @@ function collectVars(term: HeadTerm, into: Set<string>) {
   }
 }
 
-export function analyze(program: Program): AnalyzedProgram {
+export function analyze(program: Program, file?: string): AnalyzedProgram {
+  try {
+    return analyzeImpl(program, file);
+  } catch (e) {
+    if (e instanceof AnalyzerError) e.file ??= file;
+    throw e;
+  }
+}
+
+function analyzeImpl(program: Program, file: string | undefined): AnalyzedProgram {
   const extDecls = new Map<string, ExtDecl>();
   const rules = new Map<string, Rule[]>();
   const arities = new Map<string, number>();
@@ -745,6 +763,7 @@ export function analyze(program: Program): AnalyzedProgram {
     sortedStrata,
     recursivePredicates,
     nonLinearPredicates,
+    sourceFile: file,
   };
 }
 

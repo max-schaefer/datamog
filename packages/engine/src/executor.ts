@@ -27,12 +27,12 @@ export class DatamogExecutor {
    * for schema/strata/rule-source extraction) can avoid a second
    * round-trip through the parser.
    */
-  static prepare(source: string): TypedProgram {
-    return inferTypes(analyze(parse(source)));
+  static prepare(source: string, file?: string): TypedProgram {
+    return inferTypes(analyze(parse(source, file), file));
   }
 
-  async execute(source: string): Promise<QueryResult[]> {
-    return this.executeAnalyzed(DatamogExecutor.prepare(source));
+  async execute(source: string, file?: string): Promise<QueryResult[]> {
+    return this.executeAnalyzed(DatamogExecutor.prepare(source, file));
   }
 
   /**

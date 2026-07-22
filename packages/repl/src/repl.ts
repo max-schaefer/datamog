@@ -278,14 +278,22 @@ function convertError(err: unknown, source: string): ErrorEvent {
       message,
       line: err.line,
       column: err.column,
+      file: err.file,
     };
   }
   if (err instanceof AnalyzerError) {
     if (err.offset !== undefined) {
       const { line, column } = offsetToLineColumn(source, err.offset);
-      return { kind: "error", phase: "analyze", message: err.message, line, column };
+      return {
+        kind: "error",
+        phase: "analyze",
+        message: err.message,
+        line,
+        column,
+        file: err.file,
+      };
     }
-    return { kind: "error", phase: "analyze", message: err.message };
+    return { kind: "error", phase: "analyze", message: err.message, file: err.file };
   }
   return { kind: "error", phase: "execute", message: errorMessage(err) };
 }

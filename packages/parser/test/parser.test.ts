@@ -702,6 +702,24 @@ describe("parser", () => {
     expect(caught!.column).toBe(7);
   });
 
+  test("a parse error carries the source file when one is given", () => {
+    // Source positions generalise to name their file (for the module system).
+    const fileOf = (src: string, file?: string): string | undefined => {
+      try {
+        parse(src, file);
+      } catch (e) {
+        return (e as ParseError).file;
+      }
+      return "NO ERROR";
+    };
+    // Lexer/parser error and a post-process error (the `$`-namespace guard)
+    // both carry the file; a file-less parse (a REPL chunk / stdin) leaves it
+    // undefined.
+    expect(fileOf("foo(X)", "prog.dl")).toBe("prog.dl");
+    expect(fileOf("`$p`(1).", "prog.dl")).toBe("prog.dl");
+    expect(fileOf("foo(X)")).toBeUndefined();
+  });
+
   test("Regression: unsafe integer literals are rejected before JS rounds them", () => {
     // Langium's `NUMBER returns number` coercion turns this literal into
     // 9007199254740992 before downstream stages see it. Loaders already

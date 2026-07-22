@@ -48,13 +48,15 @@ async function runActiveFile(): Promise<void> {
   // directory; an unsaved buffer can't resolve sibling data files.
   const dataDir = doc.uri.scheme === "file" ? path.dirname(doc.uri.fsPath) : undefined;
   const loader = dataDir ? new DiskLoader(dataDir) : undefined;
+  // Name the file in diagnostics; an unsaved buffer has no path (file-less).
+  const file = doc.uri.scheme === "file" ? vscode.workspace.asRelativePath(doc.uri) : undefined;
 
   const backend = await createSeminaiveBackend();
   try {
     const started = Date.now();
     // Prepare separately from execution so we can inspect the analysed
     // program (here: warn about extensional predicates with no data file).
-    const analyzed = DatamogExecutor.prepare(source);
+    const analyzed = DatamogExecutor.prepare(source, file);
     await warnAboutMissingData(out, analyzed, loader, dataDir);
     const results = await new DatamogExecutor(backend, loader ? [loader] : []).executeAnalyzed(
       analyzed,
@@ -71,7 +73,11 @@ async function runActiveFile(): Promise<void> {
       `Done: ${results.length} ${plural(results.length, "query", "queries")} in ${elapsed} ms.`,
     );
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const base = err instanceof Error ? err.message : String(err);
+    // `ParseError`/`AnalyzerError` carry the source file; prefix it when set.
+    const errFile =
+      err && typeof err === "object" && "file" in err ? (err as { file?: string }).file : undefined;
+    const message = errFile ? `${errFile}: ${base}` : base;
     out.appendLine(`error: ${message}`);
     vscode.window.showErrorMessage(`Datamog: ${message}`);
   } finally {

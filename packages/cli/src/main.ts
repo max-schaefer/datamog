@@ -583,7 +583,7 @@ async function main() {
   }
   dataDir = dataDir ? resolve(dataDir) : dirname(resolve(programPath));
   const source = await dlFile.text();
-  const program = parse(source);
+  const program = parse(source, programPath);
 
   // Discover the program's inputs and outputs. The `output` marker and `?-`
   // queries are all visible in the parse, before analysis.
@@ -681,7 +681,7 @@ async function main() {
     backendOverride ?? (process.env.DATABASE_URL ? "postgres" : "sqlite");
 
   if (dryRun) {
-    const analyzed = inferTypes(analyze(program));
+    const analyzed = inferTypes(analyze(program, programPath));
     if (warnFiniteness) emitFinitenessWarnings(analyzed);
     const sqlDialect = await createSqlDialect(backendName);
     const translation = translate(analyzed, sqlDialect);
@@ -703,7 +703,7 @@ async function main() {
   }
 
   if (warnFiniteness) {
-    emitFinitenessWarnings(inferTypes(analyze(program)));
+    emitFinitenessWarnings(inferTypes(analyze(program, programPath)));
   }
 
   if (backendName === "postgres" && !process.env.DATABASE_URL) {
@@ -725,7 +725,7 @@ async function main() {
   ]);
 
   try {
-    const results = await executor.execute(source);
+    const results = await executor.execute(source, programPath);
     const chosen = allOutputs
       ? results
       : results.filter((r) => (r.label ?? "default") === selected);
@@ -761,7 +761,13 @@ async function main() {
 // `GSHEET_URL_RE`).
 if (import.meta.main) {
   main().catch((err) => {
-    console.error(err.message ?? err);
+    // `ParseError` / `AnalyzerError` carry the source file when the program
+    // came from one; prefix it so a failing run names the file (a `?-` from
+    // stdin/REPL has no file and renders as before).
+    const file =
+      err && typeof err === "object" && "file" in err ? (err as { file?: string }).file : undefined;
+    const message = err?.message ?? String(err);
+    console.error(file ? `${file}: ${message}` : message);
     process.exit(1);
   });
 }
