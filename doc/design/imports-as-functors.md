@@ -306,12 +306,11 @@ diagnostics, per-module EDB directories):
   instance's proof constructors are already reachable as `<import>_<Ctor>`, so
   matching several instantiations of one ADT module is possible without this;
   what remains deferred is multi-*output* access under one alias.)
-- **Predicate-qualified constructors** (`opt:Some`, always, even intra-module),
-  which would additionally allow two predicates in one module to share a
-  constructor tag. A larger proof-term redesign than the per-import
-  `<import>_<Ctor>` naming above: the `:` separator collides with the capture
-  operator (would want `::`), and it changes the global-unique constructor model
-  (spec §8) plus every existing `[Ctor]` use.
+- **Predicate-qualified constructors** (`p::Ctor`), which would replace the
+  per-import `<import>_<Ctor>` naming above with a uniform scheme and let two
+  predicates in one module share a constructor tag. Its own proposal, with a
+  cost/benefit that recommends deferral: see
+  [`qualified-constructors.md`](./qualified-constructors.md).
 - **REPL module bindings.** The REPL's `IncrementalSession` re-analyses the whole
   accumulated program each chunk and computes a per-chunk delta keyed off the new
   fragment's statements; elaboration transforms the whole program (dropping
