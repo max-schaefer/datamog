@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { dirname, extname, resolve } from "node:path";
-import type { ExtDecl } from "datamog-core";
-import { analyze, findInfiniteRisks, inferTypes } from "datamog-core";
+import type { DataSource, ExtDecl, Program } from "datamog-core";
+import { AnalyzerError, analyze, elaborate, findInfiniteRisks, inferTypes } from "datamog-core";
 import { CsvLoader, parseCsvContent } from "datamog-csv";
 import {
   type Backend,
@@ -23,7 +23,8 @@ import {
   parseMermaidGraph,
   validateMermaidColumns,
 } from "datamog-mermaid";
-import { parse } from "datamog-parser";
+import { ParseError, parseRaw, postProcess } from "datamog-parser";
+import { createModuleResolver } from "./module-resolver.ts";
 import { bigintSafeReplacer, formatCellAsString, prettifyProofRows } from "./output.ts";
 import { runRepl } from "./repl-driver.ts";
 
@@ -336,6 +337,85 @@ function resolveGSheetAuth(): GSheetAuth | undefined {
   return undefined;
 }
 
+/**
+ * Parse the entry, elaborate its `:=` source bindings into one merged program
+ * (resolving module imports relative to the entry file), and post-process it.
+ * Returns the merged program plus the data-file bindings for loader setup.
+ */
+function loadProgram(
+  source: string,
+  file: string,
+): { program: Program; dataSources: DataSource[] } {
+  const raw = parseRaw(source, file);
+  let result: { program: Program; dataSources: DataSource[] };
+  try {
+    result = elaborate(raw, createModuleResolver(), file);
+  } catch (e) {
+    if (e instanceof AnalyzerError) e.file ??= file;
+    throw e;
+  }
+  try {
+    postProcess(result.program);
+  } catch (e) {
+    if (e instanceof ParseError) e.file ??= file;
+    throw e;
+  }
+  return result;
+}
+
+function formatFromName(name: string): ExplicitSourceFormat | undefined {
+  switch (name) {
+    case "csv":
+      return ".csv";
+    case "jsonl":
+      return ".jsonl";
+    case "json":
+      return ".json";
+    case "mermaid":
+    case "mmd":
+      return ".mmd";
+    default:
+      return undefined;
+  }
+}
+
+/** Loaders for `input predicate P(...) := "file" [as fmt]` data-file bindings.
+ *  A local path resolves relative to the binding's own file; a URL / `gh:`
+ *  source is taken as-is. The format is the `as` override or the extension. */
+function buildDataSourceLoaders(
+  dataSources: DataSource[],
+  csvHasHeader: boolean,
+): ExtensionalLoader[] {
+  const loaders: ExtensionalLoader[] = [];
+  for (const ds of dataSources) {
+    let src: string;
+    try {
+      src = expandGitHubShorthand(ds.source);
+    } catch (e) {
+      console.error(`Invalid source for '${ds.predicate}' (${ds.source}): ${(e as Error).message}`);
+      process.exit(1);
+    }
+    if (!httpUrlFor(src)) {
+      src = resolve(ds.baseFile ? dirname(ds.baseFile) : process.cwd(), src);
+    }
+    const format = ds.format ? formatFromName(ds.format) : explicitSourceFormat(src);
+    if (ds.format && !format) {
+      console.error(
+        `Unknown format '${ds.format}' for '${ds.predicate}' (expected csv, jsonl, json, mermaid)`,
+      );
+      process.exit(1);
+    }
+    if (!format) {
+      console.error(
+        `Cannot infer a format for '${ds.predicate}' from source '${ds.source}'; add 'as <format>'`,
+      );
+      process.exit(1);
+    }
+    loaders.push(new ExplicitSourceLoader(ds.predicate, src, format, csvHasHeader));
+  }
+  return loaders;
+}
+
 function buildExplicitLoaders(
   mappings: { name: string; source: string }[],
   csvHasHeader: boolean,
@@ -583,10 +663,10 @@ async function main() {
   }
   dataDir = dataDir ? resolve(dataDir) : dirname(resolve(programPath));
   const source = await dlFile.text();
-  const program = parse(source, programPath);
+  const { program, dataSources } = loadProgram(source, programPath);
 
   // Discover the program's inputs and outputs. The `output` marker and `?-`
-  // queries are all visible in the parse, before analysis.
+  // queries are all visible in the elaborated program, before analysis.
   const inputNames: string[] = [];
   const outputPreds = new Set<string>();
   let hasDefault = false;
@@ -680,8 +760,9 @@ async function main() {
   const backendName: BackendName =
     backendOverride ?? (process.env.DATABASE_URL ? "postgres" : "sqlite");
 
+  const analyzed = inferTypes(analyze(program, programPath));
+
   if (dryRun) {
-    const analyzed = inferTypes(analyze(program, programPath));
     if (warnFiniteness) emitFinitenessWarnings(analyzed);
     const sqlDialect = await createSqlDialect(backendName);
     const translation = translate(analyzed, sqlDialect);
@@ -703,7 +784,7 @@ async function main() {
   }
 
   if (warnFiniteness) {
-    emitFinitenessWarnings(inferTypes(analyze(program, programPath)));
+    emitFinitenessWarnings(analyzed);
   }
 
   if (backendName === "postgres" && !process.env.DATABASE_URL) {
@@ -712,9 +793,13 @@ async function main() {
   }
 
   const explicitLoaders = buildExplicitLoaders(inputMappings, !csvNoHeader);
+  // Precedence: an explicit `--input` beats a program `:=` data binding, which
+  // beats the auto-load-by-convention directory loaders.
+  const dataSourceLoaders = buildDataSourceLoaders(dataSources, !csvNoHeader);
   const backend = await createBackend(backendName);
   const executor = new DatamogExecutor(backend, [
     ...explicitLoaders,
+    ...dataSourceLoaders,
     new CsvLoader({ directory: dataDir, hasHeader: !csvNoHeader }),
     // The JSONL loader's single-json-column case also matches `.jsonl` files,
     // so place the JSON file loader earlier — its `canLoad` checks for a
@@ -725,7 +810,7 @@ async function main() {
   ]);
 
   try {
-    const results = await executor.execute(source, programPath);
+    const results = await executor.executeAnalyzed(analyzed);
     const chosen = allOutputs
       ? results
       : results.filter((r) => (r.label ?? "default") === selected);

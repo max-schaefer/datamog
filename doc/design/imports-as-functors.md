@@ -1,12 +1,14 @@
 # Design proposal: modules as functors (inputs and outputs)
 
-Status: proposal, partly implemented. The grammar (the `:=` source binding on
-input predicates), the per-instance expansion (`expandModule`), and the
-elaborator (`elaborate`: the entry's bindings and, recursively, nested module
-imports, with the instantiation-graph acyclicity check; named exports and the
-unnamed `?-` default output) all exist. Still to come: boundary type-checking,
-the Bun file resolver, CLI wiring, and per-instance diagnostics. A `:=` binding
-that reaches analysis (i.e. one the elaborator did not handle) is rejected.
+Status: proposal, largely implemented. The grammar (the `:=` source binding on
+input predicates), the per-instance expansion (`expandModule`), the elaborator
+(`elaborate`: the entry's bindings and, recursively, nested module imports, with
+the instantiation-graph acyclicity check; named exports and the unnamed `?-`
+default output), the Bun file resolver, and CLI wiring (`datamog main.dl`
+resolves `from` imports from disk and wires `:=` data-file bindings into
+loaders) all exist. Still to come: boundary type-checking, per-instance
+diagnostics, and REPL / playground / VS Code wiring. A `:=` binding that reaches
+analysis (i.e. one the elaborator did not handle) is rejected.
 
 This is the ambitious alternative to the conservative module system in
 [`imports.md`](./imports.md). Read that one first for the baseline; this doc
@@ -259,11 +261,18 @@ diagnostics, per-module EDB directories):
   module's `?-` default output synthesises a named `$default` output rule so it
   reuses the named-export path; an instance exposes only its selected output (its
   other outputs and its `?-` do not leak into the merged program). (All done.)
-- **engine**: the executor gains the expansion pass ahead of the existing
-  pipeline; free inputs become the merged program's EDBs. No backend changes.
-- **cli**: root-module instantiation, input overrides, `--output` selection.
+- **engine**: no backend changes; free inputs become the merged program's EDBs.
+  The CLI runs `elaborate` ahead of the existing pipeline rather than the
+  executor (the executor stays filesystem- and elaboration-free, for the
+  playground). (Done.)
+- **cli**: `datamog main.dl` parses raw, elaborates (a Bun `ModuleResolver`
+  reads `from` imports relative to the entry), post-processes, then analyses and
+  runs the merged program. `:=` data-file bindings become loaders (precedence:
+  `--input` > `:=` binding > auto-load-by-convention). Imported outputs are
+  selectable like any named output (`datamog main.dl <name>` / `--all`). (Done.)
 - **type checking**: wiring checks at each boundary (actual vs callee input;
   selected output vs receiving declaration), reusing existing column-type unify.
+  (Still to come.)
 
 ## Deferred
 
