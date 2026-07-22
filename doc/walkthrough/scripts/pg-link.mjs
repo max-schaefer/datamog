@@ -1,8 +1,8 @@
 // Generate a playground URL for a tutorial `.dl` file.
 //
-// If the program declares `extensional p(col1: t1, col2: t2, ...)` and a
+// If the program declares `input predicate p(col1: t1, col2: t2, ...)` and a
 // sibling `p.csv` exists, inline the CSV rows as `p("v1", ...).` facts and
-// drop the `extensional` declaration, so the resulting URL is
+// drop the `input predicate` declaration, so the resulting URL is
 // self-contained. Other `.dl` text passes through untouched.
 //
 // Usage: node pg-link.mjs <dl-path> [<dl-path> ...]
@@ -13,7 +13,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 const BASE = "https://max-schaefer.github.io/datamog/";
-const EXT_RE = /^\s*extensional\s+(\w+)\s*\(([^)]+)\)\s*\.\s*$/gm;
+const EXT_RE = /^\s*input\s+predicate\s+(\w+)\s*\(([^)]+)\)\s*\.\s*$/gm;
 
 function parseCsvFields(line, delimiter = ",") {
   // Minimal CSV splitter: quoted fields, escaped quotes as "".

@@ -345,7 +345,7 @@ function validateTypes(
               const arg = elem.args[j]!;
               validateExpr(arg, varTypes, types, functionOverloads);
               // Each arg must unify with the predicate's declared column type
-              // — otherwise `t("hello")` against `extensional t(x: integer)`
+              // — otherwise `t("hello")` against `input predicate t(x: integer)`
               // passes silently and only surfaces as a database error at
               // runtime (if it surfaces at all; SQLite would coerce).
               const expected = expectedTypes[j];

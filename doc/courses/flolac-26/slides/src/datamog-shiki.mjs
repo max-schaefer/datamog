@@ -34,7 +34,7 @@ export const datamogGrammar = {
     clause: { name: "keyword.operator.clause.datamog", match: "\\?-|:-" },
     keyword: {
       name: "keyword.control.datamog",
-      match: "\\b(extensional|not|in|true|false|null)\\b",
+      match: "\\b(input|output|predicate|not|in|true|false|null)\\b",
     },
     type: {
       name: "storage.type.datamog",

@@ -5,20 +5,20 @@
 // ```prolog and are left untouched.
 //
 // Pre-baked extensional data is pulled from `src/demo-data/<deck>/<pred>.csv`
-// (or `.jsonl`), matched by the block's `extensional` declarations - the same
+// (or `.jsonl`), matched by the block's `input predicate` declarations - the same
 // file-per-predicate convention the CLI examples and embed tutorial use. `<deck>`
 // is the slide's parent folder (intro, part1, ...).
 
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 
-// Predicate names declared `extensional` in a block, skipping comment lines.
+// Predicate names declared `input predicate` in a block, skipping comment lines.
 function extensionalNames(source) {
   const names = [];
   for (const line of source.split("\n")) {
     const trimmed = line.trim();
     if (trimmed.startsWith("#")) continue;
-    const m = trimmed.match(/^extensional\s+([A-Za-z_]\w*)/);
+    const m = trimmed.match(/^input\s+predicate\s+([A-Za-z_]\w*)/);
     if (m) names.push(m[1]);
   }
   return names;
