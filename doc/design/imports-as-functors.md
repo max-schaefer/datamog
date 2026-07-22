@@ -170,6 +170,13 @@ owning module's directory. Everything derived is IDB. The chosen output is the
 query. So the merged program is an ordinary single-file Datamog program, and the
 backends need no functor-specific code.
 
+Free inputs, unlike private and output predicates, are **not** freshened per
+instance: they keep their bare name. So two instances of the same module share
+one EDB (its bundled data, the same for every instance), and a free input
+collides by name with an importer predicate spelled the same. This is the
+deliberate reading (a free input is the module's own data dependency); wire an
+input as an actual when you want a per-instance relation instead.
+
 ## Consequences and limitations
 
 State these plainly; they are the cost of expansion.

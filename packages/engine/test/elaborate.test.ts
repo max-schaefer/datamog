@@ -36,8 +36,7 @@ describe("module binding end-to-end", () => {
   test("two instances of one module wire to different relations", async () => {
     // The aliased outputs (road_reach / flight_reach) inherit reach.dl's
     // `output` marker, so analysis synthesises a query for each. Result columns
-    // come from the module's output head vars (X, Y); the importer's declared
-    // column names are the type contract, not yet mapped onto output columns.
+    // carry the importer's declared names (a, b), not the module's head vars.
     const results = await run(`
       road(1, 2). road(2, 3).
       flight(10, 20).
@@ -45,10 +44,10 @@ describe("module binding end-to-end", () => {
       input predicate flight_reach(a: integer, b: integer) := reach from "reach.dl"(edge = flight).
     `);
     expect(byLabel(results, "road_reach")).toEqual([
-      { X: 1, Y: 2 },
-      { X: 1, Y: 3 },
-      { X: 2, Y: 3 },
+      { a: 1, b: 2 },
+      { a: 1, b: 3 },
+      { a: 2, b: 3 },
     ]);
-    expect(byLabel(results, "flight_reach")).toEqual([{ X: 10, Y: 20 }]);
+    expect(byLabel(results, "flight_reach")).toEqual([{ a: 10, b: 20 }]);
   });
 });

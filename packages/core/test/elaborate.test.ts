@@ -50,6 +50,28 @@ describe("elaborate", () => {
     expect(() => analyze(program)).not.toThrow();
   });
 
+  test("relabels the instance's head columns with the importer's declared names", () => {
+    const entry = parseRaw(`
+      road(1, 2).
+      input predicate road_reach(a: integer, b: integer) := reach from "reach.dl"(edge = road).
+    `);
+    const { program } = elaborate(entry, resolve, "main.dl");
+    const headVars = (r: Stmt) =>
+      r.head.args.map((x: Stmt) => (x.$type === "Variable" ? x.name : x.$type));
+    const reachRules = rules(program.statements).filter((r) => r.head.predicate === "road_reach");
+    // Head positions carry a/b (module's X,Y renamed); internal join vars stay.
+    expect(headVars(reachRules[0])).toEqual(["a", "b"]);
+    expect(headVars(reachRules[1])).toEqual(["a", "b"]);
+    // The recursive rule's internal var is untouched: road_reach(a, Y), road(Y, b).
+    const secondBody = reachRules[1].body.map((e: Stmt) =>
+      e.args?.map((x: Stmt) => (x.$type === "Variable" ? x.name : "?")),
+    );
+    expect(secondBody).toEqual([
+      ["a", "Y"],
+      ["Y", "b"],
+    ]);
+  });
+
   test("collects data-file bindings and clears them", () => {
     const entry = parseRaw(`
       input predicate p(a: integer) := "data/p.csv".

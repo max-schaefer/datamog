@@ -1,6 +1,6 @@
-import { isExtDecl } from "datamog-parser";
+import { isExtDecl, isRule } from "datamog-parser";
 import { AnalyzerError } from "./analyzer.ts";
-import type { Binding, ExtDecl, Program, Statement } from "./ast.ts";
+import type { Binding, ExtDecl, Program, Rule, Statement } from "./ast.ts";
 import { expandModule } from "./expand.ts";
 
 /** A module a `ModuleResolver` handed back: its raw (pre-post-process) AST and
@@ -99,6 +99,13 @@ export function elaborate(
       inputs,
       exportAs: { export: binding.export, as: stmt.predicate },
     });
+    // Name the instance's output columns after the importer's declared columns,
+    // not the module's own head-variable names.
+    relabelOutputColumns(
+      expanded,
+      stmt.predicate,
+      stmt.columns.map((c) => c.name),
+    );
     // The instance may keep its own data-bound / free inputs; record and clear
     // any data binding, relative to the module's own file.
     for (const s of expanded) {
@@ -109,6 +116,56 @@ export function elaborate(
 
   entry.statements = out;
   return { program: entry, dataSources };
+}
+
+/** Call `fn` for every `Variable` node reachable from `node`. */
+function eachVar(node: unknown, fn: (v: { name: string }) => void): void {
+  if (!node || typeof node !== "object" || !("$type" in node)) return;
+  const n = node as Record<string, unknown>;
+  if (n.$type === "Variable" && typeof n.name === "string") fn(n as { name: string });
+  for (const key of Object.keys(n)) {
+    if (key.startsWith("$")) continue;
+    const v = n[key];
+    if (Array.isArray(v)) for (const el of v) eachVar(el, fn);
+    else eachVar(v, fn);
+  }
+}
+
+/** Rename the head-position variables of each rule of `outputPred` to the
+ *  importer's declared column names (positionally), so the synthesised output
+ *  query names its columns after the interface, not the module's head vars. */
+function relabelOutputColumns(
+  statements: Statement[],
+  outputPred: string,
+  columnNames: string[],
+): void {
+  for (const stmt of statements) {
+    if (isRule(stmt) && stmt.head.predicate === outputPred) relabelRuleHead(stmt, columnNames);
+  }
+}
+
+function relabelRuleHead(rule: Rule, columnNames: string[]): void {
+  const args = rule.head.args;
+  if (args.length !== columnNames.length) return; // arity mismatch: leave it (checked later)
+  const rename = new Map<string, string>(); // module head var -> declared column name
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i] as { $type: string; name?: string };
+    if (arg.$type !== "Variable" || arg.name === undefined) continue;
+    if (rename.has(arg.name) && rename.get(arg.name) !== columnNames[i]) return; // repeated head var
+    rename.set(arg.name, columnNames[i]!);
+  }
+  const sources = new Set(rename.keys());
+  const targets = new Set(rename.values());
+  // Move any internal (body) variable that already bears a target name aside to
+  // a `$`-name first (users cannot write `$`), so the rename cannot capture it.
+  const clash = new Map<string, string>();
+  eachVar(rule, (v) => {
+    if (targets.has(v.name) && !sources.has(v.name)) clash.set(v.name, `$c$${v.name}`);
+  });
+  eachVar(rule, (v) => {
+    const next = rename.get(v.name) ?? clash.get(v.name);
+    if (next !== undefined) v.name = next;
+  });
 }
 
 /** Record a data-file binding and clear it from the declaration, so the merged
