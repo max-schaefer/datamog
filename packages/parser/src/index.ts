@@ -141,7 +141,15 @@ export function parseLenient(source: string): Program {
   return program;
 }
 
-export function parse(source: string, file?: string): Program {
+/**
+ * Parse without post-processing: the AST is exactly as the grammar produced
+ * it (numeric literals not yet `rawText`-tagged, `_` not desugared, proof
+ * terms still `[Ctor]` / `Ctor(...)` rather than lowered onto `value`). The
+ * module elaborator parses each referenced module this way so it can expand
+ * (substitute inputs, freshen names) before a single post-process runs over
+ * the merged program. Lexer / parser errors still throw a `ParseError`.
+ */
+export function parseRaw(source: string, file?: string): Program {
   const result = parser.parse<Program>(source);
   if (result.lexerErrors.length > 0) {
     const err = result.lexerErrors[0]!;
@@ -169,7 +177,11 @@ export function parse(source: string, file?: string): Program {
     }
     throw new ParseError(err.message, line, col, lineColumnToOffset(source, line, col), file);
   }
-  const program = result.value;
+  return result.value;
+}
+
+export function parse(source: string, file?: string): Program {
+  const program = parseRaw(source, file);
   // `postProcess` throws `ParseError`s (via `parseErrorAtNode`) that only know
   // their node position, so stamp the source file here at the parse boundary.
   try {
