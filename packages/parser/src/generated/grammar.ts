@@ -464,34 +464,25 @@ export const DatamogGrammar = (): Grammar => loadedDatamogGrammar ?? (loadedData
             }
           },
           {
-            "$type": "Group",
+            "$type": "Alternatives",
             "elements": [
-              {
-                "$type": "Keyword",
-                "value": "["
-              },
-              {
-                "$type": "Assignment",
-                "feature": "ruleName",
-                "operator": "=",
-                "terminal": {
-                  "$type": "RuleCall",
-                  "rule": {
-                    "$ref": "#/rules@34"
-                  },
-                  "arguments": []
-                }
-              },
               {
                 "$type": "Group",
                 "elements": [
                   {
+                    "$type": "Keyword",
+                    "value": "["
+                  },
+                  {
                     "$type": "Assignment",
-                    "feature": "ctorParens",
-                    "operator": "?=",
+                    "feature": "ruleName",
+                    "operator": "=",
                     "terminal": {
-                      "$type": "Keyword",
-                      "value": "("
+                      "$type": "RuleCall",
+                      "rule": {
+                        "$ref": "#/rules@34"
+                      },
+                      "arguments": []
                     }
                   },
                   {
@@ -499,23 +490,16 @@ export const DatamogGrammar = (): Grammar => loadedDatamogGrammar ?? (loadedData
                     "elements": [
                       {
                         "$type": "Assignment",
-                        "feature": "ctorArgs",
-                        "operator": "+=",
+                        "feature": "ctorParens",
+                        "operator": "?=",
                         "terminal": {
-                          "$type": "RuleCall",
-                          "rule": {
-                            "$ref": "#/rules@17"
-                          },
-                          "arguments": []
+                          "$type": "Keyword",
+                          "value": "("
                         }
                       },
                       {
                         "$type": "Group",
                         "elements": [
-                          {
-                            "$type": "Keyword",
-                            "value": ","
-                          },
                           {
                             "$type": "Assignment",
                             "feature": "ctorArgs",
@@ -527,23 +511,124 @@ export const DatamogGrammar = (): Grammar => loadedDatamogGrammar ?? (loadedData
                               },
                               "arguments": []
                             }
+                          },
+                          {
+                            "$type": "Group",
+                            "elements": [
+                              {
+                                "$type": "Keyword",
+                                "value": ","
+                              },
+                              {
+                                "$type": "Assignment",
+                                "feature": "ctorArgs",
+                                "operator": "+=",
+                                "terminal": {
+                                  "$type": "RuleCall",
+                                  "rule": {
+                                    "$ref": "#/rules@17"
+                                  },
+                                  "arguments": []
+                                }
+                              }
+                            ],
+                            "cardinality": "*"
                           }
                         ],
-                        "cardinality": "*"
+                        "cardinality": "?"
+                      },
+                      {
+                        "$type": "Keyword",
+                        "value": ")"
                       }
                     ],
                     "cardinality": "?"
                   },
                   {
                     "$type": "Keyword",
-                    "value": ")"
+                    "value": "]"
                   }
-                ],
-                "cardinality": "?"
+                ]
               },
               {
-                "$type": "Keyword",
-                "value": "]"
+                "$type": "Group",
+                "elements": [
+                  {
+                    "$type": "Keyword",
+                    "value": "::"
+                  },
+                  {
+                    "$type": "Assignment",
+                    "feature": "ruleName",
+                    "operator": "=",
+                    "terminal": {
+                      "$type": "RuleCall",
+                      "rule": {
+                        "$ref": "#/rules@34"
+                      },
+                      "arguments": []
+                    }
+                  },
+                  {
+                    "$type": "Group",
+                    "elements": [
+                      {
+                        "$type": "Assignment",
+                        "feature": "ctorParens",
+                        "operator": "?=",
+                        "terminal": {
+                          "$type": "Keyword",
+                          "value": "("
+                        }
+                      },
+                      {
+                        "$type": "Group",
+                        "elements": [
+                          {
+                            "$type": "Assignment",
+                            "feature": "ctorArgs",
+                            "operator": "+=",
+                            "terminal": {
+                              "$type": "RuleCall",
+                              "rule": {
+                                "$ref": "#/rules@17"
+                              },
+                              "arguments": []
+                            }
+                          },
+                          {
+                            "$type": "Group",
+                            "elements": [
+                              {
+                                "$type": "Keyword",
+                                "value": ","
+                              },
+                              {
+                                "$type": "Assignment",
+                                "feature": "ctorArgs",
+                                "operator": "+=",
+                                "terminal": {
+                                  "$type": "RuleCall",
+                                  "rule": {
+                                    "$ref": "#/rules@17"
+                                  },
+                                  "arguments": []
+                                }
+                              }
+                            ],
+                            "cardinality": "*"
+                          }
+                        ],
+                        "cardinality": "?"
+                      },
+                      {
+                        "$type": "Keyword",
+                        "value": ")"
+                      }
+                    ],
+                    "cardinality": "?"
+                  }
+                ]
               }
             ],
             "cardinality": "?"
@@ -2289,6 +2374,28 @@ export const DatamogGrammar = (): Grammar => loadedDatamogGrammar ?? (loadedData
       "definition": {
         "$type": "Group",
         "elements": [
+          {
+            "$type": "Group",
+            "elements": [
+              {
+                "$type": "Assignment",
+                "feature": "qualifier",
+                "operator": "=",
+                "terminal": {
+                  "$type": "RuleCall",
+                  "rule": {
+                    "$ref": "#/rules@34"
+                  },
+                  "arguments": []
+                }
+              },
+              {
+                "$type": "Keyword",
+                "value": "::"
+              }
+            ],
+            "cardinality": "?"
+          },
           {
             "$type": "Assignment",
             "feature": "name",

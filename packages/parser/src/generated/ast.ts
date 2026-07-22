@@ -34,6 +34,7 @@ export type DatamogKeywordNames =
     | ".."
     | "/"
     | ":"
+    | "::"
     | ":="
     | "<"
     | "<<"
@@ -295,12 +296,14 @@ export interface FunctionCall extends langium.AstNode {
     readonly $type: 'FunctionCall';
     args: Array<Expression>;
     name: string;
+    qualifier?: Identifier;
 }
 
 export const FunctionCall = {
     $type: 'FunctionCall',
     args: 'args',
-    name: 'name'
+    name: 'name',
+    qualifier: 'qualifier'
 } as const;
 
 export function isFunctionCall(item: unknown): item is FunctionCall {
@@ -822,6 +825,9 @@ export class DatamogAstReflection extends langium.AbstractAstReflection {
                 },
                 name: {
                     name: FunctionCall.name
+                },
+                qualifier: {
+                    name: FunctionCall.qualifier
                 }
             },
             superTypes: [Expression.$type]

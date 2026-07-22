@@ -63,7 +63,10 @@ PrimitiveType returns string:
 Rule:
     (output?='output' 'predicate')?
     head=HeadAtom
-        ('[' ruleName=Identifier (ctorParens?='(' (ctorArgs+=Expression (',' ctorArgs+=Expression)*)? ')')? ']')?
+        (
+            '[' ruleName=Identifier (ctorParens?='(' (ctorArgs+=Expression (',' ctorArgs+=Expression)*)? ')')? ']'
+          | '::' ruleName=Identifier (ctorParens?='(' (ctorArgs+=Expression (',' ctorArgs+=Expression)*)? ')')?
+        )?
         (':' '-' body+=BodyElement (',' body+=BodyElement)*)? '.';
 
 // Queries are syntactically (almost) the same as rule bodies — a
@@ -274,8 +277,11 @@ Primary infers Expression:
     // argument of `count(*)`.
     | {infer Wildcard} '*';
 
+// A `qualifier::name(...)` form names a constructor by its predicate
+// (`num_list::Cons(H, T)`); the bare `name(...)` form is a constructor term
+// resolved by tag, or an ordinary function / aggregate call.
 FunctionCall:
-    name=IDENT '(' (args+=Expression (',' args+=Expression)*)? ')';
+    (qualifier=Identifier '::')? name=IDENT '(' (args+=Expression (',' args+=Expression)*)? ')';
 
 // A single identifier surface shared by predicates, variables, function
 // names, column names. Case is a stylistic convention (uppercase =
