@@ -1,0 +1,19 @@
+# option.dl -- the Option type, parameterised over its element predicate.
+#
+# `elem` is the type parameter: an importer wires it to any unary relation,
+# and this file becomes Option of that element type. Because `elem` is a
+# `value` column, the element type can be anything (integers, strings, ...).
+input predicate elem(v: value).
+
+# Two constructors: None, or Some(v) for each element v.
+opt()[None].
+opt()[Some] :- elem(V).
+
+# Operations over the Option, exported. The `None` / `Some` constructors stay
+# private to this file (an importer never names them); it renders each Option
+# to a string by matching them here, and reports how many there are.
+# `to_json` renders any value (an integer, a string, ...) to its JSON text, so
+# `describe` works whatever element type the importer wired in.
+output predicate describe(D) :- P : opt, P = None(), D = "(none)".
+output predicate describe(D) :- P : opt, P = Some(V), D = to_json(V).
+output predicate option_count(count(P)) :- P : opt.

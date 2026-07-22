@@ -1,0 +1,10 @@
+# option-demo.dl -- instantiate option.dl at two different element types.
+n(1). n(2). n(3).
+colour("red"). colour("green").
+
+# Option<Int> and Option<String> from the one option.dl.
+input predicate int_opt(d: string)    := describe from "option.dl"(elem = n).
+input predicate colour_opt(d: string) := describe from "option.dl"(elem = colour).
+input predicate int_size(c: integer)  := option_count from "option.dl"(elem = n).
+
+?- int_opt(D).

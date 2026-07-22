@@ -195,6 +195,62 @@ a static error naming the offending column — before anything runs. The same
 column-type compatibility as any ordinary join applies (Chapter 7); the types you
 write at the boundary are the ones enforced.
 
+## A poor-man's higher-order type
+
+A module parameterises over *relations*, and a unary relation is just a set of
+values — a type. So a module can parameterise over a **type**. Here is `Option`
+built that way, using the proof terms of Chapter 15 for its two cases:
+
+```prolog
+# option.dl
+input predicate elem(v: value).          # the element type, as a set of values
+
+opt()[None].                             # None, and...
+opt()[Some] :- elem(V).                  # ...Some(v) for each element v
+
+output predicate describe(D) :- P : opt, P = None(), D = "(none)".
+output predicate describe(D) :- P : opt, P = Some(V), D = to_json(V).
+output predicate option_count(count(P)) :- P : opt.
+```
+
+`elem` is declared `value`, so the element type is whatever an importer wires
+in. `opt`'s proof terms are the `Option` values — `None()` and `Some(v)` — and
+the exported `describe` / `option_count` are operations over them (rendering
+each case, and counting them: always one more than the elements, the `None`).
+
+Instantiate it at two element types from the one file:
+
+```prolog
+# option-demo.dl
+n(1). n(2). n(3).
+colour("red"). colour("green").
+
+input predicate int_opt(d: string)    := describe from "option.dl"(elem = n).
+input predicate colour_opt(d: string) := describe from "option.dl"(elem = colour).
+input predicate int_size(c: integer)  := option_count from "option.dl"(elem = n).
+```
+
+`datamog --all option-demo.dl` renders `Option<Int>` and `Option<String>` from
+the same module:
+
+```
+-- int_opt      -- colour_opt      -- int_size
+ (none)          (none)             4
+ 1               "red"
+ 2               "green"
+ 3
+```
+
+That is a poor-man's higher-order type: `option.dl` is `Option<_>`, applied to
+an element predicate at each binding.
+
+The importer never writes `None` or `Some` — only the exported operations. It
+*can't*: each instance's constructors are freshened (the same per-instance
+renaming that lets you instantiate a module twice), which keeps them out of the
+importer's reach. So a module hands out operations over an *abstract* type, not
+its representation — the ML-module discipline, for free. To use the raw cases,
+match them inside the module (as `describe` does) and export the result.
+
 ## A few rules of the road
 
 - **`from` distinguishes the two bindings.** `from` present is a module; a bare
@@ -240,6 +296,14 @@ chain, not a cycle, so it is fine.)
 Declare `road_reach(a: string, b: string)` and run it. Read the error. Then wire
 `edge` to a relation whose columns are strings and run again. Which boundary does
 each error name, and at what point in the pipeline is it caught?
+
+### Exercise 16.5 — A parameterised pair ★★★
+
+Following `option.dl`, write `pair.dl` parameterised over *two* element
+predicates `left` and `right`, whose proof terms are `Pair(l, r)` for each `l`
+in `left` and `r` in `right`. Export a `describe` (or a `count`) operation and
+instantiate it — a poor-man's two-argument type constructor, `Pair<A, B>`. What
+happens if you wire both parameters to the same relation?
 
 ---
 
