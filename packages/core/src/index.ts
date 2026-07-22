@@ -62,7 +62,13 @@ export {
   type ResolutionError,
   resolveCall,
 } from "./builtins.ts";
-export { inferTermType, inferTypes, rebuildVarTypes, type TypedProgram } from "./types.ts";
+export {
+  columnTypesCompatible,
+  inferTermType,
+  inferTypes,
+  rebuildVarTypes,
+  type TypedProgram,
+} from "./types.ts";
 export {
   findInfiniteRisks,
   type FinitenessCycle,
@@ -91,6 +97,8 @@ export { findPredicateReferences, type PredicateReference } from "./references.t
 export { expandModule, type ExpandOptions } from "./expand.ts";
 export {
   elaborate,
+  checkModuleBoundaries,
+  type BoundaryConstraint,
   type DataSource,
   type ElaborationResult,
   type ModuleResolver,

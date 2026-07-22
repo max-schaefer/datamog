@@ -81,6 +81,22 @@ input predicate ordered(lo: integer, hi: integer) := from "asc.dl"(p = road).
     expect(result.stdout.trim()).toBe('{"L":1,"H":2}');
   });
 
+  test("rejects an import whose declared output type is wrong", async () => {
+    const result = await withTempDir(
+      {
+        "reach.dl": REACH,
+        "main.dl": `input predicate road(src: integer, dst: integer).
+input predicate best(a: string, b: string) := reach from "reach.dl"(edge = road).
+?- best(X, Y).
+`,
+        "road.csv": "src,dst\n1,2\n",
+      },
+      (dir) => runCli(["--backend", "native", join(dir, "main.dl")]),
+    );
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toMatch(/column 1 has type 'integer' but 'string'/);
+  });
+
   test("reports a missing module clearly", async () => {
     const result = await withTempDir(
       {

@@ -1153,6 +1153,16 @@ function joinTypesWithJsonLift(
 }
 
 /**
+ * Whether an inferred column type is compatible with a declared one at a module
+ * boundary. Uses the same lenient rule as unify-with-value (integer/float
+ * interchange and primitive/value lift), so a boundary accepts exactly what an
+ * ordinary atom-argument position would.
+ */
+export function columnTypesCompatible(inferred: PrimitiveType, declared: PrimitiveType): boolean {
+  return joinTypesWithJsonLift(inferred, declared) !== null;
+}
+
+/**
  * Widen `current` with `next` for column `i` of `predicate`, throwing a
  * useful `AnalyzerError` if the two can't be unified. Used wherever the
  * join comes from stacking multiple rule heads onto the same IDB column.

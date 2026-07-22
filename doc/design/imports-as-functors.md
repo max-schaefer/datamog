@@ -4,11 +4,12 @@ Status: proposal, largely implemented. The grammar (the `:=` source binding on
 input predicates), the per-instance expansion (`expandModule`), the elaborator
 (`elaborate`: the entry's bindings and, recursively, nested module imports, with
 the instantiation-graph acyclicity check; named exports and the unnamed `?-`
-default output), the Bun file resolver, and CLI wiring (`datamog main.dl`
-resolves `from` imports from disk and wires `:=` data-file bindings into
-loaders) all exist. Still to come: boundary type-checking, per-instance
-diagnostics, and REPL / playground / VS Code wiring. A `:=` binding that reaches
-analysis (i.e. one the elaborator did not handle) is rejected.
+default output), the Bun file resolver, CLI wiring (`datamog main.dl` resolves
+`from` imports from disk and wires `:=` data-file bindings into loaders), and
+boundary type-checking (actual vs callee input, selected output vs receiving
+declaration) all exist. Still to come: per-instance diagnostics and REPL /
+playground / VS Code wiring. A `:=` binding that reaches analysis (i.e. one the
+elaborator did not handle) is rejected.
 
 This is the ambitious alternative to the conservative module system in
 [`imports.md`](./imports.md). Read that one first for the baseline; this doc
@@ -270,9 +271,13 @@ diagnostics, per-module EDB directories):
   runs the merged program. `:=` data-file bindings become loaders (precedence:
   `--input` > `:=` binding > auto-load-by-convention). Imported outputs are
   selectable like any named output (`datamog main.dl <name>` / `--all`). (Done.)
-- **type checking**: wiring checks at each boundary (actual vs callee input;
-  selected output vs receiving declaration), reusing existing column-type unify.
-  (Still to come.)
+- **type checking**: `elaborate` records a `BoundaryConstraint` per wiring (each
+  actual vs the callee input's declared columns; the selected output vs the
+  receiving declaration's columns), since those declared types are dropped when
+  the binding is elaborated away. `checkModuleBoundaries` verifies them against
+  the merged program's inferred `columnTypes` after `inferTypes`, reusing the
+  same column-type compatibility as an ordinary atom-argument position. The CLI
+  runs it right after inference. (Done.)
 
 ## Deferred
 

@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { parseRaw, postProcess } from "datamog-parser";
 import { analyze } from "../src/analyzer.ts";
-import { type ModuleResolver, elaborate } from "../src/elaborate.ts";
+import { type ModuleResolver, checkModuleBoundaries, elaborate } from "../src/elaborate.ts";
+import { inferTypes } from "../src/types.ts";
 
 const MODULES: Record<string, string> = {
   "reach.dl": `
@@ -122,5 +123,52 @@ describe("elaborate", () => {
   test("rejects a module instantiation cycle", () => {
     const entry = parseRaw('input predicate top(x: integer) := q from "a.dl".');
     expect(() => elaborate(entry, resolve, "main.dl")).toThrow(/module import cycle/);
+  });
+});
+
+describe("module boundary type-checking", () => {
+  // Elaborate + analyze + infer + check boundaries, mirroring the CLI pipeline.
+  const check = (src: string): void => {
+    const { program, boundaries } = elaborate(parseRaw(src), resolve, "main.dl");
+    postProcess(program);
+    checkModuleBoundaries(inferTypes(analyze(program)), boundaries);
+  };
+
+  test("accepts a well-typed import", () => {
+    expect(() =>
+      check(`
+        road(1, 2).
+        input predicate best(a: integer, b: integer) := reach from "reach.dl"(edge = road).
+      `),
+    ).not.toThrow();
+  });
+
+  test("rejects an output whose declared column type is wrong", () => {
+    // reach produces integers (road is integer), but best declares string.
+    expect(() =>
+      check(`
+        road(1, 2).
+        input predicate best(a: string, b: string) := reach from "reach.dl"(edge = road).
+      `),
+    ).toThrow(/bound to 'best': column 1 has type 'integer' but 'string'/);
+  });
+
+  test("rejects an actual whose column type does not match the module input", () => {
+    // labels is a string EDB wired to reach.dl's integer `edge` input.
+    expect(() =>
+      check(`
+        input predicate labels(a: string, b: string).
+        input predicate best(a: string, b: string) := reach from "reach.dl"(edge = labels).
+      `),
+    ).toThrow(/actual 'labels' wired to input 'edge'.*column 1 has type 'string' but 'integer'/);
+  });
+
+  test("rejects an output arity mismatch", () => {
+    expect(() =>
+      check(`
+        road(1, 2).
+        input predicate best(a: integer) := reach from "reach.dl"(edge = road).
+      `),
+    ).toThrow(/bound to 'best': expected 1 column\(s\) but the wired predicate has 2/);
   });
 });

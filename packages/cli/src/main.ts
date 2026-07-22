@@ -1,7 +1,14 @@
 #!/usr/bin/env bun
 import { dirname, extname, resolve } from "node:path";
-import type { DataSource, ExtDecl, Program } from "datamog-core";
-import { AnalyzerError, analyze, elaborate, findInfiniteRisks, inferTypes } from "datamog-core";
+import type { DataSource, ElaborationResult, ExtDecl } from "datamog-core";
+import {
+  AnalyzerError,
+  analyze,
+  checkModuleBoundaries,
+  elaborate,
+  findInfiniteRisks,
+  inferTypes,
+} from "datamog-core";
 import { CsvLoader, parseCsvContent } from "datamog-csv";
 import {
   type Backend,
@@ -342,12 +349,9 @@ function resolveGSheetAuth(): GSheetAuth | undefined {
  * (resolving module imports relative to the entry file), and post-process it.
  * Returns the merged program plus the data-file bindings for loader setup.
  */
-function loadProgram(
-  source: string,
-  file: string,
-): { program: Program; dataSources: DataSource[] } {
+function loadProgram(source: string, file: string): ElaborationResult {
   const raw = parseRaw(source, file);
-  let result: { program: Program; dataSources: DataSource[] };
+  let result: ElaborationResult;
   try {
     result = elaborate(raw, createModuleResolver(), file);
   } catch (e) {
@@ -663,7 +667,7 @@ async function main() {
   }
   dataDir = dataDir ? resolve(dataDir) : dirname(resolve(programPath));
   const source = await dlFile.text();
-  const { program, dataSources } = loadProgram(source, programPath);
+  const { program, dataSources, boundaries } = loadProgram(source, programPath);
 
   // Discover the program's inputs and outputs. The `output` marker and `?-`
   // queries are all visible in the elaborated program, before analysis.
@@ -761,6 +765,7 @@ async function main() {
     backendOverride ?? (process.env.DATABASE_URL ? "postgres" : "sqlite");
 
   const analyzed = inferTypes(analyze(program, programPath));
+  checkModuleBoundaries(analyzed, boundaries);
 
   if (dryRun) {
     if (warnFiniteness) emitFinitenessWarnings(analyzed);

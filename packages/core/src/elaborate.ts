@@ -1,7 +1,8 @@
 import { isExtDecl, isRule } from "datamog-parser";
 import { AnalyzerError, queryProjection } from "./analyzer.ts";
-import type { Binding, ExtDecl, Program, Query, Rule, Statement } from "./ast.ts";
+import type { Binding, ExtDecl, PrimitiveType, Program, Query, Rule, Statement } from "./ast.ts";
 import { expandModule } from "./expand.ts";
+import { type TypedProgram, columnTypesCompatible } from "./types.ts";
 
 /** A module a `ModuleResolver` handed back: its raw (pre-post-process) AST and
  *  the file it was read from (for resolving that module's own relative paths). */
@@ -31,11 +32,31 @@ export interface DataSource {
   baseFile?: string;
 }
 
+/**
+ * A type contract at a module boundary: the merged-program `predicate` must,
+ * once types are inferred, have column types compatible with `expected`. Both
+ * the actual-vs-input and output-vs-declaration boundaries reduce to this — the
+ * declared types they check against are dropped during elaboration, so ordinary
+ * inference cannot see them. Checked by `checkModuleBoundaries` after inference.
+ */
+export interface BoundaryConstraint {
+  predicate: string;
+  expected: PrimitiveType[];
+  /** Human-readable description of the boundary, for the error message. */
+  note: string;
+  /** Source position (offset, end) of the binding. */
+  pos: [number, number] | [];
+  /** File the position refers to (the importer's file). */
+  file?: string;
+}
+
 export interface ElaborationResult {
   /** The merged program, still raw: the caller post-processes then analyzes it. */
   program: Program;
   /** Data-file bindings, for the caller to wire loaders to explicit sources. */
   dataSources: DataSource[];
+  /** Boundary type contracts, for `checkModuleBoundaries` after inference. */
+  boundaries: BoundaryConstraint[];
 }
 
 function nodePos(node: { $cstNode?: { offset: number; end: number } }): [number, number] | [] {
@@ -47,6 +68,7 @@ interface Context {
   resolve: ModuleResolver;
   out: Statement[];
   dataSources: DataSource[];
+  boundaries: BoundaryConstraint[];
   /** Monotonic counter for per-instance prefixes, unique across the whole run. */
   counter: { n: number };
 }
@@ -61,14 +83,15 @@ interface Context {
  * instance of B) must be acyclic; a cycle is rejected. (Recursion *within* a
  * module is fine: that is an ordinary least fixed point over the merged program.)
  *
- * Still to come: boundary type-checking and the Bun file resolver.
+ * Also collects the boundary type contracts (see `BoundaryConstraint`) for the
+ * caller to check with `checkModuleBoundaries` once types are inferred.
  */
 export function elaborate(
   entry: Program,
   resolve: ModuleResolver,
   entryFile?: string,
 ): ElaborationResult {
-  const ctx: Context = { resolve, out: [], dataSources: [], counter: { n: 0 } };
+  const ctx: Context = { resolve, out: [], dataSources: [], boundaries: [], counter: { n: 0 } };
 
   for (const stmt of entry.statements) {
     if (!isExtDecl(stmt) || !stmt.binding) {
@@ -89,6 +112,7 @@ export function elaborate(
     const id = mod.file ?? binding.source;
     checkCycle(id, [entryFile], stmt);
     const exportName = prepareModule(mod.program, binding.export, stmt, true);
+    collectBoundaries(ctx, mod.program, binding, stmt, entryFile, stmt.predicate, (a) => a);
     const inputs: Record<string, string> = {};
     for (const actual of binding.actuals) inputs[actual.param] = actual.arg;
     instantiate(
@@ -104,7 +128,80 @@ export function elaborate(
   }
 
   entry.statements = ctx.out;
-  return { program: entry, dataSources: ctx.dataSources };
+  return { program: entry, dataSources: ctx.dataSources, boundaries: ctx.boundaries };
+}
+
+/**
+ * Record the type contracts for one binding: each actual's merged predicate must
+ * match the module input it is wired to, and the selected output's merged
+ * predicate must match the importer's declared columns. `mergedActual` maps an
+ * actual's name in the importer's scope to its merged-program name.
+ */
+function collectBoundaries(
+  ctx: Context,
+  module: Program,
+  binding: Binding,
+  importerDecl: ExtDecl,
+  importerFile: string | undefined,
+  aliasedOutput: string,
+  mergedActual: (name: string) => string,
+): void {
+  const inputs = new Map<string, ExtDecl>();
+  for (const s of module.statements) if (isExtDecl(s)) inputs.set(s.predicate, s);
+  for (const actual of binding.actuals) {
+    const inputDecl = inputs.get(actual.param);
+    if (!inputDecl) continue;
+    ctx.boundaries.push({
+      predicate: mergedActual(actual.arg),
+      expected: inputDecl.columns.map((c) => c.type),
+      note: `actual '${actual.arg}' wired to input '${actual.param}' of "${binding.source}"`,
+      pos: nodePos(importerDecl),
+      file: importerFile,
+    });
+  }
+  ctx.boundaries.push({
+    predicate: aliasedOutput,
+    expected: importerDecl.columns.map((c) => c.type),
+    note: `output of "${binding.source}" bound to '${importerDecl.predicate}'`,
+    pos: nodePos(importerDecl),
+    file: importerFile,
+  });
+}
+
+/**
+ * Check the boundary type contracts collected by `elaborate` against the merged
+ * program's inferred column types. Run after `inferTypes`. Throws an
+ * `AnalyzerError` (carrying the importer's file/position) on an arity or type
+ * mismatch that ordinary inference could not see, because the declared types
+ * were dropped when the binding was elaborated away.
+ */
+export function checkModuleBoundaries(typed: TypedProgram, boundaries: BoundaryConstraint[]): void {
+  for (const b of boundaries) {
+    const inferred = typed.columnTypes.get(b.predicate);
+    // A missing predicate (e.g. an actual that names nothing) is left to the
+    // analyzer's own reporting; there is no inferred type to compare here.
+    if (!inferred) continue;
+    if (inferred.length !== b.expected.length) {
+      throw boundaryError(
+        `${b.note}: expected ${b.expected.length} column(s) but the wired predicate has ${inferred.length}`,
+        b,
+      );
+    }
+    for (let i = 0; i < b.expected.length; i++) {
+      if (!columnTypesCompatible(inferred[i]!, b.expected[i]!)) {
+        throw boundaryError(
+          `${b.note}: column ${i + 1} has type '${inferred[i]}' but '${b.expected[i]}' was declared`,
+          b,
+        );
+      }
+    }
+  }
+}
+
+function boundaryError(message: string, b: BoundaryConstraint): AnalyzerError {
+  const err = new AnalyzerError(message, ...b.pos);
+  err.file = b.file;
+  return err;
 }
 
 /**
@@ -145,6 +242,15 @@ function instantiate(
     // A nested instance's output feeds a parent input, so it is not exposed.
     const childExport = prepareModule(child.program, binding.export, s, false);
     const childPrefix = `${s.predicate}$${ctx.counter.n++}$`;
+    collectBoundaries(
+      ctx,
+      child.program,
+      binding,
+      s,
+      file,
+      `${childPrefix}${childExport}`,
+      renameName,
+    );
     const childInputs: Record<string, string> = {};
     for (const actual of binding.actuals) childInputs[actual.param] = renameName(actual.arg);
     instantiate(
