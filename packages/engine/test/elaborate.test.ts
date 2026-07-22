@@ -25,6 +25,11 @@ const MODULES: Record<string, string> = {
     output predicate reach(X, Y) :- edge(X, Y).
     output predicate reach(X, Z) :- reach(X, Y), edge(Y, Z).
   `,
+  // Exposes its result via a `?-` default output rather than a named export.
+  "asc.dl": `
+    input predicate p(a: integer, b: integer).
+    ?- p(X, Y), X < Y.
+  `,
 };
 // Fresh parse per call (elaborate mutates the returned AST).
 const resolve: ModuleResolver = (ref) => ({ program: parseRaw(MODULES[ref]!), file: ref });
@@ -75,6 +80,19 @@ describe("module binding end-to-end", () => {
       { a: 1, b: 2 },
       { a: 1, b: 3 },
       { a: 2, b: 3 },
+    ]);
+  });
+
+  test("imports a module's default (?-) output", async () => {
+    // asc.dl's default output keeps rows with a < b; import wires p and exposes
+    // it as `ordered`, columns relabelled to the importer's declaration.
+    const results = await run(`
+      raw(1, 2). raw(5, 3). raw(4, 9).
+      input predicate ordered(lo: integer, hi: integer) := from "asc.dl"(p = raw).
+    `);
+    expect(byLabel(results, "ordered")).toEqual([
+      { lo: 1, hi: 2 },
+      { lo: 4, hi: 9 },
     ]);
   });
 });

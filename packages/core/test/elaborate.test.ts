@@ -9,6 +9,11 @@ const MODULES: Record<string, string> = {
     output predicate reach(X, Y) :- edge(X, Y).
     output predicate reach(X, Z) :- reach(X, Y), edge(Y, Z).
   `,
+  // A module that exposes its result via a `?-` default output.
+  "keep.dl": `
+    input predicate n(a: integer, b: integer).
+    ?- n(X, Y), X < Y.
+  `,
   // A wiring cycle: a.dl instantiates b.dl and vice versa.
   "a.dl": `
     input predicate p(x: integer) := q from "b.dl".
@@ -94,9 +99,24 @@ describe("elaborate", () => {
     expect(() => analyze(program)).not.toThrow();
   });
 
-  test("rejects selecting a module's default output (not yet supported)", () => {
+  test("imports a module's default (?-) output as a named predicate", () => {
+    const entry = parseRaw(`
+      val(1, 2).
+      input predicate kept(x: integer, y: integer) := from "keep.dl"(n = val).
+    `);
+    const { program } = elaborate(entry, resolve, "main.dl");
+    // The default `?-` became a rule aliased to `kept`, exposed so it prints.
+    const keptRules = rules(program.statements).filter((r) => r.head.predicate === "kept");
+    expect(keptRules.length).toBeGreaterThan(0);
+    expect(keptRules.every((r) => r.output)).toBe(true);
+    postProcess(program);
+    expect(() => analyze(program)).not.toThrow();
+  });
+
+  test("rejects a default import when the module has no `?-` default", () => {
+    // reach.dl exposes only named outputs, no `?-`.
     const entry = parseRaw('input predicate best(x: integer) := from "reach.dl".');
-    expect(() => elaborate(entry, resolve, "main.dl")).toThrow(/default output.*not yet supported/);
+    expect(() => elaborate(entry, resolve, "main.dl")).toThrow(/no.*default output/);
   });
 
   test("rejects a module instantiation cycle", () => {

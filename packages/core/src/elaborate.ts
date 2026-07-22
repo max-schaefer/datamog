@@ -1,6 +1,6 @@
 import { isExtDecl, isRule } from "datamog-parser";
-import { AnalyzerError } from "./analyzer.ts";
-import type { Binding, ExtDecl, Program, Rule, Statement } from "./ast.ts";
+import { AnalyzerError, queryProjection } from "./analyzer.ts";
+import type { Binding, ExtDecl, Program, Query, Rule, Statement } from "./ast.ts";
 import { expandModule } from "./expand.ts";
 
 /** A module a `ModuleResolver` handed back: its raw (pre-post-process) AST and
@@ -56,12 +56,12 @@ interface Context {
  * of data sources, driving `expandModule` for each module instantiation.
  *
  * Handles the entry's bindings and, recursively, any module a referenced module
- * imports in turn. The *instantiation* graph (module A wiring an input to an
+ * imports in turn, selecting a named `output predicate` or the module's unnamed
+ * `?-` default output. The *instantiation* graph (module A wiring an input to an
  * instance of B) must be acyclic; a cycle is rejected. (Recursion *within* a
  * module is fine: that is an ordinary least fixed point over the merged program.)
  *
- * Still to come: selecting a module's unnamed default output (rejected below),
- * boundary type-checking, and the Bun file resolver.
+ * Still to come: boundary type-checking and the Bun file resolver.
  */
 export function elaborate(
   entry: Program,
@@ -82,13 +82,13 @@ export function elaborate(
       ctx.out.push(stmt);
       continue;
     }
-    if (binding.export === undefined) throw defaultOutputError(stmt, binding);
-
     // The entry's binding is user-facing: rename the module's selected output to
-    // the input's declared name and relabel its columns to the declared columns.
+    // the input's declared name, relabel its columns to the declared columns,
+    // and keep it exposed so it prints.
     const mod = resolve(binding.source, entryFile);
     const id = mod.file ?? binding.source;
     checkCycle(id, [entryFile], stmt);
+    const exportName = prepareModule(mod.program, binding.export, stmt, true);
     const inputs: Record<string, string> = {};
     for (const actual of binding.actuals) inputs[actual.param] = actual.arg;
     instantiate(
@@ -96,7 +96,7 @@ export function elaborate(
       mod.file,
       `${stmt.predicate}$${ctx.counter.n++}$`,
       inputs,
-      { export: binding.export, as: stmt.predicate },
+      { export: exportName, as: stmt.predicate },
       stmt.columns.map((c) => c.name),
       [entryFile, id],
       ctx,
@@ -139,10 +139,11 @@ function instantiate(
   for (const s of module.statements) {
     if (!isExtDecl(s) || !s.binding?.isModule) continue;
     const binding = s.binding;
-    if (binding.export === undefined) throw defaultOutputError(s, binding);
     const child = ctx.resolve(binding.source, file);
     const id = child.file ?? binding.source;
     checkCycle(id, stack, s);
+    // A nested instance's output feeds a parent input, so it is not exposed.
+    const childExport = prepareModule(child.program, binding.export, s, false);
     const childPrefix = `${s.predicate}$${ctx.counter.n++}$`;
     const childInputs: Record<string, string> = {};
     for (const actual of binding.actuals) childInputs[actual.param] = renameName(actual.arg);
@@ -157,7 +158,7 @@ function instantiate(
       ctx,
     );
     // The nested instance's (prefix-freshened) selected output feeds this input.
-    inputSubst[s.predicate] = `${childPrefix}${binding.export}`;
+    inputSubst[s.predicate] = `${childPrefix}${childExport}`;
   }
 
   const expanded = expandModule(module, { prefix, inputs: inputSubst, exportAs });
@@ -170,11 +171,66 @@ function instantiate(
   ctx.out.push(...expanded);
 }
 
-function defaultOutputError(decl: ExtDecl, binding: Binding): AnalyzerError {
-  return new AnalyzerError(
-    `selecting a module's default output ('${decl.predicate} := from "${binding.source}"') is not yet supported; name an output with 'export from'`,
-    ...nodePos(decl),
-  );
+const DEFAULT_OUTPUT = "$default";
+
+/**
+ * Prepare a freshly-resolved module for expansion: choose the selected output
+ * (synthesising a `$default` output rule from the module's `?-` query when no
+ * export was named), drop the module's `?-` queries so its default does not leak
+ * into the merged program, and expose only the selected output (the module's
+ * other outputs stay as plain IDB rules, still usable as dependencies).
+ * `exposeSelected` keeps the selected output's marker so it prints; a nested
+ * instance passes `false` (its output feeds a parent input, not a result).
+ * Returns the selected output's name.
+ */
+function prepareModule(
+  module: Program,
+  requestedExport: string | undefined,
+  decl: ExtDecl,
+  exposeSelected: boolean,
+): string {
+  const exportName = requestedExport ?? synthesizeDefaultOutput(module, decl);
+  module.statements = module.statements.filter((s) => s.$type !== "Query");
+  let found = false;
+  for (const s of module.statements) {
+    if (!isRule(s) || !s.output) continue;
+    if (s.head.predicate === exportName) {
+      found = true;
+      if (!exposeSelected) s.output = false;
+    } else {
+      s.output = false;
+    }
+  }
+  if (!found) {
+    throw new AnalyzerError(
+      `module '${decl.binding?.source}' has no output named '${exportName}'`,
+      ...nodePos(decl),
+    );
+  }
+  return exportName;
+}
+
+/** Convert the module's single `?-` default output into a named `$default`
+ *  output rule, so default-output selection reuses the named-export path. */
+function synthesizeDefaultOutput(module: Program, decl: ExtDecl): string {
+  const queries = module.statements.filter((s) => s.$type === "Query");
+  if (queries.length !== 1) {
+    const how = queries.length === 0 ? "no" : "more than one";
+    throw new AnalyzerError(
+      `module '${decl.binding?.source}' has ${how} default output (a \`?-\` query); name an output with \`export from\``,
+      ...nodePos(decl),
+    );
+  }
+  const q = queries[0] as Query;
+  const args = queryProjection(q).map((t) => ({
+    $type: "Variable",
+    name: (t as { name: string }).name,
+  }));
+  const rule = q as unknown as Record<string, unknown>;
+  rule.$type = "Rule";
+  rule.head = { $type: "HeadAtom", predicate: DEFAULT_OUTPUT, args };
+  rule.output = true;
+  return DEFAULT_OUTPUT;
 }
 
 function checkCycle(id: string, stack: (string | undefined)[], decl: ExtDecl): void {

@@ -3,11 +3,10 @@
 Status: proposal, partly implemented. The grammar (the `:=` source binding on
 input predicates), the per-instance expansion (`expandModule`), and the
 elaborator (`elaborate`: the entry's bindings and, recursively, nested module
-imports, with the instantiation-graph acyclicity check; named exports only) all
-exist. Still to come: selecting a module's unnamed default output, boundary
-type-checking, the Bun file resolver, CLI wiring, and per-instance diagnostics.
-A `:=` binding that reaches analysis (i.e. one the elaborator did not handle) is
-rejected.
+imports, with the instantiation-graph acyclicity check; named exports and the
+unnamed `?-` default output) all exist. Still to come: boundary type-checking,
+the Bun file resolver, CLI wiring, and per-instance diagnostics. A `:=` binding
+that reaches analysis (i.e. one the elaborator did not handle) is rejected.
 
 This is the ambitious alternative to the conservative module system in
 [`imports.md`](./imports.md). Read that one first for the baseline; this doc
@@ -256,8 +255,10 @@ diagnostics, per-module EDB directories):
   importer's local name via `exportAs`). `elaborate` drives it recursively (the
   entry's bindings and nested imports), checks the instantiation graph is
   acyclic, and collects data-file bindings as a `DataSource[]`; it takes a
-  `ModuleResolver` callback so it stays free of filesystem access. (Both done.)
-  Still to come around `elaborate`: selecting a module's unnamed default output.
+  `ModuleResolver` callback so it stays free of filesystem access. Selecting a
+  module's `?-` default output synthesises a named `$default` output rule so it
+  reuses the named-export path; an instance exposes only its selected output (its
+  other outputs and its `?-` do not leak into the merged program). (All done.)
 - **engine**: the executor gains the expansion pass ahead of the existing
   pipeline; free inputs become the merged program's EDBs. No backend changes.
 - **cli**: root-module instantiation, input overrides, `--output` selection.
