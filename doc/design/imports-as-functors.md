@@ -1,9 +1,12 @@
 # Design proposal: modules as functors (inputs and outputs)
 
 Status: proposal, partly implemented. The grammar (the `:=` source binding on
-input predicates) and the core expansion pass (`expandModule`) exist; the
-resolver, boundary type-checking, CLI wiring, and per-instance diagnostics do
-not. A `:=` binding that reaches analysis is rejected until the resolver lands.
+input predicates), the per-instance expansion (`expandModule`), and a first-cut
+elaborator (`elaborate`: the entry's own bindings, named exports only) exist.
+Still to come: nested module imports and the acyclicity check, selecting a
+module's unnamed default output, boundary type-checking, the Bun file resolver,
+CLI wiring, and per-instance diagnostics. A `:=` binding that reaches analysis
+(i.e. one the elaborator did not handle) is rejected.
 
 This is the ambitious alternative to the conservative module system in
 [`imports.md`](./imports.md). Read that one first for the baseline; this doc
@@ -240,10 +243,14 @@ diagnostics, per-module EDB directories):
   pred, ...)` for a module, a bare string with optional `as <format>` for a data
   file). `input`, `output`, `predicate`, `from`, and `as` are contextual
   keywords. (Done.)
-- **core**: the per-instance expansion is `expandModule` (substitute inputs,
-  freshen private + output + constructor names). (Done.) Still to come: the
-  elaboration pass around it that parses each referenced module, builds the
-  instantiation graph, checks acyclicity, and merges into one `Program`.
+- **core**: `expandModule` does the per-instance expansion (substitute inputs,
+  freshen private + output + constructor names, rename the selected output to the
+  importer's local name via `exportAs`). `elaborate` drives it for the entry's
+  own bindings and collects data-file bindings as a `DataSource[]`; it takes a
+  `ModuleResolver` callback so it stays free of filesystem access. (Both done.)
+  Still to come around `elaborate`: recursing into referenced modules (nested
+  imports), the instantiation-graph acyclicity check, and default-output
+  selection.
 - **engine**: the executor gains the expansion pass ahead of the existing
   pipeline; free inputs become the merged program's EDBs. No backend changes.
 - **cli**: root-module instantiation, input overrides, `--output` selection.

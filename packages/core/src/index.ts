@@ -1,9 +1,11 @@
 export type {
+  Actual,
   AggregateCall,
   AggregateFunction,
   ArrayLiteral,
   BinaryExpr,
   BinaryOp,
+  Binding,
   BitwiseOp,
   BodyElement,
   ColumnDecl,
@@ -87,4 +89,11 @@ export { AGGREGATE_NAMES } from "./analyzer.ts";
 export { findRecursiveCalls, type RecursiveCall } from "./recursion.ts";
 export { findPredicateReferences, type PredicateReference } from "./references.ts";
 export { expandModule, type ExpandOptions } from "./expand.ts";
+export {
+  elaborate,
+  type DataSource,
+  type ElaborationResult,
+  type ModuleResolver,
+  type ResolvedModule,
+} from "./elaborate.ts";
 export { assertNever } from "./util.ts";

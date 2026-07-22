@@ -20,9 +20,11 @@ import type {
 } from "datamog-parser";
 
 export type {
+  Actual,
   AggregateCall,
   ArrayLiteral,
   BinaryExpr,
+  Binding,
   BodyElement,
   BooleanLiteral,
   ColumnDecl,

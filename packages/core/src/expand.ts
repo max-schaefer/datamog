@@ -16,6 +16,15 @@ export interface ExpandOptions {
    * merged program).
    */
   inputs: Record<string, string>;
+  /**
+   * The importer's selected output. `export` names one of the module's output
+   * predicates (or private predicates, though only outputs are meaningful to
+   * import); it is renamed to `as` (the importer's local name for the instance)
+   * instead of being freshened with `prefix`, so the importer's existing
+   * references resolve without an alias rule. Every other predicate is still
+   * prefix-freshened.
+   */
+  exportAs?: { export: string; as: string };
 }
 
 /** Yield a node and every descendant AST node (children found by walking
@@ -56,7 +65,10 @@ function* walk(node: unknown): Generator<Record<string, unknown>> {
  * safe. The importer binds its chosen name to the instance's selected output
  * (`${prefix}${outputName}`); that wiring is the resolver's job, not this pass.
  */
-export function expandModule(module: Program, { prefix, inputs }: ExpandOptions): Statement[] {
+export function expandModule(
+  module: Program,
+  { prefix, inputs, exportAs }: ExpandOptions,
+): Statement[] {
   const localNames = new Set<string>();
   const ctorNames = new Set<string>();
   for (const stmt of module.statements) {
@@ -68,6 +80,7 @@ export function expandModule(module: Program, { prefix, inputs }: ExpandOptions)
 
   const renamePredicate = (name: string): string => {
     if (Object.hasOwn(inputs, name)) return inputs[name]!;
+    if (exportAs && name === exportAs.export) return exportAs.as;
     if (localNames.has(name)) return `${prefix}${name}`;
     return name; // free input or built-in body atom
   };

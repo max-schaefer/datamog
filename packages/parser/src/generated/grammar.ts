@@ -188,8 +188,13 @@ export const DatamogGrammar = (): Grammar => loadedDatamogGrammar ?? (loadedData
                 "cardinality": "?"
               },
               {
-                "$type": "Keyword",
-                "value": "from"
+                "$type": "Assignment",
+                "feature": "isModule",
+                "operator": "?=",
+                "terminal": {
+                  "$type": "Keyword",
+                  "value": "from"
+                }
               },
               {
                 "$type": "Assignment",

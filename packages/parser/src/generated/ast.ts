@@ -145,6 +145,7 @@ export interface Binding extends langium.AstNode {
     actuals: Array<Actual>;
     export?: Identifier;
     format?: Identifier;
+    isModule: boolean;
     source: string;
 }
 
@@ -153,6 +154,7 @@ export const Binding = {
     actuals: 'actuals',
     export: 'export',
     format: 'format',
+    isModule: 'isModule',
     source: 'source'
 } as const;
 
@@ -702,6 +704,10 @@ export class DatamogAstReflection extends langium.AbstractAstReflection {
                 },
                 format: {
                     name: Binding.format
+                },
+                isModule: {
+                    name: Binding.isModule,
+                    defaultValue: false
                 },
                 source: {
                     name: Binding.source

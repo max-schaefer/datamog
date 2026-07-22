@@ -32,7 +32,7 @@ ExtDecl:
 // forces a loader when the extension does not (or cannot) say; the format is a
 // plain identifier checked against the loader registry, not a keyword.
 Binding:
-    ((export=Identifier)? 'from' source=STRING
+    ((export=Identifier)? isModule?='from' source=STRING
         ('(' actuals+=Actual (',' actuals+=Actual)* ')')?)
   | (source=STRING ('as' format=Identifier)?);
 
