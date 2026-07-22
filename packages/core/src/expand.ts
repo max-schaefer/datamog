@@ -22,7 +22,9 @@ export interface ExpandOptions {
    * import); it is renamed to `as` (the importer's local name for the instance)
    * instead of being freshened with `prefix`, so the importer's existing
    * references resolve without an alias rule. Every other predicate is still
-   * prefix-freshened.
+   * prefix-freshened. Its presence also marks this as a user-facing instance,
+   * so the module's constructors are named `<as>_<Ctor>` (writable) rather than
+   * `prefix`-freshened.
    */
   exportAs?: { export: string; as: string };
 }
@@ -54,10 +56,12 @@ function* walk(node: unknown): Generator<Record<string, unknown>> {
  *
  * - **Substitute** each wired input predicate with the actual name the importer
  *   supplied, everywhere it is referenced; free inputs keep their name.
- * - **Freshen** every private and output predicate name, and every proof
- *   constructor, with `prefix`, so two instances do not collide with each other
- *   or with the importer (the constructor freshening keeps the merged program's
- *   global constructor-uniqueness check honest).
+ * - **Freshen** every private and output predicate name with `prefix` so two
+ *   instances do not collide. Proof **constructors** of a user-facing (entry)
+ *   import are instead named `<as>_<Ctor>` after the importer's chosen output
+ *   name — a writable identifier it can pattern-match; a nested instance's
+ *   constructors keep the opaque `prefix` form. Either way the merged program's
+ *   global constructor-uniqueness check catches a residual clash.
  * - **Drop** the declarations of wired inputs (they are supplied from outside);
  *   keep free-input declarations as EDBs.
  *
@@ -84,8 +88,15 @@ export function expandModule(
     if (localNames.has(name)) return `${prefix}${name}`;
     return name; // free input or built-in body atom
   };
-  const renameConstructor = (name: string): string =>
-    ctorNames.has(name) ? `${prefix}${name}` : name;
+  // For a user-facing (entry) import, name the instance's constructors after the
+  // importer's chosen output name (`Some` -> `road_reach_Some`): a writable
+  // identifier the importer can pattern-match, unique because two bindings
+  // cannot share an output name. A nested instance (no `exportAs`) keeps the
+  // opaque `$`-prefixed name, since nobody writes it.
+  const renameConstructor = (name: string): string => {
+    if (!ctorNames.has(name)) return name;
+    return exportAs ? `${exportAs.as}_${name}` : `${prefix}${name}`;
+  };
 
   for (const stmt of module.statements) {
     for (const node of walk(stmt)) {

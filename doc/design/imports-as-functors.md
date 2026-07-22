@@ -163,11 +163,15 @@ Per instantiation:
    (for example `road_reach$reach`), so two instances do not collide with each
    other or with the importer's names. The importer's chosen name binds to the
    instance's selected output.
-4. **Freshen proof-constructor names** the same way. This is the interaction
-   between decisions 2 and 4: a module that declares an ADT constructor,
-   instantiated twice, would otherwise produce two `Foo` constructors and trip
-   the merged program's global constructor-uniqueness check. Per-instance
-   freshening keeps that check honest.
+4. **Rename proof constructors** per instance too — otherwise a module that
+   declares an ADT constructor, instantiated twice, would produce two `Foo`s and
+   trip the global constructor-uniqueness check (the interaction between
+   decisions 2 and 4). A *nested* instance's constructors are `$`-freshened
+   (opaque; nobody writes them). A *user-facing* (entry) instance's constructors
+   are instead named `<import>_<Ctor>` after the importer's chosen name (`Some`
+   -> `dist_Some`): a writable identifier the importer can pattern-match, and
+   distinct per instance, so one program can match against several
+   instantiations of one ADT module at once.
 
 After expansion, the transitive **free inputs** (those with no module default,
 at the leaves) are the merged program's EDBs, loaded from CSV relative to their
@@ -256,8 +260,9 @@ diagnostics, per-module EDB directories):
   file). `input`, `output`, `predicate`, `from`, and `as` are contextual
   keywords. (Done.)
 - **core**: `expandModule` does the per-instance expansion (substitute inputs,
-  freshen private + output + constructor names, rename the selected output to the
-  importer's local name via `exportAs`). `elaborate` drives it recursively (the
+  freshen private + output predicate names, rename the selected output to the
+  importer's local name via `exportAs`, and name a user-facing instance's
+  constructors `<import>_<Ctor>` — writable — instead of `$`-freshening them). `elaborate` drives it recursively (the
   entry's bindings and nested imports), checks the instantiation graph is
   acyclic, and collects data-file bindings as a `DataSource[]`; it takes a
   `ModuleResolver` callback so it stays free of filesystem access. Selecting a
@@ -297,7 +302,16 @@ diagnostics, per-module EDB directories):
 - **Inferring receiving column types** from the selected output signature instead
   of restating them.
 - **Aliased whole-module access** (`import g = "mod.dl"(...)` then `g.a`, `g.b`).
-  The first version selects one output per import site with `.name`.
+  The first version selects one output per import site with `.name`. (An
+  instance's proof constructors are already reachable as `<import>_<Ctor>`, so
+  matching several instantiations of one ADT module is possible without this;
+  what remains deferred is multi-*output* access under one alias.)
+- **Predicate-qualified constructors** (`opt:Some`, always, even intra-module),
+  which would additionally allow two predicates in one module to share a
+  constructor tag. A larger proof-term redesign than the per-import
+  `<import>_<Ctor>` naming above: the `:` separator collides with the capture
+  operator (would want `::`), and it changes the global-unique constructor model
+  (spec §8) plus every existing `[Ctor]` use.
 - **REPL module bindings.** The REPL's `IncrementalSession` re-analyses the whole
   accumulated program each chunk and computes a per-chunk delta keyed off the new
   fragment's statements; elaboration transforms the whole program (dropping

@@ -1,10 +1,13 @@
-# option-demo.dl -- instantiate option.dl at two different element types.
-n(1). n(2). n(3).
-colour("red"). colour("green").
+# option-demo.dl -- instantiate Option at two element types and match both.
+n(1). n(2).
+colour("red").
 
-# Option<Int> and Option<String> from the one option.dl.
-input predicate int_opt(d: string)    := describe from "option.dl"(elem = n).
-input predicate colour_opt(d: string) := describe from "option.dl"(elem = colour).
-input predicate int_size(c: integer)  := option_count from "option.dl"(elem = n).
+input predicate int_opt(o: value)    := opt from "option.dl"(elem = n).
+input predicate colour_opt(o: value) := opt from "option.dl"(elem = colour).
 
-?- int_opt(D).
+# Each instance's constructors are named after the binding, so they are
+# distinct and writable -- one program can match against both Options at once.
+output predicate present(V) :- P : int_opt,    P = int_opt_Some(V).
+output predicate present(V) :- Q : colour_opt, Q = colour_opt_Some(V).
+
+?- present(V).

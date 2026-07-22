@@ -203,53 +203,43 @@ built that way, using the proof terms of Chapter 15 for its two cases:
 
 ```prolog
 # option.dl
-input predicate elem(v: value).          # the element type, as a set of values
-
-opt()[None].                             # None, and...
-opt()[Some] :- elem(V).                  # ...Some(v) for each element v
-
-output predicate describe(D) :- P : opt, P = None(), D = "(none)".
-output predicate describe(D) :- P : opt, P = Some(V), D = to_json(V).
-output predicate option_count(count(P)) :- P : opt.
+input predicate elem(v: value).           # the element type, as a set of values
+output predicate opt()[None].             # None, and...
+output predicate opt()[Some] :- elem(V).  # ...Some(v) for each element v
 ```
 
 `elem` is declared `value`, so the element type is whatever an importer wires
-in. `opt`'s proof terms are the `Option` values — `None()` and `Some(v)` — and
-the exported `describe` / `option_count` are operations over them (rendering
-each case, and counting them: always one more than the elements, the `None`).
+in; `opt`'s proof terms are the `Option` values, `None()` and `Some(v)`.
 
-Instantiate it at two element types from the one file:
+Instantiate it at two element types, and — the useful part — pattern-match the
+cases of *both*:
 
 ```prolog
 # option-demo.dl
-n(1). n(2). n(3).
-colour("red"). colour("green").
+n(1). n(2).
+colour("red").
+input predicate int_opt(o: value)    := opt from "option.dl"(elem = n).
+input predicate colour_opt(o: value) := opt from "option.dl"(elem = colour).
 
-input predicate int_opt(d: string)    := describe from "option.dl"(elem = n).
-input predicate colour_opt(d: string) := describe from "option.dl"(elem = colour).
-input predicate int_size(c: integer)  := option_count from "option.dl"(elem = n).
+output predicate present(V) :- P : int_opt,    P = int_opt_Some(V).
+output predicate present(V) :- Q : colour_opt, Q = colour_opt_Some(V).
+?- present(V).       # 1, 2, "red"
 ```
 
-`datamog --all option-demo.dl` renders `Option<Int>` and `Option<String>` from
-the same module:
+An imported instance's constructors are named after the binding: `int_opt`'s
+`Some` is `int_opt_Some`, `colour_opt`'s is `colour_opt_Some`. That naming is
+what makes this work. Constructor names are global — a `Some` is a `Some`
+everywhere — so two instances' `Some`s could not otherwise coexist; qualifying
+each by its binding makes them distinct *and* writable, so one program can match
+against several instantiations of the same type at once: `Option<Int>` and
+`Option<String>` from the one `option.dl`. That is a poor-man's higher-order
+type — `option.dl` is `Option<_>`, applied to an element predicate at each
+binding.
 
-```
--- int_opt      -- colour_opt      -- int_size
- (none)          (none)             4
- 1               "red"
- 2               "green"
- 3
-```
-
-That is a poor-man's higher-order type: `option.dl` is `Option<_>`, applied to
-an element predicate at each binding.
-
-The importer never writes `None` or `Some` — only the exported operations. It
-*can't*: each instance's constructors are freshened (the same per-instance
-renaming that lets you instantiate a module twice), which keeps them out of the
-importer's reach. So a module hands out operations over an *abstract* type, not
-its representation — the ML-module discipline, for free. To use the raw cases,
-match them inside the module (as `describe` does) and export the result.
+If you would rather keep the representation abstract, don't import `opt` at all:
+export *operations* over it from `option.dl` — matching the constructors
+*inside* the module — and let the importer use those. Same module, ML-style:
+expose a type through functions, or expose its constructors; your call.
 
 ## A few rules of the road
 
@@ -301,9 +291,10 @@ each error name, and at what point in the pipeline is it caught?
 
 Following `option.dl`, write `pair.dl` parameterised over *two* element
 predicates `left` and `right`, whose proof terms are `Pair(l, r)` for each `l`
-in `left` and `r` in `right`. Export a `describe` (or a `count`) operation and
-instantiate it — a poor-man's two-argument type constructor, `Pair<A, B>`. What
-happens if you wire both parameters to the same relation?
+in `left` and `r` in `right`. Instantiate it as `pr` and match its constructor
+(`pr_Pair(L, R)`) to recover the pairs — a poor-man's two-argument type
+constructor, `Pair<A, B>`. What happens if you wire both parameters to the same
+relation?
 
 ---
 

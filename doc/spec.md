@@ -2167,11 +2167,14 @@ need no module-specific support. Per instantiation:
 
 1. The module reference is resolved (relative to the importing file) and parsed.
 2. The module's wired inputs are **substituted** with the actuals; every private
-   and output predicate name, and every proof constructor, is **freshened** with
-   a per-instance prefix so two instances never collide; and the selected output
-   is **renamed** to the importing input's name. The freshening prefix contains
-   `$`, which no source identifier can (§1.4), so freshened names never clash
-   with user names.
+   and output predicate name is **freshened** with a per-instance prefix (which
+   contains `$`, so it never clashes with a source identifier, §1.4); and the
+   selected output is **renamed** to the importing input's name. Its proof
+   **constructors** are named `<import>_<Ctor>` after that same importing name —
+   for `input predicate dist(...) := opt from "..."`, `Some` becomes
+   `dist_Some`. This is a writable identifier the importer can pattern-match, and
+   it is distinct per instance, so a program can match against several
+   instantiations of one ADT module at once.
 3. A data-file binding leaves the input as an EDB, loaded from its bound source.
 4. Everything merges into one program evaluated by one global least fixed point.
 

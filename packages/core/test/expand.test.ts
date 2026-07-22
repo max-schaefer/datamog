@@ -62,4 +62,16 @@ describe("expandModule", () => {
     const heads = (s: Stmt[]) => new Set(rules(s).map((r) => r.head.predicate));
     for (const h of heads(one)) expect(heads(two).has(h)).toBe(false);
   });
+
+  test("a user-facing import (exportAs) gives writable, binding-qualified constructor names", () => {
+    // With exportAs the instance is user-facing, so its constructors are named
+    // `<as>_<Ctor>` (a writable identifier) rather than `$`-prefix-freshened.
+    const stmts = expandModule(parseRaw(MODULE), {
+      prefix: "I$",
+      inputs: { edge: "road" },
+      exportAs: { export: "tagged", as: "mytag" },
+    });
+    const tagRule = rules(stmts).find((r) => r.head.predicate === "mytag");
+    expect(tagRule?.ruleName).toBe("mytag_Mk");
+  });
 });

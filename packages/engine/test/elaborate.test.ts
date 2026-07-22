@@ -30,6 +30,12 @@ const MODULES: Record<string, string> = {
     input predicate p(a: integer, b: integer).
     ?- p(X, Y), X < Y.
   `,
+  // An ADT (Option) parameterised over its element predicate.
+  "option.dl": `
+    input predicate elem(v: value).
+    output predicate opt()[None].
+    output predicate opt()[Some] :- elem(V).
+  `,
 };
 // Fresh parse per call (elaborate mutates the returned AST).
 const resolve: ModuleResolver = (ref) => ({ program: parseRaw(MODULES[ref]!), file: ref });
@@ -123,5 +129,20 @@ describe("module binding end-to-end", () => {
         "main.dl",
       ),
     ).toThrow(/column 1 has type 'integer' but 'string'/);
+  });
+
+  test("imported ADT constructors are writable and distinct per instance", async () => {
+    // Two Option instances; each instance's constructors are named after its
+    // binding (int_opt_Some, colour_opt_Some), so both are matchable at once.
+    const results = await run(`
+      n(1). n(2).
+      colour("red").
+      input predicate int_opt(o: value)    := opt from "option.dl"(elem = n).
+      input predicate colour_opt(o: value) := opt from "option.dl"(elem = colour).
+      output predicate int_some(V)    :- P : int_opt,    P = int_opt_Some(V).
+      output predicate colour_some(V) :- Q : colour_opt, Q = colour_opt_Some(V).
+    `);
+    expect(byLabel(results, "int_some")).toEqual([{ V: 1 }, { V: 2 }]);
+    expect(byLabel(results, "colour_some")).toEqual([{ V: "red" }]);
   });
 });
