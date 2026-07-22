@@ -21,8 +21,8 @@ need Bun installed.
 ## Syntax
 
 ```prolog
-# Declare extensional predicates (backed by tables)
-extensional parent(name: string, child: string).
+# Declare input predicates (extensional, backed by tables)
+input predicate parent(name: string, child: string).
 
 # Define rules (Horn clauses)
 ancestor(X, Y) :- parent(X, Y).
@@ -32,7 +32,7 @@ ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
 ?- ancestor("alice", X).
 ```
 
-- **Extensional declarations** (`extensional`) define predicates backed by tables with typed columns (`string`, `integer`, `float`, `boolean`, `value`); add `?` for nullable input columns.
+- **Input predicate declarations** (`input predicate`) define extensional predicates (EDB) backed by tables with typed columns (`string`, `integer`, `float`, `boolean`, `value`); add `?` for nullable input columns. An input can be bound to a source with `:=` (see [Modules](#modules)).
 - **Rules** define intensional predicates. Multiple rules for the same predicate are combined with `UNION`. Recursive predicates use recursive views.
 - **Facts** are rules with no body: `base_case("x").`
 - **Queries** target a predicate directly: `?- p(X).`
@@ -60,7 +60,7 @@ ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
 A `value` column holds the union of every shape: `null`, booleans, integers, floats, strings, arrays, and objects. Datamog gives you a small toolkit to read, project, iterate over, and (in narrow ways) construct them, all from inside a rule body. The name "JSON" is reserved for the syntax (JSONL files, parsing strings) and the on-disk representation; the language type is just `value`.
 
 ```prolog
-extensional event(payload: value).
+input predicate event(payload: value).
 
 # Destructure an event into flat columns. Wrong-shape access → NULL.
 request(Id, Method, Path, Status) :-
@@ -119,6 +119,26 @@ append(Cons(H, T), B, Cons(H, R)) :- append(T, B, R).
 ```
 
 A rule derives its proof term automatically, or lists the arguments explicitly with `[Ctor(a, b, ...)]` to keep an intermediate variable out. Because a constructor term matches an existing proof, operations relate values their predicate already enumerates. Runnable examples: [`proof-terms`](packages/cli/examples/proof-terms) (enums, pairs, lists), [`proof-term-fold`](packages/cli/examples/proof-term-fold) (a fold), [`peano`](packages/cli/examples/peano) (naturals), [`list-ops`](packages/cli/examples/list-ops) (append / reverse / member), and [`expr-eval`](packages/cli/examples/expr-eval) (a chart parser feeding an evaluator). The [Proof terms](doc/walkthrough/15-proof-terms.md) walkthrough chapter walks through it.
+
+## Modules
+
+A file is a function from its `input predicate`s to its outputs (`output predicate`s and the unnamed `?-` default). An input can be bound with `:=` to a source: a specific data file, or an instance of another module. Binding one file's inputs to another's outputs composes files, with no separate module construct.
+
+```prolog
+# reach.dl: reachability, parameterised by an edge relation
+input predicate edge(src: integer, dst: integer).
+output predicate reach(X, Y) :- edge(X, Y).
+output predicate reach(X, Z) :- reach(X, Y), edge(Y, Z).
+
+# main.dl: instantiate reach.dl twice against different relations
+input predicate road(src: integer, dst: integer).                       # loads road.csv
+input predicate flight(src: integer, dst: integer) := "flights.jsonl".  # explicit data file
+input predicate road_reach(a: integer, b: integer)   := reach from "reach.dl"(edge = road).
+input predicate flight_reach(a: integer, b: integer) := reach from "reach.dl"(edge = flight).
+?- road_reach(1, X).
+```
+
+`from` marks a module binding (`<export> from "mod.dl"(input = pred, ...)`; omit the export to take the module's `?-` default output); a bare string is a data-file binding (`as csv` forces the loader when the extension does not say). `datamog main.dl` resolves imports from disk relative to the entry, instantiating each module (duplicated per use, freshened so instances never collide) and merging everything into one program. The instantiation graph must be acyclic, and boundary column types are checked. See [spec §9](doc/spec.md) for the full semantics.
 
 ## Packages
 

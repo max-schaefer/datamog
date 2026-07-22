@@ -154,10 +154,11 @@ not    in    true    false    null
 string    integer    float    boolean    value
 ```
 
-`input`, `output`, and `predicate` are **contextual keywords**: they lead the
-`input predicate` and `output predicate` declaration forms, but are ordinary
-identifiers everywhere else, so a program may still name a predicate, column,
-or variable `input`, `output`, or `predicate`.
+`input`, `output`, `predicate`, `from`, and `as` are **contextual keywords**:
+they lead the `input predicate` / `output predicate` declaration forms and the
+`:=` source binding (§9), but are ordinary identifiers everywhere else, so a
+program may still name a predicate, column, or variable after them (for example
+the `from`/`to` columns of an edge relation).
 
 **Built-in operation names** (functions, body atoms, and aggregates) are
 reserved only against unquoted predicate names; they may be used as input-predicate
@@ -185,6 +186,7 @@ Bitwise:       &  |  ^  <<  >>  >>>
 Comparison:    <  >  <=  >=  ==  !=  =  <>
 Rule:          :-
 Query:         ?-
+Binding:       :=
 Range:         ..
 Grouping:      (  )  [  ]
 Separators:    ,  :  .
@@ -286,24 +288,29 @@ output**, §2.3). Results are reported in source order.
 ### 2.2 Extensional Declarations
 
 ```
-ExtDecl     ::= 'extensional' Identifier '(' ColumnDecl (',' ColumnDecl)* ')' '.'
+ExtDecl     ::= 'input' 'predicate' Identifier '(' ColumnDecl (',' ColumnDecl)* ')' (':=' Binding)? '.'
 ColumnDecl  ::= Identifier ':' PrimitiveType ('?')?
 PrimitiveType ::= 'string' | 'integer' | 'float' | 'boolean' | 'value'
 ```
 
-An extensional declaration introduces a **table-backed predicate** (EDB).
-Each column has a name and a SQL type. At execution time, the corresponding
-table is created and populated from an external data source (CSV, JSONL,
-JSON, Google Sheets, or Mermaid diagram) via a loader plugin.
+An input predicate declaration introduces an **extensional predicate** (EDB): a
+predicate supplied from outside the program's rules. Each column has a name and
+a type. At execution time the predicate is populated from an external data
+source (CSV, JSONL, JSON, Google Sheets, or Mermaid diagram) via a loader
+plugin.
 
 ```
 input predicate scores(student: string, subject: string, score: integer).
 input predicate survey(name: string, age: integer?, email: string?).
 ```
 
-The optional `?` suffix marks an extensional column as nullable. Nullable
-columns keep the same Datamog base type for type inference, but loaders and
-the generated table permit runtime `NULL` values.
+The optional `?` suffix marks a column as nullable. Nullable columns keep the
+same Datamog base type for type inference, but loaders and the generated table
+permit runtime `NULL` values.
+
+An input predicate may be **bound** to a source with `:=` — a specific data file
+or an instance of another module (§9). An unbound input is a free parameter,
+supplied at the CLI (from `<name>.csv` by convention, or a `--input` flag).
 
 ### 2.3 Rules
 
@@ -1067,9 +1074,12 @@ Program        ::= Statement*
 
 Statement      ::= ExtDecl | Rule | Query
 
-ExtDecl        ::= 'extensional' Identifier '(' ColumnDecl (',' ColumnDecl)* ')' '.'
+ExtDecl        ::= 'input' 'predicate' Identifier '(' ColumnDecl (',' ColumnDecl)* ')' (':=' Binding)? '.'
 ColumnDecl     ::= Identifier ':' PrimitiveType ('?')?
 PrimitiveType  ::= 'string' | 'integer' | 'float' | 'boolean' | 'value'
+Binding        ::= (Identifier? 'from' STRING ('(' Actual (',' Actual)* ')')?)   -- module
+                 | (STRING ('as' Identifier)?)                                    -- data file
+Actual         ::= Identifier '=' Identifier
 
 Rule           ::= HeadAtom (':-' BodyElement (',' BodyElement)*)? '.'
 HeadAtom       ::= Identifier '(' (HeadTerm (',' HeadTerm)*)? ')'
@@ -2096,7 +2106,93 @@ SQL with nested accessor chains that can exceed a SQL engine's parser or
 expression-depth limit; the in-memory interpreters have no such limit, so they
 are the reliable target for substantial proof-term manipulation.
 
-## 9 Examples
+## 9 Modules
+
+A Datamog file is a **function from input relations to output relations**: its
+`input predicate`s are parameters and its `output predicate`s and unnamed `?-`
+default (§2.3, §2.4) are results. An `input predicate` can be **bound** with `:=`
+to a source — a data file, or an instance of another module. Binding one file's
+inputs to other files' outputs composes programs without a separate module
+construct.
+
+### 9.1 Source bindings
+
+```
+Binding  ::= (Identifier? 'from' STRING ('(' Actual (',' Actual)* ')')?)   -- module
+           | (STRING ('as' Identifier)?)                                    -- data file
+Actual   ::= Identifier '=' Identifier
+```
+
+`from` present means a **module** binding; a bare string is a **data-file**
+binding. An input with no binding is a free parameter (§2.2).
+
+**Data file.** `:= "source"` binds the input to a specific file (resolved
+relative to the importing file), a URL, or a `gh:` shorthand, instead of the
+by-convention default. The loader is chosen by the source's extension, or forced
+with `as <format>` (`csv`, `jsonl`, `json`, `mermaid`) when the extension does
+not, or cannot, say:
+
+```
+input predicate airport(code: string, name: string) := "data/airports.tsv" as csv.
+```
+
+**Module.** `:= <export> from "mod.dl"(actual = pred, ...)` instantiates the
+module `mod.dl` and binds this input to one of its outputs:
+
+- `<export>` names an `output predicate` of the module; omit it
+  (`:= from "mod.dl"(...)`) to take the module's unnamed `?-` default output.
+- The parenthesised **actuals** wire the module's own inputs by name
+  (`moduleInput = localPredicate`), where `localPredicate` is any predicate in
+  the importing file's scope. An unwired module input stays free.
+
+```
+# reach.dl: reachability, parameterised by an edge relation
+input predicate edge(src: integer, dst: integer).
+output predicate reach(X, Y) :- edge(X, Y).
+output predicate reach(X, Z) :- reach(X, Y), edge(Y, Z).
+
+# main.dl: instantiate reach.dl twice against different relations
+input predicate road(src: integer, dst: integer).
+input predicate flight(src: integer, dst: integer).
+input predicate road_reach(a: integer, b: integer)   := reach from "reach.dl"(edge = road).
+input predicate flight_reach(a: integer, b: integer) := reach from "reach.dl"(edge = flight).
+?- road_reach(1, X).
+```
+
+### 9.2 Elaboration
+
+A program with bindings is **elaborated** into one flat program before analysis;
+that program then runs through the ordinary pipeline unchanged, so the backends
+need no module-specific support. Per instantiation:
+
+1. The module reference is resolved (relative to the importing file) and parsed.
+2. The module's wired inputs are **substituted** with the actuals; every private
+   and output predicate name, and every proof constructor, is **freshened** with
+   a per-instance prefix so two instances never collide; and the selected output
+   is **renamed** to the importing input's name. The freshening prefix contains
+   `$`, which no source identifier can (§1.4), so freshened names never clash
+   with user names.
+3. A data-file binding leaves the input as an EDB, loaded from its bound source.
+4. Everything merges into one program evaluated by one global least fixed point.
+
+The importing declaration's column names become the instance's result column
+names; the module's own head-variable names are not exposed.
+
+### 9.3 Constraints
+
+- **The instantiation graph must be acyclic.** Two modules whose inputs each
+  default to an instance of the other are rejected. This is distinct from
+  recursion *within* a module (an ordinary least fixed point, always allowed):
+  mutually recursive predicates must live in the same module.
+- **One output per import site.** An instance exposes only the selected output;
+  the module's other outputs and its `?-` default do not leak into the merged
+  program (they remain available internally as dependencies of the selection).
+- **Boundary types must agree.** Each actual's column types must be compatible
+  (§5.6) with the module input it is wired to, and the selected output's inferred
+  types must be compatible with the importing declaration's columns. A mismatch
+  is a static error.
+
+## 10 Examples
 
 ### Transitive Closure (Recursion)
 
@@ -2224,7 +2320,7 @@ output predicate entropy(sum(X)) :- contribution(_, X).
 ?- freq(C, N).
 ```
 
-## 10 Error Categories
+## 11 Error Categories
 
 Datamog reports errors with source positions (byte offsets) for IDE
 integration:
@@ -2232,6 +2328,7 @@ integration:
 | Category        | Examples                                                    |
 |-----------------|-------------------------------------------------------------|
 | **Parse error** | Missing period, unexpected token, malformed expression       |
-| **Analyzer error** | Undefined predicate, arity mismatch, unsafe variable, unstratifiable negation, duplicate extensional declaration, EDB/IDB conflict, aggregate constraint violation, unknown function, function arity mismatch |
+| **Analyzer error** | Undefined predicate, arity mismatch, unsafe variable, unstratifiable negation, duplicate input predicate declaration, EDB/IDB conflict, aggregate constraint violation, unknown function, function arity mismatch |
 | **Type error**  | Non-numeric range bounds, unary minus on string, subscript/slice on non-string, wrong function argument type |
+| **Module error** | Import cycle, missing default output, unknown named export, boundary type/arity mismatch (§9), unreadable module reference |
 | **Translation error** | Non-linear recursion (SQL backends only — `native` and `seminaive` accept it) |

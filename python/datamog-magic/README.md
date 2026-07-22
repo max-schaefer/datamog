@@ -39,7 +39,7 @@ export DATAMOG_CMD="bun run --cwd /path/to/datamog datamog"
 
 ```
 %%datamog
-extensional parent(p: string, c: string).
+input predicate parent(p: string, c: string).
 ancestor(X, Y) :- parent(X, Y).
 ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
 ```
