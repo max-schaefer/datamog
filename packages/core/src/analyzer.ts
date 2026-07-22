@@ -228,6 +228,17 @@ function analyzeImpl(program: Program, file: string | undefined): AnalyzedProgra
   for (const stmt of program.statements) {
     switch (stmt.$type) {
       case "ExtDecl": {
+        // A source binding (`:= "file"` / `:= out from "mod.dl"`) is elaborated
+        // away by the module resolver before analysis. That resolver is not
+        // wired up yet, so a binding still present here would be silently
+        // ignored and the input loaded from convention instead. Reject it.
+        if (stmt.binding) {
+          const pos = nodePos(stmt);
+          throw new AnalyzerError(
+            "input predicate source bindings (':=') are not yet supported",
+            ...(pos ?? []),
+          );
+        }
         if (extDecls.has(stmt.predicate)) {
           const pos = nodePos(stmt);
           throw new AnalyzerError(

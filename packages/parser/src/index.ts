@@ -1,7 +1,9 @@
 export type {
+  Actual,
   AggregateCall,
   ArrayLiteral,
   BinaryExpr,
+  Binding,
   BodyElement,
   BooleanLiteral,
   BracketAccess,
@@ -35,9 +37,11 @@ export type {
 } from "./generated/ast.js";
 
 export {
+  isActual,
   isAggregateCall,
   isArrayLiteral,
   isBinaryExpr,
+  isBinding,
   isBodyElement,
   isBooleanLiteral,
   isEquality,

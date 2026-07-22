@@ -34,6 +34,7 @@ export type DatamogKeywordNames =
     | ".."
     | "/"
     | ":"
+    | ":="
     | "<"
     | "<<"
     | "<="
@@ -49,9 +50,11 @@ export type DatamogKeywordNames =
     | "["
     | "]"
     | "^"
+    | "as"
     | "boolean"
     | "false"
     | "float"
+    | "from"
     | "in"
     | "input"
     | "integer"
@@ -68,6 +71,23 @@ export type DatamogKeywordNames =
     | "}";
 
 export type DatamogTokenNames = DatamogTerminalNames | DatamogKeywordNames;
+
+export interface Actual extends langium.AstNode {
+    readonly $container: Binding;
+    readonly $type: 'Actual';
+    arg: Identifier;
+    param: Identifier;
+}
+
+export const Actual = {
+    $type: 'Actual',
+    arg: 'arg',
+    param: 'param'
+} as const;
+
+export function isActual(item: unknown): item is Actual {
+    return reflection.isInstance(item, Actual.$type);
+}
 
 export interface AggregateCall extends langium.AstNode {
     readonly $type: 'AggregateCall';
@@ -117,6 +137,27 @@ export const BinaryExpr = {
 
 export function isBinaryExpr(item: unknown): item is BinaryExpr {
     return reflection.isInstance(item, BinaryExpr.$type);
+}
+
+export interface Binding extends langium.AstNode {
+    readonly $container: ExtDecl;
+    readonly $type: 'Binding';
+    actuals: Array<Actual>;
+    export?: Identifier;
+    format?: Identifier;
+    source: string;
+}
+
+export const Binding = {
+    $type: 'Binding',
+    actuals: 'actuals',
+    export: 'export',
+    format: 'format',
+    source: 'source'
+} as const;
+
+export function isBinding(item: unknown): item is Binding {
+    return reflection.isInstance(item, Binding.$type);
 }
 
 export type BodyElement = Equality | Filter | Literal | RangeAtom;
@@ -214,12 +255,14 @@ export function isExpression(item: unknown): item is Expression {
 export interface ExtDecl extends langium.AstNode {
     readonly $container: Program;
     readonly $type: 'ExtDecl';
+    binding?: Binding;
     columns: Array<ColumnDecl>;
     predicate: Identifier;
 }
 
 export const ExtDecl = {
     $type: 'ExtDecl',
+    binding: 'binding',
     columns: 'columns',
     predicate: 'predicate'
 } as const;
@@ -289,10 +332,10 @@ export function isHeadTerm(item: unknown): item is HeadTerm {
     return reflection.isInstance(item, HeadTerm.$type);
 }
 
-export type Identifier = 'input' | 'output' | 'predicate' | string;
+export type Identifier = 'as' | 'from' | 'input' | 'output' | 'predicate' | string;
 
 export function isIdentifier(item: unknown): item is Identifier {
-    return item === 'input' || item === 'output' || item === 'predicate' || (typeof item === 'string' && (/[a-zA-Z_][a-zA-Z0-9_]*/.test(item) || /`(\\.|[^`\\\n\r])+`/.test(item)));
+    return item === 'input' || item === 'output' || item === 'predicate' || item === 'from' || item === 'as' || (typeof item === 'string' && (/[a-zA-Z_][a-zA-Z0-9_]*/.test(item) || /`(\\.|[^`\\\n\r])+`/.test(item)));
 }
 
 export interface Literal extends langium.AstNode {
@@ -562,9 +605,11 @@ export function isWildcard(item: unknown): item is Wildcard {
 }
 
 export type DatamogAstType = {
+    Actual: Actual
     AggregateCall: AggregateCall
     ArrayLiteral: ArrayLiteral
     BinaryExpr: BinaryExpr
+    Binding: Binding
     BodyElement: BodyElement
     BooleanLiteral: BooleanLiteral
     BracketAccess: BracketAccess
@@ -596,6 +641,18 @@ export type DatamogAstType = {
 
 export class DatamogAstReflection extends langium.AbstractAstReflection {
     override readonly types = {
+        Actual: {
+            name: Actual.$type,
+            properties: {
+                arg: {
+                    name: Actual.arg
+                },
+                param: {
+                    name: Actual.param
+                }
+            },
+            superTypes: []
+        },
         AggregateCall: {
             name: AggregateCall.$type,
             properties: {
@@ -632,6 +689,25 @@ export class DatamogAstReflection extends langium.AbstractAstReflection {
                 }
             },
             superTypes: [Expression.$type]
+        },
+        Binding: {
+            name: Binding.$type,
+            properties: {
+                actuals: {
+                    name: Binding.actuals,
+                    defaultValue: []
+                },
+                export: {
+                    name: Binding.export
+                },
+                format: {
+                    name: Binding.format
+                },
+                source: {
+                    name: Binding.source
+                }
+            },
+            superTypes: []
         },
         BodyElement: {
             name: BodyElement.$type,
@@ -705,6 +781,9 @@ export class DatamogAstReflection extends langium.AbstractAstReflection {
         ExtDecl: {
             name: ExtDecl.$type,
             properties: {
+                binding: {
+                    name: ExtDecl.binding
+                },
                 columns: {
                     name: ExtDecl.columns,
                     defaultValue: []

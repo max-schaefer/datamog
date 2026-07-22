@@ -1,6 +1,9 @@
 # Design proposal: modules as functors (inputs and outputs)
 
-Status: proposal (nothing implemented yet).
+Status: proposal, partly implemented. The grammar (the `:=` source binding on
+input predicates) and the core expansion pass (`expandModule`) exist; the
+resolver, boundary type-checking, CLI wiring, and per-instance diagnostics do
+not. A `:=` binding that reaches analysis is rejected until the resolver lands.
 
 This is the ambitious alternative to the conservative module system in
 [`imports.md`](./imports.md). Read that one first for the baseline; this doc
@@ -28,9 +31,10 @@ Carried over from the discussion:
 2. **At most one unnamed query per file**, always (not only on import). Extra
    outputs must be named. This breaks programs that use several `?-` queries;
    there are no external clients, so the migration is ours alone.
-3. Actuals are **just predicate names**. There is no separate syntax for
-   supplying a data file vs a predicate vs a module. If you want to pass data,
-   you make it an input predicate first.
+3. Actuals passed to a module are **just predicate names**. (An input can still
+   be bound directly to a data file with `:= "file"` — but that is a binding on
+   the input itself, not an actual flowing into a module; actuals stay predicate
+   names.)
 4. Instantiating a module always **duplicates** it (expansion / monomorphisation).
    No sharing of instances in the first version.
 5. Composition is by **expansion** (inline), not materialise-feed. Importing a
@@ -52,11 +56,11 @@ output predicate reach(X, Z) :- reach(X, Y), edge(Y, Z).
 
 - **`input predicate P(cols).`** declares a parameter, with column types. It is
   supplied from outside the module's rules: at the CLI from `P.csv` in the
-  module's own directory (per the conservative doc's decision 1), or, when the
-  module is imported, by an actual the importer wires in. This replaces the
-  `input predicate` keyword; `input predicate` stops meaning "table-backed" and starts
-  meaning "supplied from outside these rules", so the rename reflects the real
-  role.
+  module's own directory (per the conservative doc's decision 1), from a source
+  bound with `:=` (see *Instantiation and wiring*), or, when the module is
+  imported, by an actual the importer wires in. The `input predicate` keyword
+  names that role directly: supplied from outside these rules, rather than
+  table-backed.
 - **`output predicate Head :- body.`** marks a rule as defining a named export.
   The head is rule-style (a predicate name and variable arguments, no declared
   types), so an output reads exactly like the intensional it is; a predicate is
@@ -74,30 +78,43 @@ keep it private by not.
 
 ## Instantiation and wiring
 
-An input predicate may be given a **default definition** that draws from another
-module. That default definition is the import:
+An input predicate may be **bound** to a source with `:=` (a pun on `:-`: `:-`
+means "defined by rules", `:=` means "bound to a source"). The binding is either
+a data file or a module instantiation. The single rule: **`from` present means a
+module; a bare string means a data file.**
 
 ```prolog
 # main.dl
-input predicate road(src: integer, dst: integer).      # leaf input, from road.csv
-input predicate flight(src: integer, dst: integer).     # leaf input, from flight.csv
+input predicate road(src: integer, dst: integer).       # leaf input, from road.csv
+input predicate flight(src: integer, dst: integer).      # leaf input, from flight.csv
+
+# an explicit data file, forcing the loader when the extension lies
+input predicate airport(code: string, name: string) := "data/airports.tsv" as csv.
 
 # instantiate reach.dl twice, wiring its `edge` input to two different relations
-input predicate road_reach(src: integer, dst: integer)   = "reach.dl".reach(edge = road).
-input predicate flight_reach(src: integer, dst: integer) = "reach.dl".reach(edge = flight).
+input predicate road_reach(src: integer, dst: integer)   := reach from "reach.dl"(edge = road).
+input predicate flight_reach(src: integer, dst: integer) := reach from "reach.dl"(edge = flight).
 
 ?- road_reach(1, X).
 ```
 
 Reading the right-hand side:
 
-- `"reach.dl"` is a module reference, resolved relative to the importing file.
-- `.reach` selects a named output. Omit it (`= "reach.dl"(...)`) to take the
-  module's unnamed default output.
-- `(edge = road)` supplies actuals for the callee's inputs by name. `road` is a
-  predicate in `main.dl`'s scope (here a leaf input; it could equally be a
-  derived predicate or another instantiation's result). This is decision 3: the
-  only thing that flows across the boundary as an actual is a predicate name.
+- A **bare string** (`:= "data/airports.tsv"`) is a data file, resolved relative
+  to the importing file; the loader is chosen by extension, or forced with `as
+  <format>` (`csv`, `jsonl`, `json`, `mermaid`, ...) when the extension does not
+  or cannot say. This is the explicit form of the CLI's `P.csv`-by-convention
+  default.
+- **`reach from "reach.dl"`** is a module instantiation: `"reach.dl"` is a module
+  reference (resolved relative to the importing file) and `reach` selects a named
+  output. Omit the export name (`:= from "reach.dl"(...)`) to take the module's
+  unnamed default output; the local name (`road_reach`) renames whatever is
+  selected.
+- **`(edge = road)`** supplies actuals for the callee's inputs by name
+  (`moduleInput = localPredicate`). `road` is a predicate in `main.dl`'s scope
+  (here a leaf input; it could equally be a derived predicate or another
+  instantiation's result). This is decision 3: the only thing that flows across
+  the boundary as an actual is a predicate name.
 
 An input with a module default reads like a local binding but stays a parameter:
 an importer of `main.dl` may override `road_reach` by wiring its own predicate,
@@ -218,14 +235,15 @@ from the conservative doc, delivered as the native model instead of a bolt-on.
 Beyond the conservative doc's list (grammar, keywords, resolver, per-module
 diagnostics, per-module EDB directories):
 
-- **parser / keywords**: replace `input predicate` with `input predicate`; add
-  `output predicate`; add the module-reference default form on input
-  declarations (`= "path".name(actual = pred, ...)`). Reserve `input`, `output`,
-  and `predicate`.
-- **core**: an elaboration pass that builds the instantiation graph, checks
-  acyclicity, and expands (substitute inputs, freshen private and constructor
-  names per instance) into one merged `Program`. The `input`/`output` interface
-  declarations replace `ExtDecl` and feed the same downstream maps.
+- **parser / keywords**: the `input predicate` / `output predicate` declaration
+  forms and the `:=` source binding on inputs (`[export] from "path"(actual =
+  pred, ...)` for a module, a bare string with optional `as <format>` for a data
+  file). `input`, `output`, `predicate`, `from`, and `as` are contextual
+  keywords. (Done.)
+- **core**: the per-instance expansion is `expandModule` (substitute inputs,
+  freshen private + output + constructor names). (Done.) Still to come: the
+  elaboration pass around it that parses each referenced module, builds the
+  instantiation graph, checks acyclicity, and merges into one `Program`.
 - **engine**: the executor gains the expansion pass ahead of the existing
   pipeline; free inputs become the merged program's EDBs. No backend changes.
 - **cli**: root-module instantiation, input overrides, `--output` selection.

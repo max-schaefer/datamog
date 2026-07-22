@@ -59,6 +59,19 @@ describe("analyzer", () => {
     expect(() => analyze(program)).toThrow(/duplicate column name 'name'/);
   });
 
+  test("rejects a source binding (resolver not wired up yet)", () => {
+    // A `:=` binding is elaborated away by the module resolver before analysis;
+    // until that exists, a surviving binding must error rather than be ignored.
+    expect(() => analyze(parse('input predicate p(a: integer) := "p.csv".'))).toThrow(
+      /source bindings.*not yet supported/,
+    );
+    expect(() =>
+      analyze(
+        parse('input predicate d(a: integer, b: integer) := reach from "reach.dl"(edge = e).'),
+      ),
+    ).toThrow(/not yet supported/);
+  });
+
   test("allows built-in function names as input predicate columns", () => {
     // Columns are non-callable (declared `name: type`, matched positionally),
     // so like variables they may reuse a built-in function name without

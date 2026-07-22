@@ -21,7 +21,23 @@ Statement:
 // its historical `ExtDecl` name; only the surface keyword changed from
 // `extensional` to `input predicate`.
 ExtDecl:
-    'input' 'predicate' predicate=Identifier '(' columns+=ColumnDecl (',' columns+=ColumnDecl)* ')' '.';
+    'input' 'predicate' predicate=Identifier '(' columns+=ColumnDecl (',' columns+=ColumnDecl)* ')'
+        (':=' binding=Binding)? '.';
+
+// The optional source an input predicate is bound to. `from` present means a
+// module instantiation; a bare string means a data file. For a module, an
+// omitted export name takes the module's unnamed default output, a name selects
+// that `output predicate`, and the parenthesised actuals wire the module's own
+// inputs (`moduleInput = localPredicate`). For a data file, `as <format>`
+// forces a loader when the extension does not (or cannot) say; the format is a
+// plain identifier checked against the loader registry, not a keyword.
+Binding:
+    ((export=Identifier)? 'from' source=STRING
+        ('(' actuals+=Actual (',' actuals+=Actual)* ')')?)
+  | (source=STRING ('as' format=Identifier)?);
+
+Actual:
+    param=Identifier '=' arg=Identifier;
 
 ColumnDecl:
     name=Identifier ':' type=PrimitiveType (nullable?='?')?;
@@ -267,14 +283,14 @@ FunctionCall:
 // longer enforces it — `Foo(X)` is a predicate, `foo` is a variable.
 // FunctionCall vs Variable in Primary, and Literal vs Filter in body
 // position, are disambiguated by whether `(` follows the identifier.
-// `input`, `output`, and `predicate` are contextual keywords: they lead the
-// `input predicate` / `output predicate` declaration forms, but are otherwise
-// ordinary identifiers, so a program can still name a predicate/column/variable
-// `input`, `output`, or `predicate` (they are common words). The parser tells
-// the declaration forms apart by the two-token lookahead `input`/`output`
-// followed by `predicate`.
+// `input`, `output`, `predicate`, `from`, and `as` are contextual keywords:
+// they lead the declaration / binding forms above, but are otherwise ordinary
+// identifiers, so a program can still name a predicate/column/variable after
+// them (they are common words: `from`/`to` are the usual columns of an edge
+// relation). The parser tells the forms apart by lookahead: `input`/`output`
+// followed by `predicate`; an optional export identifier followed by `from`.
 Identifier returns string:
-    IDENT | QUOTED_IDENT | 'input' | 'output' | 'predicate';
+    IDENT | QUOTED_IDENT | 'input' | 'output' | 'predicate' | 'from' | 'as';
 
 // JSON-style construction. Both literals produce a `value` (an array
 // or object). Element expressions of any primitive type are auto-lifted
