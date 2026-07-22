@@ -21,6 +21,7 @@ import {
   rowsToMermaid,
   translate,
 } from "datamog-engine";
+import { createNodeModuleResolver } from "datamog-engine/module-resolver";
 import { type GSheetAuth, GSheetLoader } from "datamog-gsheet";
 import { JsonLoader, parseJsonContent } from "datamog-json";
 import { JsonlLoader, parseJsonlContent } from "datamog-jsonl";
@@ -31,7 +32,6 @@ import {
   validateMermaidColumns,
 } from "datamog-mermaid";
 import { ParseError, parseRaw, postProcess } from "datamog-parser";
-import { createModuleResolver } from "./module-resolver.ts";
 import { bigintSafeReplacer, formatCellAsString, prettifyProofRows } from "./output.ts";
 import { runRepl } from "./repl-driver.ts";
 
@@ -353,7 +353,7 @@ function loadProgram(source: string, file: string): ElaborationResult {
   const raw = parseRaw(source, file);
   let result: ElaborationResult;
   try {
-    result = elaborate(raw, createModuleResolver(), file);
+    result = elaborate(raw, createNodeModuleResolver(), file);
   } catch (e) {
     if (e instanceof AnalyzerError) e.file ??= file;
     throw e;

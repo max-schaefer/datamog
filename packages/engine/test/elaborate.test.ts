@@ -95,4 +95,33 @@ describe("module binding end-to-end", () => {
       { lo: 4, hi: 9 },
     ]);
   });
+
+  test("prepareElaborated resolves imports and checks boundary types", async () => {
+    const { program } = DatamogExecutor.prepareElaborated(
+      `road(1, 2). road(2, 3).
+       input predicate rr(a: integer, b: integer) := reach from "reach.dl"(edge = road).`,
+      resolve,
+      "main.dl",
+    );
+    const backend = await create();
+    try {
+      const results = await new DatamogExecutor(backend).executeAnalyzed(program);
+      expect(byLabel(results, "rr")).toEqual([
+        { a: 1, b: 2 },
+        { a: 1, b: 3 },
+        { a: 2, b: 3 },
+      ]);
+    } finally {
+      await backend.close();
+    }
+
+    // A declared type that disagrees with the module's output is rejected.
+    expect(() =>
+      DatamogExecutor.prepareElaborated(
+        `road(1, 2). input predicate rr(a: string, b: string) := reach from "reach.dl"(edge = road).`,
+        resolve,
+        "main.dl",
+      ),
+    ).toThrow(/column 1 has type 'integer' but 'string'/);
+  });
 });

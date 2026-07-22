@@ -2,6 +2,7 @@ import * as path from "node:path";
 import { create as createSeminaiveBackend } from "datamog-backend-seminaive";
 import type { TypedProgram } from "datamog-core";
 import { DatamogExecutor, type QueryResult } from "datamog-engine";
+import { createNodeModuleResolver } from "datamog-engine/module-resolver";
 import * as vscode from "vscode";
 import { DiskLoader } from "./disk-loader.ts";
 
@@ -48,15 +49,22 @@ async function runActiveFile(): Promise<void> {
   // directory; an unsaved buffer can't resolve sibling data files.
   const dataDir = doc.uri.scheme === "file" ? path.dirname(doc.uri.fsPath) : undefined;
   const loader = dataDir ? new DiskLoader(dataDir) : undefined;
-  // Name the file in diagnostics; an unsaved buffer has no path (file-less).
-  const file = doc.uri.scheme === "file" ? vscode.workspace.asRelativePath(doc.uri) : undefined;
+  // The absolute path lets `from "mod.dl"` imports resolve relative to the
+  // buffer; it also names the file in diagnostics. An unsaved buffer has no
+  // path, so imports can't be resolved (and there's no directory to load from).
+  const file = doc.uri.scheme === "file" ? doc.uri.fsPath : undefined;
 
   const backend = await createSeminaiveBackend();
   try {
     const started = Date.now();
     // Prepare separately from execution so we can inspect the analysed
     // program (here: warn about extensional predicates with no data file).
-    const analyzed = DatamogExecutor.prepare(source, file);
+    // `prepareElaborated` resolves any `:=` module imports from disk first.
+    const { program: analyzed } = DatamogExecutor.prepareElaborated(
+      source,
+      createNodeModuleResolver(),
+      file,
+    );
     await warnAboutMissingData(out, analyzed, loader, dataDir);
     const results = await new DatamogExecutor(backend, loader ? [loader] : []).executeAnalyzed(
       analyzed,

@@ -7,9 +7,11 @@ the instantiation-graph acyclicity check; named exports and the unnamed `?-`
 default output), the Bun file resolver, CLI wiring (`datamog main.dl` resolves
 `from` imports from disk and wires `:=` data-file bindings into loaders), and
 boundary type-checking (actual vs callee input, selected output vs receiving
-declaration) all exist. Still to come: per-instance diagnostics and REPL /
-playground / VS Code wiring. A `:=` binding that reaches analysis (i.e. one the
-elaborator did not handle) is rejected.
+declaration), and VS Code wiring (the language-server validator and the
+`datamog.run` command both elaborate imports from disk) all exist. Still to come:
+per-instance diagnostics, and REPL / playground wiring (see *Deferred*). A `:=`
+binding that reaches analysis (i.e. one the elaborator did not handle) is
+rejected.
 
 This is the ambitious alternative to the conservative module system in
 [`imports.md`](./imports.md). Read that one first for the baseline; this doc
@@ -263,14 +265,21 @@ diagnostics, per-module EDB directories):
   reuses the named-export path; an instance exposes only its selected output (its
   other outputs and its `?-` do not leak into the merged program). (All done.)
 - **engine**: no backend changes; free inputs become the merged program's EDBs.
-  The CLI runs `elaborate` ahead of the existing pipeline rather than the
-  executor (the executor stays filesystem- and elaboration-free, for the
-  playground). (Done.)
-- **cli**: `datamog main.dl` parses raw, elaborates (a Bun `ModuleResolver`
-  reads `from` imports relative to the entry), post-processes, then analyses and
-  runs the merged program. `:=` data-file bindings become loaders (precedence:
-  `--input` > `:=` binding > auto-load-by-convention). Imported outputs are
-  selectable like any named output (`datamog main.dl <name>` / `--all`). (Done.)
+  `DatamogExecutor.prepareElaborated(source, resolve, file)` runs the elaborate
+  pipeline (parseRaw → elaborate → postProcess → analyze → inferTypes →
+  `checkModuleBoundaries`) with the resolver injected, so the engine core stays
+  filesystem-free (for the playground); the Node/Bun `createNodeModuleResolver`
+  lives on the `datamog-engine/module-resolver` subpath. (Done.)
+- **cli**: `datamog main.dl` parses raw, elaborates (resolving `from` imports
+  relative to the entry), post-processes, then analyses and runs the merged
+  program. `:=` data-file bindings become loaders (precedence: `--input` > `:=`
+  binding > auto-load-by-convention). Imported outputs are selectable like any
+  named output (`datamog main.dl <name>` / `--all`). (Done.)
+- **vscode**: the `datamog.run` command runs the buffer via `prepareElaborated`
+  (imports resolved relative to the saved file); the language-server validator
+  elaborates a binding-using document (re-parsed into a throwaway AST so the
+  Langium model is untouched) so a `:=` binding is validated rather than flagged
+  as an error. (Done.)
 - **type checking**: `elaborate` records a `BoundaryConstraint` per wiring (each
   actual vs the callee input's declared columns; the selected output vs the
   receiving declaration's columns), since those declared types are dropped when
@@ -289,4 +298,17 @@ diagnostics, per-module EDB directories):
   of restating them.
 - **Aliased whole-module access** (`import g = "mod.dl"(...)` then `g.a`, `g.b`).
   The first version selects one output per import site with `.name`.
+- **REPL module bindings.** The REPL's `IncrementalSession` re-analyses the whole
+  accumulated program each chunk and computes a per-chunk delta keyed off the new
+  fragment's statements; elaboration transforms the whole program (dropping
+  bindings, merging module rules), so the delta model would need reworking to a
+  full re-diff. A `:=` line in the REPL is still rejected. Lower value: multi-file
+  modules in an interactive session are unusual.
+- **Playground module bindings.** The playground has no filesystem and no
+  multi-source concept — a program is a single `source` string plus in-memory
+  per-predicate data. Supporting imports needs a virtual resolver backed by
+  additional in-memory `.dl` sources, which is a UX question (how the user
+  supplies and edits several files), not just wiring. `prepareElaborated` already
+  takes a `ModuleResolver`, so an in-memory resolver would slot in once that UX
+  exists.
 - REPL, playground, and VS Code wiring, as in the conservative doc.

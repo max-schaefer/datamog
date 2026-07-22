@@ -1,5 +1,14 @@
-import { type TypedProgram, analyze, inferTypes } from "datamog-core";
-import { parse } from "datamog-parser";
+import {
+  AnalyzerError,
+  type DataSource,
+  type ModuleResolver,
+  type TypedProgram,
+  analyze,
+  checkModuleBoundaries,
+  elaborate,
+  inferTypes,
+} from "datamog-core";
+import { ParseError, parse, parseRaw, postProcess } from "datamog-parser";
 import type { Backend, QueryResult } from "./backend.ts";
 import { type ExtensionalLoader, loadExtensionalData } from "./loader.ts";
 import { coerceBooleanColumns, coerceJsonColumns } from "./result-coerce.ts";
@@ -29,6 +38,39 @@ export class DatamogExecutor {
    */
   static prepare(source: string, file?: string): TypedProgram {
     return inferTypes(analyze(parse(source, file), file));
+  }
+
+  /**
+   * Like {@link prepare}, but first elaborates the program's `:=` source
+   * bindings (module imports and data-file bindings) into one merged program,
+   * resolving `from` imports via `resolve`. Returns the analysed program plus
+   * the data-file bindings for the caller to wire loaders to (see
+   * `DataSource`). Boundary types are checked. `resolve` is injected so the
+   * engine itself stays free of filesystem access; a Node/Bun resolver lives on
+   * the `datamog-engine/module-resolver` subpath.
+   */
+  static prepareElaborated(
+    source: string,
+    resolve: ModuleResolver,
+    file?: string,
+  ): { program: TypedProgram; dataSources: DataSource[] } {
+    const raw = parseRaw(source, file);
+    let elaborated: ReturnType<typeof elaborate>;
+    try {
+      elaborated = elaborate(raw, resolve, file);
+    } catch (e) {
+      if (e instanceof AnalyzerError) e.file ??= file;
+      throw e;
+    }
+    try {
+      postProcess(elaborated.program);
+    } catch (e) {
+      if (e instanceof ParseError) e.file ??= file;
+      throw e;
+    }
+    const program = inferTypes(analyze(elaborated.program, file));
+    checkModuleBoundaries(program, elaborated.boundaries);
+    return { program, dataSources: elaborated.dataSources };
   }
 
   async execute(source: string, file?: string): Promise<QueryResult[]> {

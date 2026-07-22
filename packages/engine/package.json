@@ -11,7 +11,8 @@
   "files": ["src"],
   "exports": {
     ".": "./src/index.ts",
-    "./directory-loader": "./src/directory-loader.ts"
+    "./directory-loader": "./src/directory-loader.ts",
+    "./module-resolver": "./src/module-resolver.ts"
   },
   "repository": {
     "type": "git",
