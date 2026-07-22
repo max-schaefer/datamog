@@ -1,0 +1,12 @@
+# main.dl -- instantiate reach.dl against two different relations.
+#
+# `road` and `flight` load from road.csv / flight.csv in this directory.
+input predicate road(src: integer, dst: integer).
+input predicate flight(src: integer, dst: integer).
+
+# Each binding instantiates reach.dl with a different `edge`, and names
+# the resulting `reach` output locally.
+input predicate road_reach(a: integer, b: integer)   := reach from "reach.dl"(edge = road).
+input predicate flight_reach(a: integer, b: integer) := reach from "reach.dl"(edge = flight).
+
+?- road_reach(1, X).

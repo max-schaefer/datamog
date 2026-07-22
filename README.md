@@ -281,7 +281,7 @@ For development, open the `packages/vscode-extension` folder in VS Code and pres
 
 - [Language specification](doc/spec.md) — detailed reference covering syntax, semantics, type system, and SQL translation
 - [Comparison with other Datalog systems](doc/comparison.md) — how Datamog relates to Soufflé, CodeQL, Datomic, DES, Flix, Datafrog, Z3, and others, by syntax, features, and implementation category
-- [Language walkthrough](doc/walkthrough/README.md) — the long-form, feature-by-feature tutorial (chapters 00–14 plus appendices), with runnable code and exercises
+- [Language walkthrough](doc/walkthrough/README.md) — the long-form, feature-by-feature tutorial (chapters 00–16 plus appendices), with runnable code and exercises
 - [Case studies](doc/case-studies/README.md) — a puzzle-driven companion tutorial that builds up end-to-end solutions to bigger problems
 - [Jupyter notebook tutorial](doc/jupyter/README.md) — runnable `%%datamog` cells driven by the `datamog-magic` IPython magic, with pandas DataFrame binding
 - [Embed tutorials](doc/embed-tutorials/README.md) — Markdown tutorials whose code blocks render as live, editable mini-playgrounds (deployed alongside the playground at `<site>/tutorial.html`)

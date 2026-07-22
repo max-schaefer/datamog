@@ -94,6 +94,7 @@ the browser.
 ### Part V — Extensions
 
 - [Chapter 15. Proof terms](15-proof-terms.md)
+- [Chapter 16. Modules](16-modules.md)
 
 ### Companion tutorials
 
