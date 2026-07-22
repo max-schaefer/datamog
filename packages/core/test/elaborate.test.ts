@@ -9,10 +9,14 @@ const MODULES: Record<string, string> = {
     output predicate reach(X, Y) :- edge(X, Y).
     output predicate reach(X, Z) :- reach(X, Y), edge(Y, Z).
   `,
-  // A module that itself imports another module (nested).
-  "outer.dl": `
-    input predicate leaf(a: integer) := deep from "inner.dl".
-    output predicate o(X) :- leaf(X).
+  // A wiring cycle: a.dl instantiates b.dl and vice versa.
+  "a.dl": `
+    input predicate p(x: integer) := q from "b.dl".
+    output predicate q(X) :- p(X).
+  `,
+  "b.dl": `
+    input predicate p(x: integer) := q from "a.dl".
+    output predicate q(X) :- p(X).
   `,
 };
 // Fresh parse per call (elaborate mutates the returned AST in place).
@@ -95,10 +99,8 @@ describe("elaborate", () => {
     expect(() => elaborate(entry, resolve, "main.dl")).toThrow(/default output.*not yet supported/);
   });
 
-  test("rejects a nested module import (not yet supported)", () => {
-    const entry = parseRaw('input predicate top(a: integer) := o from "outer.dl".');
-    expect(() => elaborate(entry, resolve, "main.dl")).toThrow(
-      /nested module imports are not yet supported/,
-    );
+  test("rejects a module instantiation cycle", () => {
+    const entry = parseRaw('input predicate top(x: integer) := q from "a.dl".');
+    expect(() => elaborate(entry, resolve, "main.dl")).toThrow(/module import cycle/);
   });
 });

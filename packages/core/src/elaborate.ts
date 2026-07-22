@@ -42,80 +42,146 @@ function nodePos(node: { $cstNode?: { offset: number; end: number } }): [number,
   return node.$cstNode ? [node.$cstNode.offset, node.$cstNode.end] : [];
 }
 
+/** Shared state threaded through the recursive instantiation. */
+interface Context {
+  resolve: ModuleResolver;
+  out: Statement[];
+  dataSources: DataSource[];
+  /** Monotonic counter for per-instance prefixes, unique across the whole run. */
+  counter: { n: number };
+}
+
 /**
  * Elaborate a program's `:=` source bindings into one flat program plus a list
  * of data sources, driving `expandModule` for each module instantiation.
  *
- * First cut: only the entry's own bindings, named exports only. A referenced
- * module that itself imports a module, and selecting a module's unnamed default
- * output, are rejected for now (see the errors below). Boundary type-checking,
- * the acyclicity check for nested imports, and the Bun file resolver are still
- * to come.
+ * Handles the entry's bindings and, recursively, any module a referenced module
+ * imports in turn. The *instantiation* graph (module A wiring an input to an
+ * instance of B) must be acyclic; a cycle is rejected. (Recursion *within* a
+ * module is fine: that is an ordinary least fixed point over the merged program.)
+ *
+ * Still to come: selecting a module's unnamed default output (rejected below),
+ * boundary type-checking, and the Bun file resolver.
  */
 export function elaborate(
   entry: Program,
   resolve: ModuleResolver,
   entryFile?: string,
 ): ElaborationResult {
-  const out: Statement[] = [];
-  const dataSources: DataSource[] = [];
-  let counter = 0;
+  const ctx: Context = { resolve, out: [], dataSources: [], counter: { n: 0 } };
 
   for (const stmt of entry.statements) {
     if (!isExtDecl(stmt) || !stmt.binding) {
-      out.push(stmt);
+      ctx.out.push(stmt);
       continue;
     }
     const binding = stmt.binding;
     if (!binding.isModule) {
       // Data file: keep the input as a free EDB, record its explicit source.
-      recordDataSource(stmt, binding, entryFile, dataSources);
-      out.push(stmt);
+      recordDataSource(stmt, binding, entryFile, ctx.dataSources);
+      ctx.out.push(stmt);
       continue;
     }
-    if (binding.export === undefined) {
-      throw new AnalyzerError(
-        `selecting a module's default output ('${stmt.predicate} := from "${binding.source}"') is not yet supported; name an output with 'export from'`,
-        ...nodePos(stmt),
-      );
-    }
+    if (binding.export === undefined) throw defaultOutputError(stmt, binding);
 
+    // The entry's binding is user-facing: rename the module's selected output to
+    // the input's declared name and relabel its columns to the declared columns.
     const mod = resolve(binding.source, entryFile);
-    for (const s of mod.program.statements) {
-      if (isExtDecl(s) && s.binding?.isModule) {
-        throw new AnalyzerError(
-          `module '${binding.source}' itself imports a module ('${s.predicate}'); nested module imports are not yet supported`,
-          ...nodePos(stmt),
-        );
-      }
-    }
-
-    // Instantiate the module: wire its inputs to the actuals, rename its
-    // selected output to this input's name, freshen everything else.
+    const id = mod.file ?? binding.source;
+    checkCycle(id, [entryFile], stmt);
     const inputs: Record<string, string> = {};
     for (const actual of binding.actuals) inputs[actual.param] = actual.arg;
-    const expanded = expandModule(mod.program, {
-      prefix: `${stmt.predicate}$${counter++}$`,
+    instantiate(
+      mod.program,
+      mod.file,
+      `${stmt.predicate}$${ctx.counter.n++}$`,
       inputs,
-      exportAs: { export: binding.export, as: stmt.predicate },
-    });
-    // Name the instance's output columns after the importer's declared columns,
-    // not the module's own head-variable names.
-    relabelOutputColumns(
-      expanded,
-      stmt.predicate,
+      { export: binding.export, as: stmt.predicate },
       stmt.columns.map((c) => c.name),
+      [entryFile, id],
+      ctx,
     );
-    // The instance may keep its own data-bound / free inputs; record and clear
-    // any data binding, relative to the module's own file.
-    for (const s of expanded) {
-      if (isExtDecl(s) && s.binding) recordDataSource(s, s.binding, mod.file, dataSources);
-    }
-    out.push(...expanded);
   }
 
-  entry.statements = out;
-  return { program: entry, dataSources };
+  entry.statements = ctx.out;
+  return { program: entry, dataSources: ctx.dataSources };
+}
+
+/**
+ * Expand one module instance into `ctx.out`. `inputSubst` maps this module's
+ * inputs (those wired by the caller) to their merged-program names. Before
+ * expanding, resolve this module's own module-bound inputs by recursively
+ * instantiating each and feeding its output into the corresponding input.
+ * `exportAs`/`relabelColumns` are set only for a user-facing (entry-level)
+ * instance; a nested instance freshens its selected output the normal way.
+ */
+function instantiate(
+  module: Program,
+  file: string | undefined,
+  prefix: string,
+  inputSubst: Record<string, string>,
+  exportAs: { export: string; as: string } | undefined,
+  relabelColumns: string[] | undefined,
+  stack: (string | undefined)[],
+  ctx: Context,
+): void {
+  const localNames = new Set<string>();
+  for (const s of module.statements) if (isRule(s)) localNames.add(s.head.predicate);
+  // How a name in this module's scope reads in the merged program (mirrors
+  // expandModule's own renaming), used to resolve a nested import's actuals.
+  const renameName = (name: string): string =>
+    Object.hasOwn(inputSubst, name)
+      ? inputSubst[name]!
+      : localNames.has(name)
+        ? `${prefix}${name}`
+        : name;
+
+  for (const s of module.statements) {
+    if (!isExtDecl(s) || !s.binding?.isModule) continue;
+    const binding = s.binding;
+    if (binding.export === undefined) throw defaultOutputError(s, binding);
+    const child = ctx.resolve(binding.source, file);
+    const id = child.file ?? binding.source;
+    checkCycle(id, stack, s);
+    const childPrefix = `${s.predicate}$${ctx.counter.n++}$`;
+    const childInputs: Record<string, string> = {};
+    for (const actual of binding.actuals) childInputs[actual.param] = renameName(actual.arg);
+    instantiate(
+      child.program,
+      child.file,
+      childPrefix,
+      childInputs,
+      undefined,
+      undefined,
+      [...stack, id],
+      ctx,
+    );
+    // The nested instance's (prefix-freshened) selected output feeds this input.
+    inputSubst[s.predicate] = `${childPrefix}${binding.export}`;
+  }
+
+  const expanded = expandModule(module, { prefix, inputs: inputSubst, exportAs });
+  if (exportAs && relabelColumns) relabelOutputColumns(expanded, exportAs.as, relabelColumns);
+  // A kept data-bound / free input carrying a data binding: record and clear it,
+  // relative to this module's own file.
+  for (const s of expanded) {
+    if (isExtDecl(s) && s.binding) recordDataSource(s, s.binding, file, ctx.dataSources);
+  }
+  ctx.out.push(...expanded);
+}
+
+function defaultOutputError(decl: ExtDecl, binding: Binding): AnalyzerError {
+  return new AnalyzerError(
+    `selecting a module's default output ('${decl.predicate} := from "${binding.source}"') is not yet supported; name an output with 'export from'`,
+    ...nodePos(decl),
+  );
+}
+
+function checkCycle(id: string, stack: (string | undefined)[], decl: ExtDecl): void {
+  if (stack.includes(id)) {
+    const path = [...stack, id].filter((s): s is string => s !== undefined).join(" -> ");
+    throw new AnalyzerError(`module import cycle: ${path}`, ...nodePos(decl));
+  }
 }
 
 /** Call `fn` for every `Variable` node reachable from `node`. */
