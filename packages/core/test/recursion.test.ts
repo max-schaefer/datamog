@@ -14,7 +14,7 @@ function findCalls(source: string) {
 describe("findRecursiveCalls", () => {
   test("flags self-recursion", () => {
     const source = `
-      extensional parent(p: string, c: string).
+      input predicate parent(p: string, c: string).
       ancestor(X, Y) :- parent(X, Y).
       ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
     `;
@@ -24,7 +24,7 @@ describe("findRecursiveCalls", () => {
   test("flags mutually recursive predicates", () => {
     // `even` and `odd` form one SCC; each calls the other.
     const source = `
-      extensional edge(s: string, d: string).
+      input predicate edge(s: string, d: string).
       even_path(X, Y) :- edge(X, Y).
       even_path(X, Y) :- odd_path(X, Z), edge(Z, Y).
       odd_path(X, Y) :- even_path(X, Z), edge(Z, Y).
@@ -36,7 +36,7 @@ describe("findRecursiveCalls", () => {
     // `summary` reads `ancestor` but is itself non-recursive — that
     // call is not a recursive call.
     const source = `
-      extensional parent(p: string, c: string).
+      input predicate parent(p: string, c: string).
       ancestor(X, Y) :- parent(X, Y).
       ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
       summary(X) :- ancestor(X, _).
@@ -46,7 +46,7 @@ describe("findRecursiveCalls", () => {
 
   test("returns empty for non-recursive programs", () => {
     const source = `
-      extensional p(x: integer).
+      input predicate p(x: integer).
       doubled(X, Y) :- p(X), Y = X * 2.
     `;
     expect(findCalls(source)).toEqual([]);
@@ -57,7 +57,7 @@ describe("findRecursiveCalls", () => {
     // if q happened to be in the same SCC — though stratification
     // rejects that program upstream, the function should be defensive.
     const source = `
-      extensional base(x: string).
+      input predicate base(x: string).
       live(X) :- base(X).
       dead(X) :- base(X), not live(X).
     `;
@@ -66,7 +66,7 @@ describe("findRecursiveCalls", () => {
 
   test("orders calls by source offset", () => {
     const source = `
-      extensional edge(s: string, d: string).
+      input predicate edge(s: string, d: string).
       reach(X, Y) :- edge(X, Y).
       reach(X, Y) :- reach(X, Z), edge(Z, W), reach(W, Y).
     `;

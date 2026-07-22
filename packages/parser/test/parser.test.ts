@@ -11,7 +11,7 @@ import { ParseError, parse, parseLenient } from "../src/index.ts";
 
 describe("parser", () => {
   test("ext declaration", () => {
-    const program = parse("extensional parent(name: string, child: string).");
+    const program = parse("input predicate parent(name: string, child: string).");
     expect(program.statements).toHaveLength(1);
     const decl = program.statements[0] as ExtDecl;
     expect(decl.$type).toBe("ExtDecl");
@@ -26,7 +26,7 @@ describe("parser", () => {
 
   test("ext declaration with all types", () => {
     const program = parse(
-      "extensional t(a: string, b: integer?, c: float, d: boolean?, e: value).",
+      "input predicate t(a: string, b: integer?, c: float, d: boolean?, e: value).",
     );
     const decl = program.statements[0] as ExtDecl;
     expect(decl.columns[0]).toMatchObject({ name: "a", type: "string" });
@@ -38,7 +38,7 @@ describe("parser", () => {
 
   test("quoted predicate and column identifiers", () => {
     const program = parse(`
-      extensional \`http-event\`(\`content-type\`: string, \`in\`: integer).
+      input predicate \`http-event\`(\`content-type\`: string, \`in\`: integer).
       \`ok-response\`(Kind) :- \`http-event\`(Kind, Code), Code == 200.
       ?- \`ok-response\`(Kind).
     `);
@@ -228,7 +228,7 @@ describe("parser", () => {
   test("complete program", () => {
     const source = `
       # Extensional
-      extensional parent(name: string, child: string).
+      input predicate parent(name: string, child: string).
 
       # Rules
       ancestor(X, Y) :- parent(X, Y).

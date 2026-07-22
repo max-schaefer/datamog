@@ -11,7 +11,7 @@
 # because X is trivially a sibling of X. We'll tighten this up with
 # inequality in a later chapter.
 
-extensional parent(parent_name: string, child_name: string).
+input predicate parent(parent_name: string, child_name: string).
 
 # Placeholder so the file parses.
 same_gen(X, Y) :- parent(X, Y), X = "__never_matches__".

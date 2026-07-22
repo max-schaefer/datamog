@@ -9,7 +9,7 @@ Reaching past what is there does not drop the row; it yields `null`.
 A missing key and an out-of-range index both give `null`, and `null` keeps spreading as you reach further in:
 
 ```datamog
-extensional tree(t: value).
+input predicate tree(t: value).
 
 kind(T["nope"])            :- tree(T).   # null: no such key
 deep(T["args"][9]["name"]) :- tree(T).   # null: index 9 is off the end

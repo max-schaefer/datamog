@@ -20,7 +20,7 @@ describe("finiteness analysis", () => {
   test("flags self-recursion through arithmetic", () => {
     // Classic non-terminating: each iteration produces a new integer.
     const source = `
-      extensional seed(x: integer).
+      input predicate seed(x: integer).
       s(X) :- seed(X).
       s(Y) :- s(X), Y = X + 1.
     `;
@@ -29,7 +29,7 @@ describe("finiteness analysis", () => {
 
   test("flags reversed equality self-recursion through arithmetic", () => {
     const source = `
-      extensional seed(x: integer).
+      input predicate seed(x: integer).
       s(X) :- seed(X).
       s(Y) :- s(X), X + 1 = Y.
     `;
@@ -38,7 +38,7 @@ describe("finiteness analysis", () => {
 
   test("flags self-recursion through string concat", () => {
     const source = `
-      extensional seed(x: string).
+      input predicate seed(x: string).
       s(X) :- seed(X).
       s(Y) :- s(X), Y = X + "a".
     `;
@@ -52,7 +52,7 @@ describe("finiteness analysis", () => {
     // "FunctionCall in a head/body/equality is PLUS" rule covers this
     // without requiring a parse_json-specific case.
     const source = `
-      extensional seed(s: string).
+      input predicate seed(s: string).
       g(parse_json(S)) :- seed(S).
       g(parse_json(as_string(J))) :- g(J).
     `;
@@ -62,7 +62,7 @@ describe("finiteness analysis", () => {
   test("does not flag plain transitive closure", () => {
     // ancestor is recursive but values come from a finite EDB; no PLUS edge.
     const source = `
-      extensional parent(p: string, c: string).
+      input predicate parent(p: string, c: string).
       ancestor(X, Y) :- parent(X, Y).
       ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
     `;
@@ -71,7 +71,7 @@ describe("finiteness analysis", () => {
 
   test("does not flag mutual recursion without arithmetic", () => {
     const source = `
-      extensional edge(s: string, d: string).
+      input predicate edge(s: string, d: string).
       even_path(X, Y) :- edge(X, Y).
       even_path(X, Y) :- odd_path(X, Z), edge(Z, Y).
       odd_path(X, Y) :- even_path(X, Z), edge(Z, Y).
@@ -119,7 +119,7 @@ describe("finiteness analysis", () => {
     // Y = W and W = Y are just renames; they don't manufacture values. The
     // recursion flows through `parent` (an EDB), so it stays bounded.
     const source = `
-      extensional parent(p: string, c: string).
+      input predicate parent(p: string, c: string).
       ancestor(X, Y) :- parent(X, Y).
       ancestor(X, Y) :- parent(X, Z), ancestor(Z, W), Y = W.
       ancestor(X, Y) :- parent(X, Z), ancestor(Z, W), W = Y.
@@ -132,7 +132,7 @@ describe("finiteness analysis", () => {
     // values. Aggregate predicates are also non-recursive by analyser
     // rule, so the cycle test wouldn't fire anyway.
     const source = `
-      extensional p(x: integer).
+      input predicate p(x: integer).
       total(count(*)) :- p(_).
       stats(sum(X)) :- p(X).
     `;
@@ -142,7 +142,7 @@ describe("finiteness analysis", () => {
   test("non-recursive arithmetic is fine", () => {
     // X + 1 in a non-recursive rule: no cycle, no flag.
     const source = `
-      extensional p(x: integer).
+      input predicate p(x: integer).
       doubled(X, Y) :- p(X), Y = X * 2.
     `;
     expect(flagged(source)).toEqual([]);
@@ -155,7 +155,7 @@ describe("finiteness analysis", () => {
     // value-producing edge. The recursive rule's head arg `Y` (which
     // is `X + 1` after binding) is the one we should highlight.
     const source = `
-      extensional seed(x: integer).
+      input predicate seed(x: integer).
       s(X) :- seed(X).
       s(Y) :- s(X), Y = X + 1.
     `;
@@ -229,7 +229,7 @@ describe("finiteness of proof terms", () => {
     // column (index 2 -> ".3"). The recursive Trans constructor nests the
     // sub-proof, so over a cyclic graph the proof term grows without bound.
     const source = `
-      extensional edge(a: integer, b: integer).
+      input predicate edge(a: integer, b: integer).
       path(A, B)[Edge] :- edge(A, B).
       path(A, C)[Trans] :- edge(A, B), path(B, C).
     `;
@@ -240,7 +240,7 @@ describe("finiteness of proof terms", () => {
     // `_ : path(B, C)` drops the nested sub-proof, so the proof column no
     // longer lies on a value-producing cycle and the derivation stays finite.
     const source = `
-      extensional edge(a: integer, b: integer).
+      input predicate edge(a: integer, b: integer).
       path(A, B)[Edge] :- edge(A, B).
       path(A, C)[Trans] :- edge(A, B), _ : path(B, C).
     `;
@@ -249,7 +249,7 @@ describe("finiteness of proof terms", () => {
 
   test("a non-recursive proof-carrying predicate is finite", () => {
     const source = `
-      extensional num(n: integer).
+      input predicate num(n: integer).
       num_pair()[MkPair] :- num(Left), num(Right).
     `;
     expect(flagged(source)).toEqual([]);

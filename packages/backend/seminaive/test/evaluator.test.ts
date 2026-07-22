@@ -631,7 +631,7 @@ describe("seminaive backend — more body shapes", () => {
     ]);
     try {
       const results = await executor.execute(`
-        extensional flag(name: string, on: boolean, target: boolean).
+        input predicate flag(name: string, on: boolean, target: boolean).
         matched(N) :- flag(N, B, B).
         ?- matched(N).
       `);
@@ -731,7 +731,7 @@ describe("seminaive backend — stratification and dependency depth", () => {
     // evaluator leaves the relation empty. Rules over it should compute
     // to the empty set without error.
     const results = await run(`
-      extensional raw(x: integer).
+      input predicate raw(x: integer).
       derived(X) :- raw(X), X > 0.
       ?- derived(X).
     `);
@@ -878,7 +878,7 @@ describe("seminaive backend — backend lifecycle", () => {
     ]);
     try {
       const results = await executor.execute(`
-        extensional score(name: string, n: integer).
+        input predicate score(name: string, n: integer).
         winners(Who) :- score(Who, N), N > 15.
         ?- winners(Who).
       `);
@@ -901,7 +901,7 @@ describe("seminaive backend — backend lifecycle", () => {
       await executor.execute("p(1). ?- p(X).");
 
       const source = `
-        extensional score(name: string, n: integer).
+        input predicate score(name: string, n: integer).
         ?- score(Name, N).
       `;
       const decl = DatamogExecutor.prepare(source).extDecls.get("score")!;

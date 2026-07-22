@@ -26,13 +26,13 @@ export interface PredicateReference {
 }
 
 // Optional leading prefix (`not` for negated body literals,
-// `extensional` for declarations) followed by whitespace and the
+// `input predicate` for declarations) followed by whitespace and the
 // predicate IDENT. Matches at the start of the CST text. The
 // capture group is the predicate name; we use
 // match[0].length - match[1].length to recover the name's offset
 // within the source-text slice.
 const LITERAL_PRED_RE = /^(?:not\s+)?([a-z][a-zA-Z0-9_]*)/;
-const EXT_DECL_PRED_RE = /^extensional\s+([a-z][a-zA-Z0-9_]*)/;
+const EXT_DECL_PRED_RE = /^input\s+predicate\s+([a-z][a-zA-Z0-9_]*)/;
 
 function spanWithRe(
   cst: { offset: number; text: string },
@@ -55,8 +55,8 @@ function spanWithRe(
  * compare arrays without sorting.
  */
 export function findPredicateReferences(analyzed: AnalyzedProgram): PredicateReference[] {
-  // For an `extensional` declaration the CST starts at the
-  // `extensional` keyword, so we have to locate the predicate IDENT
+  // For an `input predicate` declaration the CST starts at the `input`
+  // keyword, so we have to locate the predicate IDENT
   // *inside* the declaration's text. For a rule head the CST starts
   // at the predicate IDENT itself, so its `offset` is already
   // correct.

@@ -105,7 +105,7 @@ it's used in the body.
 Consider:
 
 ```prolog
-extensional person(name: string, age: integer).
+input predicate person(name: string, age: integer).
 
 grown_up(Name) :- person(Name, A), A >= 18.
 ```
@@ -113,7 +113,7 @@ grown_up(Name) :- person(Name, A), A >= 18.
 The inferencer walks the rule body: `person(Name, A)` fixes `Name`
 as `string` and `A` as `integer`. `A >= 18` is consistent (integer vs.
 integer literal). The head `grown_up(Name)` therefore has column 1
-of type `string`. No explicit `extensional grown_up(name: string).` is
+of type `string`. No explicit `input predicate grown_up(name: string).` is
 needed.
 
 ### Type conflicts
@@ -121,8 +121,8 @@ needed.
 What if two rules for the same predicate disagree? From
 
 ```prolog
-extensional a(x: integer).
-extensional b(x: string).
+input predicate a(x: integer).
+input predicate b(x: string).
 
 c(X) :- a(X).
 c(X) :- b(X).
@@ -191,7 +191,7 @@ less than `'apple'`?"
 term is expected:
 
 ```prolog
-extensional account(name: string, active: boolean).
+input predicate account(name: string, active: boolean).
 
 live(N)    :- account(N, true).
 disabled(N) :- account(N, false).
@@ -322,16 +322,16 @@ rejects it, and why.
 
 ```prolog
 # (a) — one extensional
-extensional emp(name: string, salary: integer).
+input predicate emp(name: string, salary: integer).
 raise(N, S2) :- emp(N, S), S2 = S + 0.10.
 
 # (b) — conflicting extensional usage
-extensional a(x: integer).
-extensional b(x: string).
+input predicate a(x: integer).
+input predicate b(x: string).
 both(X) :- a(X), b(X).
 
 # (c) — per-column inference in an IDB
-extensional item(name: string, price: float).
+input predicate item(name: string, price: float).
 expensive(X) :- item(X, P), P > 100.
 labelled(X) :- item(X, P), P > "threshold".
 ```

@@ -1,6 +1,6 @@
 # Tutorial, chapter 9 — aggregates.
 
-extensional scores(student: string, subject: string, score: integer).
+input predicate scores(student: string, subject: string, score: integer).
 
 # Average score per student. Non-aggregate head variable `Student`
 # becomes the GROUP BY column; the aggregate `avg(Score)` fills the

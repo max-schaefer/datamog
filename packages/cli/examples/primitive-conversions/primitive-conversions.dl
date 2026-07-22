@@ -6,8 +6,8 @@
 # than implicitly truncating or coercing. Round-trip examples in the
 # `formatted` predicate exercise the inverse direction.
 
-extensional inputs(kind: string, raw: string).
-extensional formats(name: string, i: integer, r: float, b: boolean).
+input predicate inputs(kind: string, raw: string).
+input predicate formats(name: string, i: integer, r: float, b: boolean).
 
 # Parse the string into the target type. Failed parses surface as NULL and
 # propagate naturally through the rest of the rule body.

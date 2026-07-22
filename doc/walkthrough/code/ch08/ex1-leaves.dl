@@ -1,6 +1,6 @@
 # Exercise 8.1 — Leaf nodes.
 
-extensional edge(src: string, dst: string).
+input predicate edge(src: string, dst: string).
 
 # Placeholder.
 leaf(X) :- edge(X, _), X = "__never_matches__".

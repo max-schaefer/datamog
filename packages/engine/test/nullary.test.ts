@@ -13,14 +13,14 @@ const norm = (sql: string) => sql.replace(/\s+/g, " ").trim();
 // a row present means the proposition holds.
 describe("nullary predicates", () => {
   test("non-recursive nullary view uses a single marker column", () => {
-    const r = tr("extensional q(x: integer).\np() :- q(1).\n?- p().");
+    const r = tr("input predicate q(x: integer).\np() :- q(1).\n?- p().");
     const view = r.createViews.find((v) => v.includes('"p"'))!;
     // Single-rule non-recursive views emit `SELECT DISTINCT` so the view is a set.
     expect(norm(view)).toContain("SELECT DISTINCT 1 AS col1 FROM");
   });
 
   test("negated nullary atom compiles to NOT EXISTS", () => {
-    const r = tr("extensional q(x: integer).\np() :- q(1).\nr() :- not p().\n?- r().");
+    const r = tr("input predicate q(x: integer).\np() :- q(1).\nr() :- not p().\n?- r().");
     const view = r.createViews.find((v) => v.includes('"r"'))!;
     expect(norm(view)).toContain('NOT EXISTS (SELECT 1 FROM "p")');
   });
@@ -32,7 +32,7 @@ describe("nullary predicates", () => {
   });
 
   test("nullary ground query compiles to a probe", () => {
-    const r = tr("extensional q(x: integer).\np() :- q(1).\n?- p().");
+    const r = tr("input predicate q(x: integer).\np() :- q(1).\n?- p().");
     expect(norm(r.queries[0]!)).toContain("__probe");
   });
 

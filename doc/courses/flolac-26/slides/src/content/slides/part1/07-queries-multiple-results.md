@@ -7,7 +7,7 @@ section: "Pokémon"
 List all Pokémon (or, by filtering, just those with 45 HP):
 
 ```datamog
-extensional pokemon(id: integer, name: string, hp: integer).
+input predicate pokemon(id: integer, name: string, hp: integer).
 
 ?- pokemon(_, Name, _).    # all Pokémon in the EDB
 ```

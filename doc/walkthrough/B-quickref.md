@@ -7,9 +7,9 @@ definition, see [`doc/spec.md`](../spec.md).
 
 | Syntax                                     | Meaning                                          |
 | ------------------------------------------ | ------------------------------------------------ |
-| `extensional p(col1: type, col2: type).`   | declare an EDB predicate with typed columns      |
-| `extensional p(col: type?).`               | declare a nullable EDB column                    |
-| ``extensional `p-name`(`col-name`: type).`` | quote predicate or column identifiers            |
+| `input predicate p(col1: type, col2: type).`   | declare an EDB predicate with typed columns      |
+| `input predicate p(col: type?).`               | declare a nullable EDB column                    |
+| ``input predicate `p-name`(`col-name`: type).`` | quote predicate or column identifiers            |
 | `p("value", 42).`                          | assert a ground fact                             |
 | `h(X, Y) :- body.`                         | rule defining an IDB predicate                   |
 | `?- q(X, Y).`                              | query                                            |

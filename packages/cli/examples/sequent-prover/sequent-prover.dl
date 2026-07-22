@@ -35,10 +35,10 @@
 # De Morgan tautology ~(p&q)->(~p|~q); prepend parse-to-cnf's parser to go
 # straight from a string.
 
-extensional node(id: integer, kind: string).
-extensional node_var(id: integer, name: string).
-extensional node_child(id: integer, pos: integer, child: integer).
-extensional root(id: integer).
+input predicate node(id: integer, kind: string).
+input predicate node_var(id: integer, name: string).
+input predicate node_child(id: integer, pos: integer, child: integer).
+input predicate root(id: integer).
 
 # --- The calculus as data ------------------------------------------------
 #

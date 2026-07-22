@@ -1,6 +1,6 @@
 # Exercise 6.3 solution.
 
-extensional words(w: string).
+input predicate words(w: string).
 
 prefix(W, P) :- words(W), I in [0 .. length(W)], P = W[:I].
 

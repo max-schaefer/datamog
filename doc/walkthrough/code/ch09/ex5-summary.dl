@@ -1,6 +1,6 @@
 # Exercise 9.5 — Multiple aggregates in one head.
 
-extensional scores(student: string, subject: string, score: integer).
+input predicate scores(student: string, subject: string, score: integer).
 
 # TODO: define subject_stats with three aggregates in one head.
 

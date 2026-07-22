@@ -7,7 +7,7 @@ section: "Recursion"
 The step can even mention `reach` **twice**, joining one journey after another:
 
 ```datamog
-extensional line(from: string, to: string).
+input predicate line(from: string, to: string).
 
 reach(X, Y) :- line(X, Y).                 # base case
 reach(X, Y) :- reach(X, Z), reach(Z, Y).   # doubly recursive step

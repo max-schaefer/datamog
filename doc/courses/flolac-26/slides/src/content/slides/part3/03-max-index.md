@@ -8,8 +8,8 @@ tight: true
 In the formula evaluator from Part 2, we had two extensionals:
 
 ```prolog
-extensional node_var(id: integer, idx: integer).
-extensional num_vars(n: integer).
+input predicate node_var(id: integer, idx: integer).
+input predicate num_vars(n: integer).
 ```
 
 Using `max`, we can derive the second from the first:

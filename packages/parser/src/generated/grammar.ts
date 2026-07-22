@@ -73,7 +73,11 @@ export const DatamogGrammar = (): Grammar => loadedDatamogGrammar ?? (loadedData
         "elements": [
           {
             "$type": "Keyword",
-            "value": "extensional"
+            "value": "input"
+          },
+          {
+            "$type": "Keyword",
+            "value": "predicate"
           },
           {
             "$type": "Assignment",
@@ -2171,6 +2175,18 @@ export const DatamogGrammar = (): Grammar => loadedDatamogGrammar ?? (loadedData
               "$ref": "#/rules@37"
             },
             "arguments": []
+          },
+          {
+            "$type": "Keyword",
+            "value": "input"
+          },
+          {
+            "$type": "Keyword",
+            "value": "output"
+          },
+          {
+            "$type": "Keyword",
+            "value": "predicate"
           }
         ]
       },

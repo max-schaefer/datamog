@@ -6,7 +6,7 @@
 # in-memory evaluator accepts the rule and computes the closure
 # correctly.
 
-extensional edge(src: string, dst: string).
+input predicate edge(src: string, dst: string).
 
 tc(X, Y) :- edge(X, Y).
 tc(X, Z) :- edge(X, Y), tc(Y, Z).

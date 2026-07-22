@@ -75,7 +75,7 @@ async function runInteractiveMode(repl: DatamogRepl, backendName: string): Promi
     `Datamog REPL (backend: ${backendName}). Type :help for commands, :quit to exit.\n`,
   );
   process.stdout.write(
-    "Queries and `extensional` declarations commit on Enter; rules accumulate until a blank line.\n",
+    "Queries and `input predicate` declarations commit on Enter; rules accumulate until a blank line.\n",
   );
   rl.setPrompt(PRIMARY_PROMPT);
   rl.prompt();

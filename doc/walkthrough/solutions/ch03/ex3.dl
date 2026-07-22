@@ -1,6 +1,6 @@
 # Exercise 3.3 solution.
 
-extensional edge(src: string, dst: string).
+input predicate edge(src: string, dst: string).
 
 undirected(X, Y) :- edge(X, Y).
 undirected(X, Y) :- edge(Y, X).

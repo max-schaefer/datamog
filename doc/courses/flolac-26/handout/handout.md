@@ -17,7 +17,7 @@ Predicates may be either _extensional_, _intensional_, or _built-in_.
 Extensional predicates are declared, but not defined in the program itself. An extensional declaration like
 
 ```prolog
-extensional person(name: string, age: integer).
+input predicate person(name: string, age: integer).
 ```
 
 means that `person` is an extensional predicate of arity 2 (that is, it has 2 _arguments_, also called columns), the first of which is a string and the second an integer. The argument _names_ in extensional declarations are just for readability and do not have any semantic meaning.
@@ -106,7 +106,7 @@ The pieces above are already enough to write a complete program. Suppose the den
 A single non-recursive rule picks out the adults, and a query asks for them:
 
 ```prolog
-extensional person(name: string, age: integer).
+input predicate person(name: string, age: integer).
 
 adult(Name) :- person(Name, Age), Age >= 18.
 
@@ -152,7 +152,7 @@ Stratification ensures that the program has a well-defined _stratified model_. W
 > We use the following program as our running example:
 >
 > ```prolog
-> extensional number(n: integer).
+> input predicate number(n: integer).
 >
 > even(0).
 > even(N) :- number(N), odd(N - 1).

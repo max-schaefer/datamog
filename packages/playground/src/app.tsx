@@ -31,7 +31,7 @@ interface ExtDecl {
   columns: string;
 }
 
-const EXT_RE = /^\s*extensional\s+(\w+)\s*\(([^)]+)\)/gm;
+const EXT_RE = /^\s*input\s+predicate\s+(\w+)\s*\(([^)]+)\)/gm;
 
 function extractExtensionals(source: string): ExtDecl[] {
   const decls: ExtDecl[] = [];

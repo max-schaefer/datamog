@@ -12,7 +12,7 @@
 # output identical across every backend, the object payload here
 # uses keys that are already in sorted order. See spec §2.9.
 
-extensional raw(kind: string, payload: string).
+input predicate raw(kind: string, payload: string).
 
 # Parse each payload into a `value`. Malformed input → NULL.
 parsed(K, P, J) :- raw(K, P), J = parse_json(P).

@@ -12,8 +12,8 @@ Several tuples may share one `id`: a Pokémon can have multiple types.
 Query to find Pokémon with both "water" and "ice":
 
 ```datamog
-extensional pokemon(id: integer, name: string, hp: integer).
-extensional type(id: integer, type: string).
+input predicate pokemon(id: integer, name: string, hp: integer).
+input predicate type(id: integer, type: string).
 
 ?- pokemon(Id, Name, _), type(Id, "water"), type(Id, "ice").
 ```

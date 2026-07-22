@@ -8,7 +8,7 @@ tight: true
 Is the thief taller than 150 cm? **Yes.**
 
 ```datamog
-extensional villager(name: string, age: integer, height: integer).
+input predicate villager(name: string, age: integer, height: integer).
 
 suspect(Name) :- villager(Name, _, Height),
                  Height > 150.

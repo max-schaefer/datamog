@@ -56,7 +56,7 @@ describe("GSheetLoader", () => {
       auth: makeAuth(),
       sheets: { parent: { spreadsheetId: "abc123" } },
     });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     expect(await loader.canLoad(decl)).toBe(true);
   });
 
@@ -65,7 +65,7 @@ describe("GSheetLoader", () => {
       auth: makeAuth(),
       sheets: {},
     });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     expect(await loader.canLoad(decl)).toBe(false);
   });
 
@@ -93,7 +93,7 @@ describe("GSheetLoader", () => {
       auth: makeAuth(),
       sheets: { parent: { spreadsheetId: "abc123" } },
     });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
 
     mockDocWithSheet(
       loader,
@@ -120,7 +120,7 @@ describe("GSheetLoader", () => {
       auth: makeAuth(),
       sheets: { t: { spreadsheetId: "abc123" } },
     });
-    const decl = getExtDecl("extensional t(a: string, b: integer, c: float, d: boolean).");
+    const decl = getExtDecl("input predicate t(a: string, b: integer, c: float, d: boolean).");
 
     mockDocWithSheet(
       loader,
@@ -141,7 +141,7 @@ describe("GSheetLoader", () => {
       auth: makeAuth(),
       sheets: { parent: { spreadsheetId: "abc123" } },
     });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
 
     mockDocWithSheet(
       loader,
@@ -165,7 +165,7 @@ describe("GSheetLoader", () => {
       auth: makeAuth(),
       sheets: { t: { spreadsheetId: "abc123" } },
     });
-    const decl = getExtDecl("extensional t(n: integer).");
+    const decl = getExtDecl("input predicate t(n: integer).");
     mockDocWithSheet(loader, "Sheet1", ["n"], [{ n: "not-an-int" }]);
     const { backend } = makeMockBackend();
 
@@ -177,7 +177,7 @@ describe("GSheetLoader", () => {
       auth: makeAuth(),
       sheets: { parent: { spreadsheetId: "abc123" } },
     });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
 
     mockDocWithSheet(loader, "Sheet1", ["name"], []);
 
@@ -190,7 +190,7 @@ describe("GSheetLoader", () => {
       auth: makeAuth(),
       sheets: { parent: { spreadsheetId: "abc123", range: "Missing" } },
     });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
 
     // Mock with only "Sheet1", not "Missing"
     mockDocWithSheet(loader, "Sheet1", ["name", "child"], []);
@@ -204,7 +204,7 @@ describe("GSheetLoader", () => {
       auth: makeAuth(),
       sheets: { parent: { spreadsheetId: "abc123", range: "Data" } },
     });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
 
     mockDocWithSheet(loader, "Data", ["name", "child"], [{ name: "alice", child: "bob" }]);
 
@@ -231,7 +231,7 @@ describe("GSheetLoader (public CSV fallback)", () => {
       { parent: { spreadsheetId: "abc123" } },
       "name,child\nalice,bob\ncarol,dave\n",
     );
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     const { backend, insertedQueries } = makeMockBackend();
     const result = await loader.load(decl, backend);
 
@@ -246,7 +246,7 @@ describe("GSheetLoader (public CSV fallback)", () => {
       { t: { spreadsheetId: "abc123" } },
       "a,b,c,d\nhello,42,3.14,true\n",
     );
-    const decl = getExtDecl("extensional t(a: string, b: integer, c: float, d: boolean).");
+    const decl = getExtDecl("input predicate t(a: string, b: integer, c: float, d: boolean).");
     const { backend, insertedQueries } = makeMockBackend();
     const result = await loader.load(decl, backend);
 
@@ -266,7 +266,7 @@ describe("GSheetLoader (public CSV fallback)", () => {
       { parent: { spreadsheetId: "abc123" } },
       "﻿name,child\nalice,bob\n",
     );
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     const { backend, insertedQueries } = makeMockBackend();
     const result = await loader.load(decl, backend);
     expect(result.rowsLoaded).toBe(1);
@@ -279,21 +279,21 @@ describe("GSheetLoader (public CSV fallback)", () => {
     // a blank row after the header shifts later diagnostics upward, so a
     // bad value on source line 4 was reported as line 3.
     const loader = makeLoaderWithCsv({ t: { spreadsheetId: "abc123" } }, "n\n\n1\nnot-an-int\n");
-    const decl = getExtDecl("extensional t(n: integer).");
+    const decl = getExtDecl("input predicate t(n: integer).");
     const { backend } = makeMockBackend();
     expect(loader.load(decl, backend)).rejects.toThrow(/t\.gsheet line 4, column 'n'/);
   });
 
   test("throws on missing column in public CSV export", async () => {
     const loader = makeLoaderWithCsv({ parent: { spreadsheetId: "abc123" } }, "name\nalice\n");
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     const { backend } = makeMockBackend();
     expect(loader.load(decl, backend)).rejects.toThrow(/missing field 'child'/);
   });
 
   test("returns zero rows for empty CSV", async () => {
     const loader = makeLoaderWithCsv({ parent: { spreadsheetId: "abc123" } }, "");
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     const { backend } = makeMockBackend();
     const result = await loader.load(decl, backend);
     expect(result.rowsLoaded).toBe(0);
@@ -304,7 +304,7 @@ describe("GSheetLoader (public CSV fallback)", () => {
       { parent: { spreadsheetId: "abc123" } },
       'name,child\n"alice, sr",bob\n"carol ""C""",dave\n',
     );
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     const { backend, insertedQueries } = makeMockBackend();
     const result = await loader.load(decl, backend);
 

@@ -138,7 +138,7 @@ Or add "used" blocks and find every `(def, use)` pair where the
 definition actually reaches a use:
 
 ```prolog
-extensional use(block: string, defname: string).
+input predicate use(block: string, defname: string).
 
 def_use(Block, D) :- use(Block, D), reaches(D, Block).
 ```

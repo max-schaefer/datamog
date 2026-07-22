@@ -4,6 +4,6 @@
 # 1934. Two people in our data qualify; if you get fewer or more,
 # re-check your query.
 
-extensional person(name: string, country: string, year_born: integer).
+input predicate person(name: string, country: string, year_born: integer).
 
 # TODO: add your query below.

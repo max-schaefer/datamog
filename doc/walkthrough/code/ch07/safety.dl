@@ -3,7 +3,7 @@
 # Every variable in the head appears in a positive body atom (or
 # is bound to one via an equality).
 
-extensional edge(src: string, dst: string).
+input predicate edge(src: string, dst: string).
 
 # Safe: X and Y come from edge; Label is bound via equality from
 # already-bound X and Y.

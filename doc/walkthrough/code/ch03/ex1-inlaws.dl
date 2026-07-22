@@ -4,8 +4,8 @@
 # can be an in-law of Y. Reuse `spouse` from the body of the
 # chapter if you like — you'd just need to define it here first.
 
-extensional parent(parent_name: string, child_name: string).
-extensional marriage(p1: string, p2: string).
+input predicate parent(parent_name: string, child_name: string).
+input predicate marriage(p1: string, p2: string).
 
 spouse(X, Y) :- marriage(X, Y).
 spouse(X, Y) :- marriage(Y, X).

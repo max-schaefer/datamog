@@ -145,7 +145,7 @@ export class DatamogCompletionProvider extends DefaultCompletionProvider {
 
 function predicateDetail(pi: PredicateInfo): string {
   if (pi.kind === "extensional") {
-    return pi.columns ? `extensional(${pi.columns.join(", ")})` : `extensional/${pi.arity}`;
+    return pi.columns ? `input(${pi.columns.join(", ")})` : `input/${pi.arity}`;
   }
   return `rule/${pi.arity}`;
 }

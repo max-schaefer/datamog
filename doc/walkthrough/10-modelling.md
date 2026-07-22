@@ -12,9 +12,9 @@ habits you build up.
 From [`code/ch10/hr.dl`](code/ch10/hr.dl):
 
 ```prolog
-extensional employee(id: integer, name: string, salary: integer).
-extensional in_department(emp_id: integer, dept_id: integer).
-extensional manages(manager: integer, report: integer).
+input predicate employee(id: integer, name: string, salary: integer).
+input predicate in_department(emp_id: integer, dept_id: integer).
+input predicate manages(manager: integer, report: integer).
 ```
 
 Three EDBs, each a simple flat relation. Notice what's **not**

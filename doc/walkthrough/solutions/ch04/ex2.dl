@@ -4,7 +4,7 @@
 # sources, one for nodes that appear as destinations. Using just
 # one would miss nodes that appear in only one column.
 
-extensional edge(src: string, dst: string).
+input predicate edge(src: string, dst: string).
 
 reach_or_self(X, Y) :- edge(X, Y).
 reach_or_self(X, Y) :- edge(X, Z), reach_or_self(Z, Y).

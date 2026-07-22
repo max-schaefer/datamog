@@ -129,7 +129,7 @@ So far, we have defined data inline as facts. For larger datasets, you can
 declare an **extensional predicate** and load data from a CSV file:
 
 ```prolog
-extensional scores(student: string, subject: string, score: integer).
+input predicate scores(student: string, subject: string, score: integer).
 ```
 
 This tells Datamog to look for a file named `scores.csv` in the same directory,

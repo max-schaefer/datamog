@@ -4,6 +4,6 @@
 # the output alias list since we don't want to print the year we
 # already know.
 
-extensional person(name: string, country: string, year_born: integer).
+input predicate person(name: string, country: string, year_born: integer).
 
 ?- person(Name, Country, 1934).

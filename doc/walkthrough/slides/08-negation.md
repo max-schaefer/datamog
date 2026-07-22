@@ -27,7 +27,7 @@ Datamog's answer: **stratified negation**. You may use `not`, but only on predic
 # Orphans
 
 ```prolog
-extensional parent(parent_name: string, child_name: string).
+input predicate parent(parent_name: string, child_name: string).
 
 person(P) :- parent(P, _).
 person(P) :- parent(_, P).

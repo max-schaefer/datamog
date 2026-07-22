@@ -8,7 +8,7 @@ tight: true
 Recursive `reach` replaces the second `line` with `reach` itself:
 
 ```datamog
-extensional line(from: string, to: string).
+input predicate line(from: string, to: string).
 
 reach(X, Y) :- line(X, Y).
 reach(X, Y) :- line(X, Z), reach(Z, Y).

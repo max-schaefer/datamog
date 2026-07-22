@@ -8,7 +8,7 @@ tight: true
 A **descendant** is an ancestor read backwards, so we flip the arguments:
 
 ```datamog
-extensional parent(parent: string, child: string).
+input predicate parent(parent: string, child: string).
 
 ancestor(X, Y) :- parent(X, Y).
 ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).

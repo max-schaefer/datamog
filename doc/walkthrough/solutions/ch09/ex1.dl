@@ -1,6 +1,6 @@
 # Exercise 9.1 solution.
 
-extensional scores(student: string, subject: string, score: integer).
+input predicate scores(student: string, subject: string, score: integer).
 
 subject_count(Subject, count(Student)) :- scores(Student, Subject, _).
 

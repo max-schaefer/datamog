@@ -1,8 +1,8 @@
 # Exercise 10.1 solution.
 
-extensional book(id: integer, title: string, author_id: integer).
-extensional author(id: integer, name: string, country: string).
-extensional checkout(book_id: integer, borrower_id: integer, date: string).
+input predicate book(id: integer, title: string, author_id: integer).
+input predicate author(id: integer, name: string, country: string).
+input predicate checkout(book_id: integer, borrower_id: integer, date: string).
 
 # A book is currently out if it appears anywhere in checkout.
 # (A real system would filter by active-loan status; this simple

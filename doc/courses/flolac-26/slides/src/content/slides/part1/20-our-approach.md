@@ -7,9 +7,9 @@ section: "Find the Thief"
 Villager data comes from extensionals — our input tables, the initial facts:
 
 ```prolog
-extensional villager(name: string, age: integer, height: integer).
-extensional hairColour(name: string, colour: string).
-extensional location(name: string, location: string).
+input predicate villager(name: string, age: integer, height: integer).
+input predicate hairColour(name: string, colour: string).
+input predicate location(name: string, location: string).
 ```
 
 We want to define an intensional predicate:

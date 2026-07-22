@@ -13,7 +13,7 @@ const executor = new DatamogExecutor(backend, [
 ]);
 ```
 
-The loader looks for `<predicate>.jsonl` in the configured directory (e.g. `data/follows.jsonl` for an `extensional follows(...)` declaration). Each line is a JSON object containing the declared column names; extra keys are ignored:
+The loader looks for `<predicate>.jsonl` in the configured directory (e.g. `data/follows.jsonl` for an `input predicate follows(...)` declaration). Each line is a JSON object containing the declared column names; extra keys are ignored:
 
 ```jsonl
 {"user":"alice","friend":"bob"}

@@ -10,7 +10,7 @@ Make `reach` **reflexive**: every station should reach itself, in zero steps.
 First list all the stations (the places that appear on some line), then let each station reach itself:
 
 ```datamog
-extensional line(from: string, to: string).
+input predicate line(from: string, to: string).
 
 station(X) :- line(X, _).
 station(X) :- line(_, X).

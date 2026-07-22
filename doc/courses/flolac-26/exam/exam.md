@@ -18,7 +18,7 @@ The grid is supplied as an extensional predicate
 `grid(R, C, N)`: the cell in row `R`, column `C` holds digit `N`.
 
 ```prolog
-extensional grid(r: integer, c: integer, n: integer).
+input predicate grid(r: integer, c: integer, n: integer).
 ```
 
 Rows and columns range between 1 and 9:

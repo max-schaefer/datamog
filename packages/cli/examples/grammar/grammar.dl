@@ -12,7 +12,7 @@
 # a(F, T) means the nonterminal A matches input[F:T].
 # Query: does the grammar accept the full string?
 
-extensional input(s: string).
+input predicate input(s: string).
 
 at(S, I, C) :- input(S), I in [0 .. length(S) - 1], C = S[I].
 

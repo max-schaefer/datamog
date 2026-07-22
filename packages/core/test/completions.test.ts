@@ -12,8 +12,8 @@ import {
 describe("collectUserPredicates", () => {
   test("returns every EDB and IDB head in source order, deduped", () => {
     const source = `
-      extensional edge(s: string, d: string).
-      extensional node(n: string).
+      input predicate edge(s: string, d: string).
+      input predicate node(n: string).
       reach(X, Y) :- edge(X, Y).
       reach(X, Y) :- edge(X, Z), reach(Z, Y).
       isolated(N) :- node(N), not edge(N, _).
@@ -34,7 +34,7 @@ describe("collectUserPredicates", () => {
 
 describe("findEnclosingRule + collectVariablesInRule", () => {
   test("returns the rule the cursor sits in and its user-typed variables", () => {
-    const source = `extensional edge(s: string, d: string).
+    const source = `input predicate edge(s: string, d: string).
 reach(X, Y) :- edge(X, Z), reach(Z, Y).
 `;
     const program = parse(source);
@@ -49,7 +49,7 @@ reach(X, Y) :- edge(X, Z), reach(Z, Y).
   test("filters out synthetic $anon variables introduced for `_`", () => {
     // `_` becomes `$anonN` after postProcess — those shouldn't be
     // proposed as completions, since the user can't type them.
-    const source = "extensional p(x: integer).\nq(X) :- p(X), p(_).\n";
+    const source = "input predicate p(x: integer).\nq(X) :- p(X), p(_).\n";
     const program = parse(source);
     const cursor = source.indexOf("p(_)");
     const rule = findEnclosingRule(program, cursor);
@@ -57,7 +57,7 @@ reach(X, Y) :- edge(X, Z), reach(Z, Y).
   });
 
   test("returns undefined when cursor sits between statements", () => {
-    const source = "extensional p(x: integer).\n\n?- p(X).\n";
+    const source = "input predicate p(x: integer).\n\n?- p(X).\n";
     const program = parse(source);
     // Offset on the blank line between the ExtDecl and the Query.
     const cursor = source.indexOf("\n\n") + 1;

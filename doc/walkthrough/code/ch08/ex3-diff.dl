@@ -1,7 +1,7 @@
 # Exercise 8.3 — Set difference and intersection.
 
-extensional a(x: string).
-extensional b(x: string).
+input predicate a(x: string).
+input predicate b(x: string).
 
 # Placeholders.
 only_in_a(X) :- a(X), X = "__never_matches__".

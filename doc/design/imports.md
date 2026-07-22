@@ -19,7 +19,7 @@ reusable libraries later. It covers what we call the two use cases:
 ## Summary of the model
 
 - A **module is a file**. Its resolved absolute path is its identity.
-- A predicate is **owned** by the one module that declares it (`extensional`) or
+- A predicate is **owned** by the one module that declares it (`input predicate`) or
   defines it (has rules for it). Exactly one owner.
 - A module lists what it offers with `export`. A module states what it depends on
   with `import "path"`, which is resolved relative to the importing file.
@@ -32,7 +32,7 @@ reusable libraries later. It covers what we call the two use cases:
 
 These are the four decisions taken up front:
 
-1. EDB data for a module's `extensional` predicates resolves relative to **that
+1. EDB data for a module's `input predicate` predicates resolves relative to **that
    module's own directory**.
 2. Global checks (constructor-name uniqueness in particular) run on the **merged**
    program.
@@ -46,7 +46,7 @@ These are the four decisions taken up front:
 # lib/graph.dl
 export edge, path.
 
-extensional edge(src: integer, dst: integer).
+input predicate edge(src: integer, dst: integer).
 
 path(X, Y) :- edge(X, Y).
 path(X, Z) :- path(X, Y), edge(Y, Z).
@@ -97,7 +97,7 @@ aliasing lands).
 
 ### Ownership and visibility
 
-- **Owner.** A predicate is owned by the module that declares it `extensional`
+- **Owner.** A predicate is owned by the module that declares it `input predicate`
   or writes rules for it. Declaring the same EDB in two modules, or writing
   rules for the same predicate name in two modules, is an error. This is
   decision 3, and it is the multi-file analogue of the REPL's existing "defined

@@ -27,7 +27,7 @@ A subtlety appears: these features can manufacture values outside the active dom
 # Arithmetic in rule bodies
 
 ```prolog
-extensional score(student: string, subject: string, points: integer).
+input predicate score(student: string, subject: string, points: integer).
 
 out_of_ten(Student, Subject, P10) :-
     score(Student, Subject, P), P10 = P / 10.

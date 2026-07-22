@@ -1,6 +1,6 @@
 # Exercise 9.1 — Simple counts.
 
-extensional scores(student: string, subject: string, score: integer).
+input predicate scores(student: string, subject: string, score: integer).
 
 # TODO: three aggregate rules.
 

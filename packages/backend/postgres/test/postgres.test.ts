@@ -363,7 +363,7 @@ describe.skipIf(!HAS_DATABASE_URL)("postgres backend (DATABASE_URL)", () => {
     ]);
     const executor = new DatamogExecutor(backend, [loader]);
     const results = await executor.execute(`
-      extensional doc(data: value).
+      input predicate doc(data: value).
       shape(T, N) :- doc(D), T = type_of(D), N = length(D).
       item(Name) :-
         doc(D),

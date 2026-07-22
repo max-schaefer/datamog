@@ -120,7 +120,7 @@ That's the payoff of composability: every IDB is a named, queryable relation.
 # Extending the analysis — def-use pairs
 
 ```prolog
-extensional use(block: string, defname: string).
+input predicate use(block: string, defname: string).
 
 def_use(Block, D) :- use(Block, D), reaches(D, Block).
 ```

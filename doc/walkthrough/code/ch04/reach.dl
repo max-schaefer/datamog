@@ -6,7 +6,7 @@
 #   a --> e --> f
 #   d --> f
 
-extensional edge(src: string, dst: string).
+input predicate edge(src: string, dst: string).
 
 reach(X, Y) :- edge(X, Y).
 reach(X, Y) :- edge(X, Z), reach(Z, Y).

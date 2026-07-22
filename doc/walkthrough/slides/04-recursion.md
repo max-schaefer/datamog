@@ -30,7 +30,7 @@ SQL handles it too — with `WITH RECURSIVE` and careful gymnastics. Datalog jus
 # Ancestor — the canonical example
 
 ```prolog
-extensional parent(parent_name: string, child_name: string).
+input predicate parent(parent_name: string, child_name: string).
 
 ancestor(X, Y) :- parent(X, Y).
 ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
@@ -62,7 +62,7 @@ This is **naive evaluation**. Apply rules until nothing changes. Chapter 5 unpac
 # The same pattern outside families
 
 ```prolog
-extensional edge(src: string, dst: string).
+input predicate edge(src: string, dst: string).
 
 reach(X, Y) :- edge(X, Y).
 reach(X, Y) :- edge(X, Z), reach(Z, Y).

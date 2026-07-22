@@ -8,7 +8,7 @@ tight: true
 Publicly available data about 891 passengers:
 
 ```prolog
-extensional passenger(id: integer,          # unique ID
+input predicate passenger(id: integer,          # unique ID
                       survived: integer,    # 0: no, 1: yes
                       class: integer,       # 1-3 (first to third class)
                       sex: string,          # "male" or "female"
@@ -18,7 +18,7 @@ extensional passenger(id: integer,          # unique ID
 We don't know every passenger's age, so ages live in a separate relation:
 
 ```prolog
-extensional age(id: integer,                # refers to an id in passenger
+input predicate age(id: integer,                # refers to an id in passenger
                 years: float).              # age at the time of the sinking (but check this later!)
 ```
 

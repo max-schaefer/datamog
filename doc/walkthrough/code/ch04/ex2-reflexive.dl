@@ -4,7 +4,7 @@
 # You'll need a third rule that derives reach_or_self(X, X) for
 # every X that appears in `edge` (either column).
 
-extensional edge(src: string, dst: string).
+input predicate edge(src: string, dst: string).
 
 reach_or_self(X, Y) :- edge(X, Y).
 reach_or_self(X, Y) :- edge(X, Z), reach_or_self(Z, Y).

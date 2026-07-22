@@ -1,6 +1,6 @@
 # Exercise 9.2 solution.
 
-extensional scores(student: string, subject: string, score: integer).
+input predicate scores(student: string, subject: string, score: integer).
 
 avg_by_subject(Subject, avg(Score)) :- scores(_, Subject, Score).
 

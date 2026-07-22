@@ -7,7 +7,7 @@ Google Sheets loader plugin for Datamog. Populates extensional predicate tables 
 Given a Datamog program that declares an extensional predicate:
 
 ```prolog
-extensional parent(name: string, child: string).
+input predicate parent(name: string, child: string).
 ```
 
 Point it at a Google Sheet with the predicate's like-named input flag (after the program):

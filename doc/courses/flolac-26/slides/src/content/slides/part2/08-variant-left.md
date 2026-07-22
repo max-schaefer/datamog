@@ -7,7 +7,7 @@ section: "Recursion"
 The recursive step can put the recursive call **first**, then take a line:
 
 ```datamog
-extensional line(from: string, to: string).
+input predicate line(from: string, to: string).
 
 reach(X, Y) :- line(X, Y).               # base case
 reach(X, Y) :- reach(X, Z), line(Z, Y).  # left-recursive step

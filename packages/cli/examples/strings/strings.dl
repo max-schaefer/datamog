@@ -1,7 +1,7 @@
 # String manipulation example
 # Demonstrates concatenation, length, subscript, and slice.
 
-extensional words(w: string).
+input predicate words(w: string).
 
 prefixed(R) :- words(W), R = "hello_" + W.
 lengths(W, N) :- words(W), N = length(W).

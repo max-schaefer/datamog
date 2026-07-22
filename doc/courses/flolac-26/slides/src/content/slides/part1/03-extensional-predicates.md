@@ -10,7 +10,7 @@ tight: true
 Declared like this:
 
 ```prolog
-extensional pokemon(id: integer, name: string, hp: integer).
+input predicate pokemon(id: integer, name: string, hp: integer).
 ```
 
 Intuitively: `pokemon` lists the `name` and `hp` for each Pokémon, identified by an integer `id`.

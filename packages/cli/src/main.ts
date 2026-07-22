@@ -227,7 +227,7 @@ export class ExplicitSourceLoader implements ExtensionalLoader {
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(
-        `Failed to fetch extensional source '${url.href}' for predicate '${this.predicateName}': ${response.status} ${response.statusText}`,
+        `Failed to fetch input source '${url.href}' for predicate '${this.predicateName}': ${response.status} ${response.statusText}`,
       );
     }
     return response.text();

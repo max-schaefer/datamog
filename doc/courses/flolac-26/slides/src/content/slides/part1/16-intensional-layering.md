@@ -8,11 +8,11 @@ tight: true
 Predicates build on each other: ability "prankster" adds 1 to a move's priority.
 
 ```datamog
-extensional learns(name: string, move: string).
-extensional move_priority(move: string, priority: integer).
-extensional doubles_move(move: string).
-extensional protection_move(move: string).
-extensional pokemon_ability(name: string, ability: string).
+input predicate learns(name: string, move: string).
+input predicate move_priority(move: string, priority: integer).
+input predicate doubles_move(move: string).
+input predicate protection_move(move: string).
+input predicate pokemon_ability(name: string, ability: string).
 
 learns_priority(Name, Move, Priority) :-
   learns(Name, Move),

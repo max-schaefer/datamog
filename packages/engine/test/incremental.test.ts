@@ -74,12 +74,12 @@ describe("IncrementalSession", () => {
       };
       const session = new IncrementalSession(sqlite, [failingLoader]);
       await expect(
-        session.addStatements("extensional a(x: integer).\nextensional b(y: integer)."),
+        session.addStatements("input predicate a(x: integer).\ninput predicate b(y: integer)."),
       ).rejects.toThrow(/simulated loader failure/);
       // `a` was fully applied before `b` failed; the session must still let a
       // later chunk re-declare and use it rather than wedging until `:reset`.
       const r = await session.addStatements(
-        "extensional a(x: integer).\nreachable(X) :- a(X).\n?- reachable(X).",
+        "input predicate a(x: integer).\nreachable(X) :- a(X).\n?- reachable(X).",
       );
       expect(r.queries).toHaveLength(1);
     } finally {

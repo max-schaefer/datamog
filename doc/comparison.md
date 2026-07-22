@@ -21,7 +21,7 @@ semantics: three that compile a program to SQL (`CREATE TABLE` / `CREATE VIEW` /
 `SELECT`) and run it on a relational database (PostgreSQL, SQLite, and sql.js,
 the WASM build of SQLite), and two pure in-memory interpreters (a naive and a
 seminaive bottom-up evaluator) that serve as readable reference implementations.
-The surface is Prolog-like Horn clauses with typed `extensional` declarations,
+The surface is Prolog-like Horn clauses with typed `input predicate` declarations,
 stratified negation, aggregates, and static type inference over five column
 types, one of which (`value`) is a first-class JSON/nested type. It is built for
 teaching and experimentation: it ships a browser playground, a VS Code
@@ -32,7 +32,7 @@ extensibility that production engines carry.
 
 | System | Category | Implemented in / how it runs | Surface syntax |
 |---|---|---|---|
-| **Datamog** | Educational | TypeScript/Bun; compiles to SQL (Postgres, SQLite, sql.js) or runs naive/seminaive in-memory interpreters | Prolog-like, typed `extensional` declarations |
+| **Datamog** | Educational | TypeScript/Bun; compiles to SQL (Postgres, SQLite, sql.js) or runs naive/seminaive in-memory interpreters | Prolog-like, typed `input predicate` declarations |
 | **DES** | Educational deductive DB | Prolog (SWI/SICStus); top-down-driven bottom-up evaluation with tabling | Prolog-like; also SQL and relational-algebra front-ends |
 | **Soufflé** | Research, production-used | C++; compiles Datalog to parallel C++ through a relational-algebra machine IR (semi-naive) | Prolog-like, `.decl` / `.input` / `.output` |
 | **CodeQL (QL)** | Production (commercial) | Proprietary engine; compiles QL and evaluates bottom-up (parity-stratified least fixed point) over an extracted snapshot database | Object-oriented first-order logic; SQL-like `from` / `where` / `select` |
@@ -78,7 +78,7 @@ Seeing it side by side is the quickest way to feel the syntactic range.
 **Datamog** (typed declarations, Prolog-like rules, `?-` query):
 
 ```prolog
-extensional edge(x: integer, y: integer).
+input predicate edge(x: integer, y: integer).
 path(X, Y) :- edge(X, Y).
 path(X, Y) :- path(X, Z), edge(Z, Y).
 ?- path(1, 3).

@@ -1,6 +1,6 @@
 # Tutorial, chapter 6 — arithmetic in rule bodies.
 
-extensional score(student: string, subject: string, points: integer).
+input predicate score(student: string, subject: string, points: integer).
 
 # Arithmetic in the rule head: convert points out of 100 to points
 # out of 10 (integer division — more on that below).

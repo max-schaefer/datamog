@@ -4,7 +4,7 @@
 # as the symmetric closure: for every edge (X, Y), include both
 # (X, Y) and (Y, X).
 
-extensional edge(src: string, dst: string).
+input predicate edge(src: string, dst: string).
 
 # Placeholder so the file parses; delete once you've added rules.
 undirected(X, Y) :- edge(X, Y), X = "__never_matches__".

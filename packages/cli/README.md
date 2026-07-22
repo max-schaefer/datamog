@@ -97,7 +97,7 @@ GOOGLE_API_KEY=... bun run datamog \
   --scores https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit
 ```
 
-The sheet must have a header row with column names matching the `extensional` declaration. Public spreadsheets are fetched via CSV export and require no credentials. For private sheets, set `GOOGLE_API_KEY` or `GOOGLE_SERVICE_ACCOUNT_EMAIL` + `GOOGLE_PRIVATE_KEY`.
+The sheet must have a header row with column names matching the `input predicate` declaration. Public spreadsheets are fetched via CSV export and require no credentials. For private sheets, set `GOOGLE_API_KEY` or `GOOGLE_SERVICE_ACCOUNT_EMAIL` + `GOOGLE_PRIVATE_KEY`.
 
 ## Options
 

@@ -5,7 +5,7 @@ import { expect, test } from "@playwright/test";
 // via `#p=` with `&norun` so the linter fires but the program isn't
 // executed (no query, and we don't need any results).
 const PROGRAM = [
-  "extensional person(name: string, age: integer).",
+  "input predicate person(name: string, age: integer).",
   "adult(N) :- person(N, A), A >= 18.",
 ].join("\n");
 
@@ -41,7 +41,7 @@ test.describe("editor autocomplete", () => {
     // A built-in function name should be in the same pool.
     await expect(popup.getByText("upper", { exact: true })).toBeVisible();
     // A reserved keyword should be in the same pool too.
-    await expect(popup.getByText("extensional", { exact: true })).toBeVisible();
+    await expect(popup.getByText("input", { exact: true })).toBeVisible();
   });
 
   test("Tab accepts the open completion (does not insert a tab)", async ({ page, browserName }) => {

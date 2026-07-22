@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 // playground would have nothing to display, so the Run button should
 // be disabled with a tooltip pointing at the missing query.
 const NO_QUERY_PROGRAM = [
-  "extensional input(x: integer).",
+  "input predicate input(x: integer).",
   "double(Y) :- input(X), Y = X * 2.",
 ].join("\n");
 

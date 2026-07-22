@@ -8,7 +8,7 @@ The same `reach` predicate answers questions in every direction. A file
 runs one query; change it to ask each one:
 
 ```datamog
-extensional line(from: string, to: string).
+input predicate line(from: string, to: string).
 reach(X, Y) :- line(X, Y).
 reach(X, Y) :- line(X, Z), reach(Z, Y).
 

@@ -8,7 +8,7 @@ Langium-based parser for the Datamog Datalog dialect. The grammar is defined in 
 import { parse } from "datamog-parser";
 
 const program = parse(`
-  extensional parent(name: string, child: string).
+  input predicate parent(name: string, child: string).
   ancestor(X, Y) :- parent(X, Y).
   ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
   ?- ancestor("alice", X).

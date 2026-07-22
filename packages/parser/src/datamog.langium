@@ -16,8 +16,12 @@ entry Program:
 Statement:
     ExtDecl | Rule | Query;
 
+// An input predicate: a parameter supplied from outside the rules (a data
+// file at the CLI, or a wired module output on import). The AST node keeps
+// its historical `ExtDecl` name; only the surface keyword changed from
+// `extensional` to `input predicate`.
 ExtDecl:
-    'extensional' predicate=Identifier '(' columns+=ColumnDecl (',' columns+=ColumnDecl)* ')' '.';
+    'input' 'predicate' predicate=Identifier '(' columns+=ColumnDecl (',' columns+=ColumnDecl)* ')' '.';
 
 ColumnDecl:
     name=Identifier ':' type=PrimitiveType (nullable?='?')?;
@@ -263,8 +267,14 @@ FunctionCall:
 // longer enforces it — `Foo(X)` is a predicate, `foo` is a variable.
 // FunctionCall vs Variable in Primary, and Literal vs Filter in body
 // position, are disambiguated by whether `(` follows the identifier.
+// `input`, `output`, and `predicate` are contextual keywords: they lead the
+// `input predicate` / `output predicate` declaration forms, but are otherwise
+// ordinary identifiers, so a program can still name a predicate/column/variable
+// `input`, `output`, or `predicate` (they are common words). The parser tells
+// the declaration forms apart by the two-token lookahead `input`/`output`
+// followed by `predicate`.
 Identifier returns string:
-    IDENT | QUOTED_IDENT;
+    IDENT | QUOTED_IDENT | 'input' | 'output' | 'predicate';
 
 // JSON-style construction. Both literals produce a `value` (an array
 // or object). Element expressions of any primitive type are auto-lifted

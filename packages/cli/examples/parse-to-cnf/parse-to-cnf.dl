@@ -26,7 +26,7 @@
 # pimp < por < pand < pnot < patom. The input string lives in input.csv and
 # is De Morgan's law  ~(p&q)>(~p|~q), a tautology -- expect a "yes" verdict.
 
-extensional input(s: string).
+input predicate input(s: string).
 
 # === Parser (new in this step) ===========================================
 

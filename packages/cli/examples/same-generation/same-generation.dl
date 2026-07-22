@@ -8,9 +8,9 @@
 # The "up" relation goes from child to parent; "down" from parent to child.
 # Two trees are connected at their roots via "over".
 
-extensional over(x: string, y: string).
-extensional up(child: string, parent: string).
-extensional down(parent: string, child: string).
+input predicate over(x: string, y: string).
+input predicate up(child: string, parent: string).
+input predicate down(parent: string, child: string).
 
 sg(X, Y) :- over(X, Y).
 sg(X, Y) :- up(X, X1), sg(X1, Y1), down(Y1, Y).

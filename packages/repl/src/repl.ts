@@ -30,7 +30,7 @@ const HELP_TEXT = [
   "  :quit | :q             exit",
   "",
   "Datamog input:",
-  "  Queries (?- ...) and `extensional` declarations run as soon as you press",
+  "  Queries (?- ...) and `input predicate` declarations run as soon as you press",
   "  Enter on a complete line. Rules accumulate across lines and commit on a",
   "  blank line — put every rule for the same predicate in one chunk (predicates",
   "  are locked once committed; use :reset to start over).",

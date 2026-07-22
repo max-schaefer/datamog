@@ -10,7 +10,7 @@ several can sit on one page.
 ## Authoring
 
 Write normal Markdown. Any fenced ```` ```datamog ```` block becomes an
-interactive embed. A block that declares `extensional` predicates gets
+interactive embed. A block that declares `input predicate` predicates gets
 pre-baked data from sibling files in `data/`, matched by predicate name (the
 same file-per-predicate convention the CLI examples use):
 
@@ -20,7 +20,7 @@ same file-per-predicate convention the CLI examples use):
 A block with no matching data file just runs with whatever rows the reader
 types. In the rendered page the reader clicks `▸ run` next to a query to
 evaluate it (the result panel appears below the line and collapses), and clicks
-the data chip next to an `extensional` declaration to view, edit, or reset its
+the data chip next to an `input predicate` declaration to view, edit, or reset its
 rows.
 
 ## Rendering

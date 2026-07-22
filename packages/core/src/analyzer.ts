@@ -231,7 +231,7 @@ function analyzeImpl(program: Program, file: string | undefined): AnalyzedProgra
         if (extDecls.has(stmt.predicate)) {
           const pos = nodePos(stmt);
           throw new AnalyzerError(
-            `Predicate '${stmt.predicate}' is declared as extensional multiple times`,
+            `Predicate '${stmt.predicate}' is declared as an input predicate multiple times`,
             ...(pos ?? []),
           );
         }
@@ -348,7 +348,7 @@ function analyzeImpl(program: Program, file: string | undefined): AnalyzedProgra
     if (extDecls.has(predicate)) {
       const pos = nodePos(rules.get(predicate)![0]!.head);
       throw new AnalyzerError(
-        `Predicate '${predicate}' is declared as both extensional and intensional`,
+        `Predicate '${predicate}' is both an input predicate and defined by rules`,
         ...(pos ?? []),
       );
     }

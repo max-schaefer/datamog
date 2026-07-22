@@ -161,7 +161,7 @@ describe("CLI arg validation", () => {
     const dl = "/tmp/datamog-cli-args.dl";
     await Bun.write(a, "x\n1\n");
     await Bun.write(b, "x\n2\n");
-    await Bun.write(dl, "extensional p(x: integer).\n?- p(X).\n");
+    await Bun.write(dl, "input predicate p(x: integer).\n?- p(X).\n");
     try {
       const result = await runCli([dl, "--p", a, "--p", b]);
       expect(result.exitCode).toBe(1);
@@ -184,7 +184,7 @@ describe("CLI arg validation", () => {
     const csv = "/tmp/datamog-cli-unknown-ext.csv";
     const dl = "/tmp/datamog-cli-unknown-ext.dl";
     await Bun.write(csv, "x\n1\n");
-    await Bun.write(dl, "extensional p(x: integer).\n?- p(X).\n");
+    await Bun.write(dl, "input predicate p(x: integer).\n?- p(X).\n");
     try {
       const result = await runCli([dl, "--typo", csv]);
       expect(result.exitCode).toBe(1);
@@ -201,7 +201,7 @@ describe("CLI arg validation", () => {
     const dir = await mkdtemp(join(tmpdir(), "datamog-cli-json-"));
     const dl = join(dir, "program.dl");
     const json = join(dir, "config.json");
-    await Bun.write(dl, "extensional cfg(blob: value).\n?- cfg(X).\n");
+    await Bun.write(dl, "input predicate cfg(blob: value).\n?- cfg(X).\n");
     await Bun.write(json, '{"b":2,"a":1}');
     try {
       const result = await runCli(["--output-format", "jsonl", dl, "--cfg", json]);
@@ -218,7 +218,7 @@ describe("CLI arg validation", () => {
     const dir = await mkdtemp(join(tmpdir(), "datamog-cli-input-"));
     const dl = join(dir, "program.dl");
     const csv = join(dir, "src.csv");
-    await Bun.write(dl, "extensional p(x: integer).\n?- p(X).\n");
+    await Bun.write(dl, "input predicate p(x: integer).\n?- p(X).\n");
     await Bun.write(csv, "x\n7\n");
     try {
       const result = await runCli(["--output-format", "jsonl", "--input", `p=${csv}`, dl]);
@@ -236,7 +236,7 @@ describe("CLI arg validation", () => {
     await Bun.write(csv, "src,dst\na,b\nb,c\n");
     await Bun.write(
       dl,
-      "extensional road_network(src: string, dst: string).\n" +
+      "input predicate road_network(src: string, dst: string).\n" +
         "output predicate ends(D) :- road_network(_, D).\n" +
         "?- road_network(S, D).\n",
     );
@@ -301,7 +301,7 @@ describe("CLI arg validation", () => {
     }
   });
 
-  test("Regression: explicit extensional loader supports HTTP URL sources", async () => {
+  test("Regression: explicit input predicate loader supports HTTP URL sources", async () => {
     // An HTTP(S) explicit source (`--input p=https://host/data.csv`) is
     // fetched as text first and then routed through the same format-specific
     // parsers as a local explicit file, rather than being resolved as a
@@ -317,7 +317,7 @@ describe("CLI arg validation", () => {
       const format = explicitSourceFormat(source);
       expect(format).toBe(".csv");
       const loader = new ExplicitSourceLoader("parent", source, format!, true);
-      const decl = getExtDecl("extensional parent(name: string, child: string).");
+      const decl = getExtDecl("input predicate parent(name: string, child: string).");
       const { backend, inserts } = makeBackend();
       const result = await loader.load(decl, backend);
 

@@ -41,7 +41,7 @@ The villager data is stored in a CSV file (`person.csv`):
 Declare this as an extensional predicate:
 
 ```prolog
-extensional person(name: string, age: integer, hair: string, height: integer, location: string).
+input predicate person(name: string, age: integer, hair: string, height: integer, location: string).
 ```
 
 ## The clues
@@ -112,7 +112,7 @@ suspect(Name) :-
 <summary>Solution</summary>
 
 ```prolog
-extensional person(name: string, age: integer, hair: string, height: integer, location: string).
+input predicate person(name: string, age: integer, hair: string, height: integer, location: string).
 
 dark_hair("black").
 dark_hair("brown").
@@ -199,7 +199,7 @@ into scope.
 <summary>Solution</summary>
 
 ```prolog
-extensional person(name: string, age: integer, hair: string, height: integer, location: string).
+input predicate person(name: string, age: integer, hair: string, height: integer, location: string).
 
 dark_hair("black").
 dark_hair("brown").

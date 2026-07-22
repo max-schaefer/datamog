@@ -6,7 +6,7 @@
 # fixed-point: it keeps marking variables safe as long as progress
 # is being made.
 
-extensional seed(x: integer).
+input predicate seed(x: integer).
 
 # TODO: write a rule `quad(A, B, C, D) :- ...` where each of
 # A, B, C, D is bound in turn by an expression involving a

@@ -8,7 +8,7 @@ tight: true
 Make `reach` **symmetric**: if you can get from one station to another, you can get back again.
 
 ```datamog
-extensional line(from: string, to: string).
+input predicate line(from: string, to: string).
 
 # as before:
 reach(X, Y) :- line(X, Y).

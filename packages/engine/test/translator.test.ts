@@ -22,7 +22,7 @@ function norm(sql: string): string {
 
 describe("translator", () => {
   test("generates CREATE TABLE for ext declaration", () => {
-    const result = translateSource("extensional parent(name: string, child: string).");
+    const result = translateSource("input predicate parent(name: string, child: string).");
     expect(result.createTables).toHaveLength(1);
     expect(norm(result.createTables[0]!)).toBe(
       'CREATE TABLE IF NOT EXISTS "parent" ( "name" TEXT NOT NULL, "child" TEXT NOT NULL );',
@@ -31,7 +31,7 @@ describe("translator", () => {
 
   test("quotes escaped predicate and column identifiers in SQL", () => {
     const result = translateSource(
-      'extensional `http-event`(`content-type`: string, `quote"col`: integer).',
+      'input predicate `http-event`(`content-type`: string, `quote"col`: integer).',
     );
     expect(norm(result.createTables[0]!)).toBe(
       'CREATE TABLE IF NOT EXISTS "http-event" ( "content-type" TEXT NOT NULL, "quote""col" INTEGER NOT NULL );',
@@ -39,7 +39,9 @@ describe("translator", () => {
   });
 
   test("maps SQL types correctly", () => {
-    const result = translateSource("extensional t(a: string, b: integer, c: float, d: boolean).");
+    const result = translateSource(
+      "input predicate t(a: string, b: integer, c: float, d: boolean).",
+    );
     const sql = norm(result.createTables[0]!);
     expect(sql).toContain('"a" TEXT NOT NULL');
     expect(sql).toContain('"b" INTEGER NOT NULL');
@@ -50,8 +52,8 @@ describe("translator", () => {
     expect(sql).toContain('"d" BOOLEAN NOT NULL');
   });
 
-  test("omits NOT NULL for nullable extensional columns", () => {
-    const result = translateSource("extensional t(a: string, b: integer?, c: value?).");
+  test("omits NOT NULL for nullable input predicate columns", () => {
+    const result = translateSource("input predicate t(a: string, b: integer?, c: value?).");
     const sql = norm(result.createTables[0]!);
     expect(sql).toContain('"a" TEXT NOT NULL');
     expect(sql).toContain('"b" INTEGER,');
@@ -62,7 +64,7 @@ describe("translator", () => {
 
   test("emits TRUE/FALSE for boolean literals", () => {
     const result = translateSource(`
-      extensional flag(name: string, on: boolean).
+      input predicate flag(name: string, on: boolean).
       live(N) :- flag(N, true).
       dead(N) :- flag(N, false).
     `);
@@ -74,7 +76,7 @@ describe("translator", () => {
 
   test("generates CREATE VIEW for non-recursive rule", () => {
     const result = translateSource(`
-      extensional parent(name: string, child: string).
+      input predicate parent(name: string, child: string).
       grandparent(X, Y) :- parent(X, Z), parent(Z, Y).
     `);
     expect(result.createViews).toHaveLength(1);
@@ -86,7 +88,7 @@ describe("translator", () => {
 
   test("generates join conditions from shared variables", () => {
     const result = translateSource(`
-      extensional parent(name: string, child: string).
+      input predicate parent(name: string, child: string).
       grandparent(X, Y) :- parent(X, Z), parent(Z, Y).
     `);
     const sql = norm(result.createViews[0]!);
@@ -97,7 +99,7 @@ describe("translator", () => {
 
   test("generates WHERE for constants in rule body", () => {
     const result = translateSource(`
-      extensional parent(name: string, child: string).
+      input predicate parent(name: string, child: string).
       alice_child(X) :- parent("alice", X).
     `);
     const sql = norm(result.createViews[0]!);
@@ -106,7 +108,7 @@ describe("translator", () => {
 
   test("generates UNION for multiple rules with same head", () => {
     const result = translateSource(`
-      extensional parent(name: string, child: string).
+      input predicate parent(name: string, child: string).
       related(X, Y) :- parent(X, Y).
       related(X, Y) :- parent(Y, X).
     `);
@@ -116,7 +118,7 @@ describe("translator", () => {
 
   test("generates CREATE RECURSIVE VIEW for recursive rules", () => {
     const result = translateSource(`
-      extensional parent(name: string, child: string).
+      input predicate parent(name: string, child: string).
       ancestor(X, Y) :- parent(X, Y).
       ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
     `);
@@ -128,7 +130,7 @@ describe("translator", () => {
 
   test("generates SELECT for query with constants", () => {
     const result = translateSource(`
-      extensional parent(name: string, child: string).
+      input predicate parent(name: string, child: string).
       ancestor(X, Y) :- parent(X, Y).
       ?- ancestor("alice", X).
     `);
@@ -140,7 +142,7 @@ describe("translator", () => {
 
   test("generates SELECT for query with all variables", () => {
     const result = translateSource(`
-      extensional parent(name: string, child: string).
+      input predicate parent(name: string, child: string).
       ancestor(X, Y) :- parent(X, Y).
       ?- ancestor(X, Y).
     `);
@@ -160,7 +162,7 @@ describe("translator", () => {
 
   test("handles constants in rule head", () => {
     const result = translateSource(`
-      extensional items(name: string).
+      input predicate items(name: string).
       tagged(X, "yes") :- items(X).
     `);
     const sql = norm(result.createViews[0]!);
@@ -170,7 +172,7 @@ describe("translator", () => {
 
   test("don't-care variables do not create join conditions", () => {
     const result = translateSource(`
-      extensional parent(name: string, child: string).
+      input predicate parent(name: string, child: string).
       has_child(X) :- parent(X, _).
     `);
     const sql = norm(result.createViews[0]!);
@@ -181,7 +183,7 @@ describe("translator", () => {
 
   test("views are ordered by dependencies", () => {
     const result = translateSource(`
-      extensional edge(src: string, dst: string).
+      input predicate edge(src: string, dst: string).
       path(X, Y) :- edge(X, Y).
       path(X, Y) :- edge(X, Z), path(Z, Y).
       reachable(X) :- path("start", X).
@@ -195,7 +197,7 @@ describe("translator", () => {
 
   test("number constants in queries", () => {
     const result = translateSource(`
-      extensional scores(name: string, score: integer).
+      input predicate scores(name: string, score: integer).
       high(X) :- scores(X, 100).
       ?- high(X).
     `);
@@ -205,7 +207,7 @@ describe("translator", () => {
 
   test("generates SQL for arithmetic expression in head", () => {
     const result = translateSource(`
-      extensional scores(name: string, score: integer).
+      input predicate scores(name: string, score: integer).
       doubled(X, Y) :- scores(X, S), Y = S * 2.
     `);
     const sql = norm(result.createViews[0]!);
@@ -215,8 +217,8 @@ describe("translator", () => {
 
   test("generates SQL for expression in atom argument", () => {
     const result = translateSource(`
-      extensional nums(val: integer).
-      extensional offsets(delta: integer).
+      input predicate nums(val: integer).
+      input predicate offsets(delta: integer).
       shifted(X) :- nums(X), offsets(X + 1).
     `);
     const sql = norm(result.createViews[0]!);
@@ -225,7 +227,7 @@ describe("translator", () => {
 
   test("translates && to SQL AND", () => {
     const result = translateSource(`
-      extensional t(a: boolean, b: boolean).
+      input predicate t(a: boolean, b: boolean).
       r(C) :- t(A, B), C = A && B.
     `);
     const sql = norm(result.createViews[0]!);
@@ -234,7 +236,7 @@ describe("translator", () => {
 
   test("translates || to SQL OR", () => {
     const result = translateSource(`
-      extensional t(a: boolean, b: boolean).
+      input predicate t(a: boolean, b: boolean).
       r(C) :- t(A, B), C = A || B.
     `);
     const sql = norm(result.createViews[0]!);
@@ -243,7 +245,7 @@ describe("translator", () => {
 
   test("translates comparison expression to SQL", () => {
     const result = translateSource(`
-      extensional t(a: integer).
+      input predicate t(a: integer).
       r(C) :- t(X), C = X > 0.
     `);
     const sql = norm(result.createViews[0]!);
@@ -252,7 +254,7 @@ describe("translator", () => {
 
   test("translates == to SQL =, != to SQL <>", () => {
     const result = translateSource(`
-      extensional t(a: integer).
+      input predicate t(a: integer).
       r1(C) :- t(X), C = X == 0.
       r2(C) :- t(X), C = X != 0.
     `);
@@ -264,7 +266,7 @@ describe("translator", () => {
 
   test("compound filter translates with AND", () => {
     const result = translateSource(`
-      extensional t(a: integer, b: integer).
+      input predicate t(a: integer, b: integer).
       r(X, Y) :- t(X, Y), (X > 0) && (Y < 10).
     `);
     const sql = norm(result.createViews[0]!);
@@ -275,7 +277,7 @@ describe("translator", () => {
 
   test("translates ! to SQL NOT", () => {
     const result = translateSource(`
-      extensional t(a: boolean).
+      input predicate t(a: boolean).
       r(C) :- t(A), C = !A.
     `);
     const sql = norm(result.createViews[0]!);
@@ -284,7 +286,7 @@ describe("translator", () => {
 
   test("generates SQL for comparison", () => {
     const result = translateSource(`
-      extensional scores(name: string, score: integer).
+      input predicate scores(name: string, score: integer).
       high(X) :- scores(X, S), S > 80.
     `);
     const sql = norm(result.createViews[0]!);
@@ -293,14 +295,14 @@ describe("translator", () => {
 
   test("string ordering comparisons use portable collation", () => {
     const pg = translateSource(`
-      extensional words(a: string, b: string).
+      input predicate words(a: string, b: string).
       before(A, B) :- words(A, B), A < B.
     `);
     expect(norm(pg.createViews[0]!)).toContain(`(__b0."a" COLLATE "C") < (__b0."b" COLLATE "C")`);
 
     const sq = translateSource(
       `
-        extensional words(a: string, b: string).
+        input predicate words(a: string, b: string).
         before(A, B) :- words(A, B), A < B.
       `,
       sqlite,
@@ -312,7 +314,7 @@ describe("translator", () => {
 
   test("generates SQL for != comparison", () => {
     const result = translateSource(`
-      extensional pairs(a: integer, b: integer).
+      input predicate pairs(a: integer, b: integer).
       diff(X, Y) :- pairs(X, Y), X != Y.
     `);
     const sql = norm(result.createViews[0]!);
@@ -325,7 +327,7 @@ describe("translator", () => {
     // logical-equality emitter (Postgres uses `IS NOT DISTINCT FROM`,
     // SQLite uses `IS`).
     const result = translateSource(`
-      extensional pairs(a: integer, b: integer).
+      input predicate pairs(a: integer, b: integer).
       match(X, Y) :- pairs(X, Y), X + 1 = Y.
     `);
     const sql = norm(result.createViews[0]!);
@@ -334,7 +336,7 @@ describe("translator", () => {
 
   test("generates SQL for equality binding used in head", () => {
     const result = translateSource(`
-      extensional base(x: integer).
+      input predicate base(x: integer).
       computed(X, Y) :- base(X), Y = X + 10.
     `);
     const sql = norm(result.createViews[0]!);
@@ -344,7 +346,7 @@ describe("translator", () => {
 
   test("uses || for string concatenation with type info", () => {
     const result = translateTyped(`
-      extensional words(w: string).
+      input predicate words(w: string).
       prefixed(R) :- words(W), R = "hello_" + W.
     `);
     const sql = norm(result.createViews[0]!);
@@ -354,7 +356,7 @@ describe("translator", () => {
 
   test("uses + for integer arithmetic with type info", () => {
     const result = translateTyped(`
-      extensional nums(x: integer).
+      input predicate nums(x: integer).
       inc(X, Y) :- nums(X), Y = X + 1.
     `);
     const sql = norm(result.createViews[0]!);
@@ -364,7 +366,7 @@ describe("translator", () => {
 
   test("generates LENGTH for length()", () => {
     const result = translateSource(`
-      extensional words(w: string).
+      input predicate words(w: string).
       lengths(W, N) :- words(W), N = length(W).
     `);
     const sql = norm(result.createViews[0]!);
@@ -373,7 +375,7 @@ describe("translator", () => {
 
   test("upper/lower emit portable ASCII-only case folding", () => {
     const result = translateSource(`
-      extensional words(w: string).
+      input predicate words(w: string).
       folded(U, L) :- words(W), U = upper(W), L = lower(W).
     `);
     const sql = norm(result.createViews[0]!);
@@ -385,7 +387,7 @@ describe("translator", () => {
 
   test("generates SUBSTR for subscript", () => {
     const result = translateSource(`
-      extensional words(w: string).
+      input predicate words(w: string).
       first_char(W, C) :- words(W), C = W[0].
     `);
     const sql = norm(result.createViews[0]!);
@@ -395,7 +397,7 @@ describe("translator", () => {
 
   test("generates SUBSTR for slice", () => {
     const result = translateSource(`
-      extensional words(w: string).
+      input predicate words(w: string).
       mid(W, S) :- words(W), S = W[1:3].
     `);
     const sql = norm(result.createViews[0]!);
@@ -404,7 +406,7 @@ describe("translator", () => {
 
   test("generates SUBSTR with one argument for open-ended slice W[s:]", () => {
     const result = translateSource(`
-      extensional words(w: string).
+      input predicate words(w: string).
       tail(W, S) :- words(W), S = W[2:].
     `);
     const sql = norm(result.createViews[0]!);
@@ -414,7 +416,7 @@ describe("translator", () => {
 
   test("generates SUBSTR with length for open-start slice W[:e]", () => {
     const result = translateSource(`
-      extensional words(w: string).
+      input predicate words(w: string).
       head(W, S) :- words(W), S = W[:3].
     `);
     const sql = norm(result.createViews[0]!);
@@ -424,7 +426,7 @@ describe("translator", () => {
 
   test("omits SUBSTR entirely for full slice W[:]", () => {
     const result = translateSource(`
-      extensional words(w: string).
+      input predicate words(w: string).
       copy(W, S) :- words(W), S = W[:].
     `);
     const sql = norm(result.createViews[0]!);
@@ -437,7 +439,7 @@ describe("translator", () => {
     // must appear in GROUP BY. Exercises the non-Variable branch of the
     // aggregate-rule head loop.
     const result = translateSource(`
-      extensional t(a: integer, b: integer).
+      input predicate t(a: integer, b: integer).
       shifted(X + 1, count(*)) :- t(X, _).
     `);
     const sql = norm(result.createViews[0]!);
@@ -447,8 +449,8 @@ describe("translator", () => {
 
   test("generates NOT EXISTS for negated atoms", () => {
     const result = translateSource(`
-      extensional node(name: string).
-      extensional edge(src: string, dst: string).
+      input predicate node(name: string).
+      input predicate edge(src: string, dst: string).
       reachable(X) :- edge("start", X).
       unreachable(X) :- node(X), not reachable(X).
     `);
@@ -467,7 +469,7 @@ describe("translator", () => {
     // for `odd` (whose rules are purely recursive) needs `columnTypes` to
     // emit the `CAST(NULL AS INTEGER)` projection.
     const result = translateTyped(`
-      extensional base(x: integer).
+      input predicate base(x: integer).
       even(X) :- base(X).
       even(X) :- odd(X).
       odd(X) :- even(X).
@@ -497,7 +499,7 @@ describe("translator", () => {
 
   test("generates BETWEEN for filter range (non-variable expr)", () => {
     const result = translateTyped(`
-      extensional vals(x: integer).
+      input predicate vals(x: integer).
       filtered(X) :- vals(X), X + 1 in [1 .. 100].
     `);
     const sql = norm(result.createViews[0]!);
@@ -506,7 +508,7 @@ describe("translator", () => {
 
   test("generates BETWEEN for variable range with non-integer bounds", () => {
     const result = translateTyped(`
-      extensional base(x: float).
+      input predicate base(x: float).
       filtered(X) :- base(X), X in [0.5 .. 9.5].
     `);
     const sql = norm(result.createViews[0]!);
@@ -516,7 +518,7 @@ describe("translator", () => {
 
   test("generates generate_series with expression bounds", () => {
     const result = translateTyped(`
-      extensional base(x: integer, y: integer).
+      input predicate base(x: integer, y: integer).
       inrange(X, Z) :- base(X, Y), Z in [Y .. Y + 10].
     `);
     const sql = norm(result.createViews[0]!);
@@ -526,7 +528,7 @@ describe("translator", () => {
 
   test("generates GROUP BY for aggregate rule", () => {
     const result = translateSource(`
-      extensional parent(name: string, child: string).
+      input predicate parent(name: string, child: string).
       num_children(P, count(C)) :- parent(P, C).
     `);
     const sql = norm(result.createViews[0]!);
@@ -537,7 +539,7 @@ describe("translator", () => {
 
   test("generates COUNT(*) for count(*)", () => {
     const result = translateSource(`
-      extensional parent(name: string, child: string).
+      input predicate parent(name: string, child: string).
       total(count(*)) :- parent(_, _).
     `);
     const sql = norm(result.createViews[0]!);
@@ -547,7 +549,7 @@ describe("translator", () => {
 
   test("treats count(_0) as a normal user variable aggregate", () => {
     const result = translateSource(`
-      extensional parent(name: string, child: string).
+      input predicate parent(name: string, child: string).
       total(count(_0)) :- parent(_0, _).
     `);
     const sql = norm(result.createViews[0]!);
@@ -557,7 +559,7 @@ describe("translator", () => {
 
   test("generates SUM aggregate", () => {
     const result = translateSource(`
-      extensional scores(name: string, score: integer).
+      input predicate scores(name: string, score: integer).
       totals(X, sum(S)) :- scores(X, S).
     `);
     const sql = norm(result.createViews[0]!);
@@ -567,7 +569,7 @@ describe("translator", () => {
 
   test("generates aggregate with expression argument", () => {
     const result = translateSource(`
-      extensional items(part: string, qty: integer, cost: integer).
+      input predicate items(part: string, qty: integer, cost: integer).
       total_cost(P, sum(Q * C)) :- items(P, Q, C).
     `);
     const sql = norm(result.createViews[0]!);
@@ -585,7 +587,7 @@ describe("translator", () => {
       ["max", "MAX"],
     ] as const) {
       const result = translateSource(`
-        extensional t(a: string, b: integer).
+        input predicate t(a: string, b: integer).
         r(X, ${func}(Y)) :- t(X, Y).
       `);
       const sql = norm(result.createViews[0]!);
@@ -595,7 +597,7 @@ describe("translator", () => {
 
   test("string aggregates order with portable collation", () => {
     const result = translateSource(`
-      extensional words(w: string).
+      input predicate words(w: string).
       r(min(W), max(W), concat(W), list(W)) :- words(W).
     `);
     const sql = norm(result.createViews[0]!);
@@ -606,8 +608,8 @@ describe("translator", () => {
 
   test("generates UNION of aggregate rules", () => {
     const result = translateSource(`
-      extensional t1(a: string, b: integer).
-      extensional t2(a: string, b: integer).
+      input predicate t1(a: string, b: integer).
+      input predicate t2(a: string, b: integer).
       totals(X, sum(Y)) :- t1(X, Y).
       totals(X, sum(Y)) :- t2(X, Y).
     `);
@@ -618,7 +620,7 @@ describe("translator", () => {
 
   test("generates STRING_AGG for concat (postgres)", () => {
     const result = translateSource(`
-      extensional items(group_name: string, item: string).
+      input predicate items(group_name: string, item: string).
       concat_items(G, concat(I)) :- items(G, I).
     `);
     const sql = norm(result.createViews[0]!);
@@ -640,7 +642,7 @@ describe("translator", () => {
     // value-typed concat args through `jsonStringify` (the same
     // regex-strip used by `to_json`) before they reach the aggregate.
     const result = translateSource(`
-      extensional data(j: value).
+      input predicate data(j: value).
       result(concat(J)) :- data(J).
     `);
     const sql = norm(result.createViews[0]!);
@@ -656,7 +658,7 @@ describe("translator", () => {
 
   test("generates JSONB_AGG for list with `value` arg (postgres)", () => {
     const result = translateSource(`
-      extensional events(group_name: string, payload: value).
+      input predicate events(group_name: string, payload: value).
       collected(G, list(P)) :- events(G, P).
     `);
     const sql = norm(result.createViews[0]!);
@@ -676,7 +678,7 @@ describe("translator", () => {
     // numerically — `::TEXT` here would lex-sort `[10, 2]` as
     // `[10, 2]`, diverging from the native JS `<` comparator.
     const result = translateSource(`
-      extensional t(g: string, n: integer).
+      input predicate t(g: string, n: integer).
       collected(G, list(N)) :- t(G, N).
     `);
     const sql = norm(result.createViews[0]!);
@@ -688,7 +690,7 @@ describe("translator", () => {
 
   test("Regression: list with float arg guards non-finite values before JSON lift", () => {
     const result = translateSource(`
-      extensional data(x: float).
+      input predicate data(x: float).
       collected(list(X)) :- data(X).
     `);
     const sql = norm(result.createViews[0]!);
@@ -701,7 +703,7 @@ describe("translator", () => {
     // `t(5)` over a value column emits `j = to_jsonb(5)` instead of
     // `j = 5` (which would error on Postgres: jsonb = integer).
     const result = translateSource(`
-      extensional t(j: value).
+      input predicate t(j: value).
       r("match") :- t(5).
     `);
     const sql = norm(result.createViews[0]!);
@@ -711,7 +713,7 @@ describe("translator", () => {
 
   test("primitive query args lift via to_jsonb when column is `value` (postgres)", () => {
     const result = translateSource(`
-      extensional t(j: value).
+      input predicate t(j: value).
       ?- t(5).
     `);
     const sql = norm(result.queries[0]!);
@@ -720,8 +722,8 @@ describe("translator", () => {
 
   test("primitive shared variables lift when joined with `value` columns (postgres)", () => {
     const result = translateSource(`
-      extensional i(x: integer).
-      extensional j(x: value).
+      input predicate i(x: integer).
+      input predicate j(x: value).
       r(X) :- i(X), j(X).
     `);
     const sql = norm(result.createViews[0]!);
@@ -741,7 +743,7 @@ describe("translator", () => {
 
   test("primitive iteration sources lift before json iteration (postgres)", () => {
     const result = translateSource(`
-      extensional p(x: integer).
+      input predicate p(x: integer).
       r(K, V) :- p(X), object_entry(X, K, V).
     `);
     const sql = norm(result.createViews[0]!);
@@ -751,7 +753,7 @@ describe("translator", () => {
 
   test("comparison J == 5 (value vs int) lifts the primitive side (postgres)", () => {
     const result = translateSource(`
-      extensional t(j: value).
+      input predicate t(j: value).
       r(J) :- t(J), J == 5.
     `);
     const sql = norm(result.createViews[0]!);
@@ -763,7 +765,7 @@ describe("translator", () => {
     // becomes a filter equality; the dialect's null-aware operator
     // sees a lifted RHS so jsonb_col IS NOT DISTINCT FROM to_jsonb(5).
     const result = translateSource(`
-      extensional t(j: value).
+      input predicate t(j: value).
       r(J) :- t(J), J = 5.
     `);
     const sql = norm(result.createViews[0]!);
@@ -788,7 +790,7 @@ describe("translator", () => {
   test("rejects non-linear recursion", () => {
     expect(() =>
       translateSource(`
-      extensional edge(src: string, dst: string).
+      input predicate edge(src: string, dst: string).
       tc(X, Y) :- edge(X, Y).
       tc(X, Z) :- tc(X, Y), tc(Y, Z).
     `),
@@ -799,7 +801,7 @@ describe("translator", () => {
     // Typed path needed: `odd` has only recursive rules so the dialect
     // synthesises an empty anchor that requires `columnTypes`.
     const result = translateTyped(`
-      extensional base(x: integer).
+      input predicate base(x: integer).
       even(X) :- base(X).
       even(X) :- odd(X).
       odd(X) :- even(X).
@@ -814,7 +816,7 @@ describe("translator", () => {
 
   test("repeated variables in query atom produce a join condition", () => {
     const result = translateSource(`
-      extensional p(a: string, b: string).
+      input predicate p(a: string, b: string).
       ?- p(X, X).
     `);
     const sql = norm(result.queries[0]!);
@@ -830,7 +832,7 @@ describe("translator", () => {
 
   test("repeated variables in query atom on IDB predicate", () => {
     const result = translateSource(`
-      extensional e(a: string, b: string).
+      input predicate e(a: string, b: string).
       q(A, B) :- e(A, B).
       ?- q(X, X).
     `);
@@ -841,7 +843,7 @@ describe("translator", () => {
 
   test("integer literal head arg is omitted from GROUP BY", () => {
     const result = translateSource(`
-      extensional t(x: integer).
+      input predicate t(x: integer).
       r(2, count(X)) :- t(X).
     `);
     const sql = norm(result.createViews[0]!);
@@ -855,7 +857,7 @@ describe("translator", () => {
 
   test("string literal head arg is omitted from GROUP BY", () => {
     const result = translateSource(`
-      extensional t(x: integer).
+      input predicate t(x: integer).
       r("total", count(X)) :- t(X).
     `);
     const sql = norm(result.createViews[0]!);
@@ -865,7 +867,7 @@ describe("translator", () => {
 
   test("equality can forward-reference a later equality", () => {
     const result = translateSource(`
-      extensional t(x: integer).
+      input predicate t(x: integer).
       r(Z) :- t(X), Z = Y * 2, Y = X + 1.
     `);
     const sql = norm(result.createViews[0]!);
@@ -874,7 +876,7 @@ describe("translator", () => {
 
   test("equality can bind a bare variable on the right", () => {
     const result = translateSource(`
-      extensional t(x: integer).
+      input predicate t(x: integer).
       renamed(X) :- t(Y), Y = X.
       incremented(Y) :- t(X), X + 1 = Y.
     `);
@@ -898,7 +900,7 @@ describe("translator", () => {
 
   test("range bound referencing an equality-bound integer variable binds the range", () => {
     const result = translateTyped(`
-      extensional t(x: integer).
+      input predicate t(x: integer).
       r(Z) :- t(X), Y = X + 1, Z in [1 .. Y].
     `);
     const sql = norm(result.createViews[0]!);
@@ -918,7 +920,7 @@ describe("translator", () => {
 
   test("anonymous variables in query atoms are not projected", () => {
     const result = translateSource(`
-      extensional p(a: integer, b: integer).
+      input predicate p(a: integer, b: integer).
       ?- p(X, _).
     `);
     const sql = norm(result.queries[0]!);
@@ -933,7 +935,7 @@ describe("translator", () => {
 
   test("variable bound to integer literal is omitted from GROUP BY", () => {
     const result = translateSource(`
-      extensional t(x: integer).
+      input predicate t(x: integer).
       r(Y, count(X)) :- t(X), Y = 5.
     `);
     const sql = norm(result.createViews[0]!);
@@ -949,7 +951,7 @@ describe("translator", () => {
     // `(-5)`; the old `isLiteralBinding` regex didn't accept the parens
     // and let the binding slip into GROUP BY.
     const result = translateSource(`
-      extensional t(x: integer).
+      input predicate t(x: integer).
       r(Y, count(X)) :- t(X), Y = -5.
     `);
     const sql = norm(result.createViews[0]!);
@@ -959,7 +961,7 @@ describe("translator", () => {
 
   test("slice with start > end returns empty string", () => {
     const result = translateSource(`
-      extensional t(s: string).
+      input predicate t(s: string).
       r(R) :- t(S), R = S[4:2].
     `);
     const sql = norm(result.createViews[0]!);
@@ -970,7 +972,7 @@ describe("translator", () => {
 
   test("division wraps the divisor with NULLIF for cross-backend consistency", () => {
     const result = translateSource(`
-      extensional t(x: integer, y: integer).
+      input predicate t(x: integer, y: integer).
       r(X, Y, Z) :- t(X, Y), Z = X / Y.
     `);
     const sql = norm(result.createViews[0]!);
@@ -981,7 +983,7 @@ describe("translator", () => {
 
   test("modulo wraps the divisor with NULLIF", () => {
     const result = translateSource(`
-      extensional t(x: integer, y: integer).
+      input predicate t(x: integer, y: integer).
       r(X, Y, Z) :- t(X, Y), Z = X % Y.
     `);
     const sql = norm(result.createViews[0]!);
@@ -990,7 +992,7 @@ describe("translator", () => {
 
   test("float modulo emits a portable real remainder expression", () => {
     const result = translateSource(`
-      extensional t(x: float, y: float).
+      input predicate t(x: float, y: float).
       r(X, Y, Z) :- t(X, Y), Z = X % Y.
     `);
     const sql = norm(result.createViews[0]!);
@@ -1001,7 +1003,7 @@ describe("translator", () => {
 
   test("round/2 routes through dialect-specific portable emission", () => {
     const pg = translateSource(`
-      extensional t(x: float, n: integer).
+      input predicate t(x: float, n: integer).
       r(Z) :- t(X, N), Z = round(X, N).
     `);
     const pgSql = norm(pg.createViews[0]!);
@@ -1010,7 +1012,7 @@ describe("translator", () => {
 
     const sq = translateSource(
       `
-        extensional t(x: integer, n: integer).
+        input predicate t(x: integer, n: integer).
         r(Z) :- t(X, N), Z = round(X, N).
       `,
       sqlite,
@@ -1023,7 +1025,7 @@ describe("translator", () => {
 
   test("exp pre-checks overflow before calling EXP", () => {
     const result = translateSource(`
-      extensional t(x: float).
+      input predicate t(x: float).
       r(X, Z) :- t(X), Z = exp(X).
     `);
     const sql = norm(result.createViews[0]!);
@@ -1035,7 +1037,7 @@ describe("translator", () => {
 
   test("float arithmetic results are finite-guarded", () => {
     const result = translateSource(`
-      extensional t(x: float, y: float).
+      input predicate t(x: float, y: float).
       r(P, Q, R) :- t(X, Y), P = X * Y, Q = X / Y, R = X % Y.
     `);
     const sql = norm(result.createViews[0]!);
@@ -1047,7 +1049,7 @@ describe("translator", () => {
 
   test("sqrt of a negative argument returns NULL (not an error)", () => {
     const result = translateSource(`
-      extensional t(x: float).
+      input predicate t(x: float).
       r(X, Z) :- t(X), Z = sqrt(X).
     `);
     const sql = norm(result.createViews[0]!);
@@ -1058,7 +1060,7 @@ describe("translator", () => {
 
   test("ln of zero or negative returns NULL (not an error)", () => {
     const result = translateSource(`
-      extensional t(x: float).
+      input predicate t(x: float).
       r(X, Z) :- t(X), Z = ln(X).
     `);
     const sql = norm(result.createViews[0]!);
@@ -1068,7 +1070,7 @@ describe("translator", () => {
 
   test("** guards against negative-base/fractional-exp and zero-to-negative", () => {
     const result = translateSource(`
-      extensional t(x: float, y: float).
+      input predicate t(x: float, y: float).
       r(X, Y, Z) :- t(X, Y), Z = X ** Y.
     `);
     const sql = norm(result.createViews[0]!);
@@ -1089,7 +1091,7 @@ describe("translator", () => {
     // dispatches on receiver type and that both bound forms (start
     // present, end implicit) reach the dialect's array-subset emit.
     const pg = translateSource(`
-      extensional p(j: value).
+      input predicate p(j: value).
       r(S) :- p(J), S = J[1:3].
     `);
     expect(norm(pg.createViews[0]!)).toContain("jsonb_array_elements");
@@ -1098,7 +1100,7 @@ describe("translator", () => {
     expect(norm(pg.createViews[0]!)).toContain("jsonb_typeof");
 
     const sqlite = translateSource(
-      `extensional p(j: value).
+      `input predicate p(j: value).
        r(S) :- p(J), S = J[1:3].`,
       new SqliteSqlDialect(),
     );
@@ -1114,7 +1116,7 @@ describe("translator", () => {
     // and `end`, leaving the playground squiggly anchored at byte 0.
     // The offending rule is the one with multiple recursive body
     // atoms; pick its position so the user lands on the right rule.
-    const source = `extensional edge(src: string, dst: string).
+    const source = `input predicate edge(src: string, dst: string).
 path(X, Y) :- edge(X, Y).
 path(X, Y) :- path(X, Z), path(Z, Y).
 ?- path(X, Y).
@@ -1144,7 +1146,7 @@ path(X, Y) :- path(X, Z), path(Z, Y).
     // semantically-equivalent SQL on a NULL input, so the choice is
     // safe. Confirms that path doesn't crash and produces ABS(NULL).
     const result = translateSource(`
-      extensional p(x: integer).
+      input predicate p(x: integer).
       r(X) :- p(X), X = abs(null).
     `);
     const sql = norm(result.createViews[0]!);
@@ -1153,7 +1155,7 @@ path(X, Y) :- path(X, Z), path(Z, Y).
 
   test("to_string emits CAST AS TEXT for numeric inputs", () => {
     const result = translateSource(`
-      extensional t(x: integer).
+      input predicate t(x: integer).
       r(X, S) :- t(X), S = to_string(X).
     `);
     const sql = norm(result.createViews[0]!);
@@ -1165,7 +1167,7 @@ path(X, Y) :- path(X, Z), path(Z, Y).
     // SQLite has no native boolean type; CAST AS TEXT would render
     // 1/0. The CASE form keeps every backend producing identical string.
     const result = translateSource(`
-      extensional t(b: boolean).
+      input predicate t(b: boolean).
       r(B, S) :- t(B), S = to_string(B).
     `);
     const sql = norm(result.createViews[0]!);
@@ -1176,7 +1178,7 @@ path(X, Y) :- path(X, Z), path(Z, Y).
 
   test("to_integer goes through the dialect parse hook (Postgres regex form)", () => {
     const result = translateSource(`
-      extensional w(s: string).
+      input predicate w(s: string).
       r(S, N) :- w(S), N = to_integer(S).
     `);
     const sql = norm(result.createViews[0]!);
@@ -1188,7 +1190,7 @@ path(X, Y) :- path(X, Z), path(Z, Y).
 
   test("to_float on SQLite uses the GLOB validation chain", () => {
     const result = translateSource(
-      `extensional w(s: string).
+      `input predicate w(s: string).
        r(S, N) :- w(S), N = to_float(S).`,
       sqlite,
     );
@@ -1202,7 +1204,7 @@ path(X, Y) :- path(X, Z), path(Z, Y).
 
   test("to_float on Postgres gates the double-precision cast", () => {
     const result = translateSource(`
-      extensional w(s: string).
+      input predicate w(s: string).
       r(S, N) :- w(S), N = to_float(S).
     `);
     const sql = norm(result.createViews[0]!);
@@ -1213,7 +1215,7 @@ path(X, Y) :- path(X, Z), path(Z, Y).
 
   test("to_boolean strictly matches 'true' / 'false' literals", () => {
     const result = translateSource(`
-      extensional w(s: string).
+      input predicate w(s: string).
       r(S, B) :- w(S), B = to_boolean(S).
     `);
     const sql = norm(result.createViews[0]!);
@@ -1224,7 +1226,7 @@ path(X, Y) :- path(X, Z), path(Z, Y).
 
   test("parse_json on Postgres gates ::jsonb cast on pg_input_is_valid", () => {
     const result = translateSource(`
-      extensional raw(s: string).
+      input predicate raw(s: string).
       parsed(J) :- raw(S), J = parse_json(S).
     `);
     const sql = norm(result.createViews[0]!);
@@ -1241,7 +1243,7 @@ path(X, Y) :- path(X, Z), path(Z, Y).
     // runtime. Postgres jsonb accepts both `null` and huge numeric leaves
     // like `9e999`, so the dialect must explicitly filter the parsed tree.
     const result = translateSource(`
-      extensional raw(s: string).
+      input predicate raw(s: string).
       parsed(J) :- raw(S), J = parse_json(S).
     `);
     const sql = norm(result.createViews[0]!);
@@ -1274,7 +1276,7 @@ path(X, Y) :- path(X, Z), path(Z, Y).
 
   test("parse_json on SQLite gates json() on json_valid", () => {
     const result = translateSource(
-      `extensional raw(s: string).
+      `input predicate raw(s: string).
        parsed(J) :- raw(S), J = parse_json(S).`,
       sqlite,
     );
@@ -1285,7 +1287,7 @@ path(X, Y) :- path(X, Z), path(Z, Y).
 
   test("keys / values / to_json compile on Postgres", () => {
     const result = translateSource(`
-      extensional p(j: value).
+      input predicate p(j: value).
       hk(B) :- p(J), B = has_key(J, "id").
       ks(K) :- p(J), K = keys(J).
       vs(V) :- p(J), V = values(J).
@@ -1308,7 +1310,7 @@ path(X, Y) :- path(X, Z), path(Z, Y).
   test("keys / values / to_json compile on SQLite", () => {
     const result = translateSource(
       `
-      extensional p(j: value).
+      input predicate p(j: value).
       hk(B) :- p(J), B = has_key(J, "id").
       ks(K) :- p(J), K = keys(J).
       vs(V) :- p(J), V = values(J).
@@ -1344,7 +1346,7 @@ path(X, Y) :- path(X, Z), path(Z, Y).
 
   test("queries on EDB predicates use SELECT DISTINCT for set semantics", () => {
     const result = translateSource(`
-      extensional p(a: integer, b: integer).
+      input predicate p(a: integer, b: integer).
       ?- p(X, Y).
     `);
     const sql = norm(result.queries[0]!);
@@ -1356,7 +1358,7 @@ path(X, Y) :- path(X, Z), path(Z, Y).
     // source (no UNION to dedup through). Without DISTINCT, querying such a
     // view loses Datalog's set semantics.
     const result = translateSource(`
-      extensional t(x: integer).
+      input predicate t(x: integer).
       q(X) :- t(X).
       ?- q(X).
     `);
@@ -1370,7 +1372,7 @@ path(X, Y) :- path(X, Z), path(Z, Y).
     // a cryptic "undefined is not an object". Reject it at post-processing.
     expect(() =>
       translateSource(`
-        extensional w(s: string).
+        input predicate w(s: string).
         r(C) :- w(W), C = W[].
       `),
     ).toThrow(/Empty bracket access/);
@@ -1382,7 +1384,7 @@ path(X, Y) :- path(X, Z), path(Z, Y).
     // variable has no body binding.
     expect(() =>
       translateSource(`
-        extensional t(x: integer).
+        input predicate t(x: integer).
         ?- not t(X).
       `),
     ).toThrow(/Unsafe variable 'X'/);
@@ -1427,7 +1429,7 @@ path(X, Y) :- path(X, Z), path(Z, Y).
 
   test("array literal compiles to jsonb_build_array on Postgres", () => {
     const result = translateSource(`
-      extensional t(x: integer).
+      input predicate t(x: integer).
       r(X, J) :- t(X), J = [X, X + 1, X * 2].
     `);
     const sql = norm(result.createViews[0]!);
@@ -1436,7 +1438,7 @@ path(X, Y) :- path(X, Z), path(Z, Y).
 
   test("object literal compiles to jsonb_build_object on Postgres with quoted keys", () => {
     const result = translateSource(`
-      extensional t(x: integer).
+      input predicate t(x: integer).
       r(X, J) :- t(X), J = {"x": X, "double": X * 2}.
     `);
     const sql = norm(result.createViews[0]!);
@@ -1446,7 +1448,7 @@ path(X, Y) :- path(X, Z), path(Z, Y).
 
   test("nested object/array literal", () => {
     const result = translateSource(`
-      extensional t(x: integer).
+      input predicate t(x: integer).
       r(J) :- t(X), J = {"vals": [X, X + 1]}.
     `);
     const sql = norm(result.createViews[0]!);
@@ -1459,7 +1461,7 @@ describe("translator (sqlite dialect)", () => {
   test("generates CREATE VIEW IF NOT EXISTS for non-recursive rule", () => {
     const result = translateSource(
       `
-      extensional parent(name: string, child: string).
+      input predicate parent(name: string, child: string).
       grandparent(X, Y) :- parent(X, Z), parent(Z, Y).
     `,
       sqlite,
@@ -1473,7 +1475,7 @@ describe("translator (sqlite dialect)", () => {
   test("generates WITH RECURSIVE inside CREATE VIEW for recursive rule", () => {
     const result = translateSource(
       `
-      extensional parent(name: string, child: string).
+      input predicate parent(name: string, child: string).
       ancestor(X, Y) :- parent(X, Y).
       ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
     `,
@@ -1518,7 +1520,7 @@ describe("translator (sqlite dialect)", () => {
   test("sqlite range with correlated high bound uses exact correlated generation", () => {
     const result = translateTyped(
       `
-      extensional base(n: integer).
+      input predicate base(n: integer).
       nums(N, X) :- base(N), X in [0 .. N - 1].
     `,
       sqlite,
@@ -1553,7 +1555,7 @@ describe("translator (sqlite dialect)", () => {
   test("generates GROUP_CONCAT for concat (sqlite)", () => {
     const result = translateSource(
       `
-      extensional items(group_name: string, item: string).
+      input predicate items(group_name: string, item: string).
       concat_items(G, concat(I)) :- items(G, I).
     `,
       sqlite,
@@ -1568,7 +1570,7 @@ describe("translator (sqlite dialect)", () => {
   test("generates JSON_GROUP_ARRAY for list with `value` arg (sqlite)", () => {
     const result = translateSource(
       `
-      extensional events(group_name: string, payload: value).
+      input predicate events(group_name: string, payload: value).
       collected(G, list(P)) :- events(G, P).
     `,
       sqlite,
@@ -1599,7 +1601,7 @@ describe("translator (sqlite dialect)", () => {
     // emit a JSON `null` per row.
     const result = translateSource(
       `
-      extensional t(g: string, w: string).
+      input predicate t(g: string, w: string).
       collected(G, list(W)) :- t(G, W).
     `,
       sqlite,
@@ -1616,7 +1618,7 @@ describe("translator (sqlite dialect)", () => {
   test("generates CREATE VIEW IF NOT EXISTS for aggregate rule (sqlite)", () => {
     const result = translateSource(
       `
-      extensional parent(name: string, child: string).
+      input predicate parent(name: string, child: string).
       num_children(P, count(C)) :- parent(P, C).
     `,
       sqlite,
@@ -1631,7 +1633,7 @@ describe("translator (sqlite dialect)", () => {
     expect(() =>
       translateSource(
         `
-      extensional edge(src: string, dst: string).
+      input predicate edge(src: string, dst: string).
       tc(X, Y) :- edge(X, Y).
       tc(X, Z) :- tc(X, Y), tc(Y, Z).
     `,
@@ -1643,7 +1645,7 @@ describe("translator (sqlite dialect)", () => {
   test("generates WITH RECURSIVE for mutual recursion", () => {
     const result = translateSource(
       `
-      extensional base(x: integer).
+      input predicate base(x: integer).
       even(X) :- base(X).
       even(X) :- odd(X).
       odd(X) :- even(X).
@@ -1669,7 +1671,7 @@ describe("translator (sqlite dialect)", () => {
     // body put them after the WHERE clause and produced invalid SQL.
     const result = translateTyped(
       `
-      extensional base(x: integer).
+      input predicate base(x: integer).
       a(X) :- base(X).
       a(X) :- b(X, X).
       b(X, Y) :- a(X), Y = X + 1.
@@ -1688,7 +1690,7 @@ describe("translator (sqlite dialect)", () => {
   test("mutual recursion CTE strips the SELECT token past leading span markers", () => {
     const result = translateSource(
       `
-      extensional base(x: integer).
+      input predicate base(x: integer).
       even(X) :- base(X).
       even(X) :- odd(X).
       odd(X) :- even(X).
@@ -1705,7 +1707,7 @@ describe("translator (sqlite dialect)", () => {
   test("self-recursive rule works when the recursive rule appears first", () => {
     const result = translateSource(
       `
-      extensional e(a: integer, b: integer).
+      input predicate e(a: integer, b: integer).
       path(X, Z) :- path(X, Y), e(Y, Z).
       path(X, Y) :- e(X, Y).
     `,
@@ -1724,7 +1726,7 @@ describe("translator (sqlite dialect)", () => {
   test("array literal with value-typed element wraps with json() to mark as JSON", () => {
     const result = translateSource(
       `
-      extensional t(j: value).
+      input predicate t(j: value).
       r(JJ) :- t(J), JJ = [J, J].
     `,
       sqlite,
@@ -1736,7 +1738,7 @@ describe("translator (sqlite dialect)", () => {
   test("object literal compiles to json_object on SQLite with quoted keys, sorted in jsonb order", () => {
     const result = translateSource(
       `
-      extensional t(x: integer).
+      input predicate t(x: integer).
       r(X, J) :- t(X), J = {"b": X, "aa": X * 2, "a": X + 1}.
     `,
       sqlite,
@@ -1769,7 +1771,7 @@ describe("translator (sqlite dialect)", () => {
 
 describe("translator — source maps", () => {
   test("emits a span per positive body atom", () => {
-    const source = `extensional edge(src: string, dst: string).
+    const source = `input predicate edge(src: string, dst: string).
 reach(X) :- edge("a", X), edge(X, "b").`;
     const result = translate(inferTypes(analyze(parse(source))), sqlite);
     const [sql] = result.createViews;
@@ -1800,7 +1802,7 @@ reach(X) :- edge("a", X), edge(X, "b").`;
   });
 
   test("emits a span for the head atom and for the whole rule", () => {
-    const source = `extensional edge(src: string, dst: string).
+    const source = `input predicate edge(src: string, dst: string).
 reach(X) :- edge("a", X).`;
     const result = translate(inferTypes(analyze(parse(source))), sqlite);
     const [spans] = result.viewSpans;
@@ -1818,7 +1820,7 @@ reach(X) :- edge("a", X).`;
     const result = translate(
       inferTypes(
         analyze(
-          parse(`extensional edge(src: string, dst: string).
+          parse(`input predicate edge(src: string, dst: string).
 reach(X) :- edge("a", X).`),
         ),
       ),
@@ -1829,7 +1831,7 @@ reach(X) :- edge("a", X).`),
   });
 
   test("marks query atoms", () => {
-    const source = `extensional edge(src: string, dst: string).
+    const source = `input predicate edge(src: string, dst: string).
 reach(X) :- edge("a", X).
 ?- reach(X).`;
     const result = translate(inferTypes(analyze(parse(source))), sqlite);
@@ -1842,7 +1844,7 @@ reach(X) :- edge("a", X).
 
 describe("translator — null literal and logical equality", () => {
   test("null literal emits SQL NULL on every dialect", () => {
-    const source = `extensional t(a: integer, b: integer).
+    const source = `input predicate t(a: integer, b: integer).
 maybe(X, B) :- t(X, _), B = (X = null).
 ?- maybe(X, B).`;
     for (const d of [sqlite, postgres]) {
@@ -1854,7 +1856,7 @@ maybe(X, B) :- t(X, _), B = (X = null).
   });
 
   test("`=` (logical equality) emits IS / IS NOT DISTINCT FROM per dialect", () => {
-    const source = `extensional t(a: integer, b: integer).
+    const source = `input predicate t(a: integer, b: integer).
 q(X, Y) :- t(X, Y), X = Y.
 ?- q(X, Y).`;
     const sqliteSql = translateTyped(source, sqlite).createViews.join("\n");
@@ -1866,7 +1868,7 @@ q(X, Y) :- t(X, Y), X = Y.
   });
 
   test("`<>` (logical inequality) emits IS NOT / IS DISTINCT FROM per dialect", () => {
-    const source = `extensional t(a: integer, b: integer).
+    const source = `input predicate t(a: integer, b: integer).
 q(X, Y) :- t(X, Y), X <> Y.
 ?- q(X, Y).`;
     const sqliteSql = translateTyped(source, sqlite).createViews.join("\n");
@@ -1877,7 +1879,7 @@ q(X, Y) :- t(X, Y), X <> Y.
   });
 
   test("`==` and `!=` keep their 3VL spelling (plain `=` / `<>`)", () => {
-    const source = `extensional t(a: integer, b: integer).
+    const source = `input predicate t(a: integer, b: integer).
 q(X, Y) :- t(X, Y), X == Y.
 ?- q(X, Y).`;
     const sql = translateTyped(source, sqlite).createViews.join("\n");
@@ -1891,7 +1893,7 @@ describe("bitwise / shift operators", () => {
   const expr = (op: string, dialect: SqlDialect): string => {
     const result = translateSource(
       `
-      extensional t(x: integer, y: integer).
+      input predicate t(x: integer, y: integer).
       r(X, Y, Z) :- t(X, Y), Z = X ${op} Y.
     `,
       dialect,

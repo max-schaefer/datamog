@@ -85,7 +85,7 @@ escapes inside and are stripped before the decoded name is exposed to
 downstream stages.
 
 ```
-extensional `http-event`(`content-type`: string, `in`: integer).
+input predicate `http-event`(`content-type`: string, `in`: integer).
 ok(`First Name`) :- `http-event`(`First Name`, _).
 ```
 
@@ -146,16 +146,21 @@ contributes a non-null value, and `null` flows through at runtime.
 
 ### 1.6 Keywords
 
-Two groups of words are reserved. **Lexical keywords** cannot appear as a bare
-identifier in any position (predicate, column, or variable):
+**Lexical keywords** cannot appear as a bare identifier in any position
+(predicate, column, or variable):
 
 ```
-extensional    output    predicate    not    in    true    false    null
+not    in    true    false    null
 string    integer    float    boolean    value
 ```
 
+`input`, `output`, and `predicate` are **contextual keywords**: they lead the
+`input predicate` and `output predicate` declaration forms, but are ordinary
+identifiers everywhere else, so a program may still name a predicate, column,
+or variable `input`, `output`, or `predicate`.
+
 **Built-in operation names** (functions, body atoms, and aggregates) are
-reserved only against unquoted predicate names; they may be used as extensional
+reserved only against unquoted predicate names; they may be used as input-predicate
 columns and as variables:
 
 ```
@@ -198,7 +203,7 @@ constraints below are the only exceptions.
 
 **The namespaces**
 
-- **Reserved keywords**: `extensional`, `not`, `in`, `true`, `false`, `null`,
+- **Reserved keywords**: `input predicate`, `not`, `in`, `true`, `false`, `null`,
   and the five type names `string`, `integer`, `float`, `boolean`, `value`.
   These are *lexical* keywords, so the parser rejects them as a bare identifier
   in every position (predicate, extensional column, and variable alike). `true`, `false`,
@@ -213,7 +218,7 @@ constraints below are the only exceptions.
 - **Predicate names**: a single namespace shared by extensional (EDB) and
   intensional (IDB) predicates. Each name is one or the other, never both
   (§4.6), and carries a fixed arity (§4.2).
-- **Extensional columns**: the named, typed fields of an `extensional`
+- **Extensional columns**: the named, typed fields of an `input predicate`
   declaration (§2.2), unique within it, and matched against loader input by
   exact, case-sensitive name. Intensional (rule-defined) predicates have no
   named columns; their fields are positional.
@@ -292,8 +297,8 @@ table is created and populated from an external data source (CSV, JSONL,
 JSON, Google Sheets, or Mermaid diagram) via a loader plugin.
 
 ```
-extensional scores(student: string, subject: string, score: integer).
-extensional survey(name: string, age: integer?, email: string?).
+input predicate scores(student: string, subject: string, score: integer).
+input predicate survey(name: string, age: integer?, email: string?).
 ```
 
 The optional `?` suffix marks an extensional column as nullable. Nullable
@@ -895,7 +900,7 @@ A `value`-typed expression reaches a rule body in one of
 these ways:
 
 1. **A `value`-typed EDB column.** Declared via
-   `extensional p(col1: value, ...).` and populated via the JSONL
+   `input predicate p(col1: value, ...).` and populated via the JSONL
    loader (with the single-`value`-column special case in §7.2)
    or the standalone JSON loader (§7.5).
 2. **Subscript** `X[K]` where `X : value`. Returns `value`.
@@ -949,7 +954,7 @@ on an array, `array_element` on an object, anything on a
 primitive leaf) yields zero rows.
 
 Built-in body-atom names (`object_entry`, `array_element`) are
-reserved: they cannot be declared as `extensional` or defined
+reserved: they cannot be declared as `input predicate` or defined
 as IDB. Negation of a built-in body atom is rejected.
 
 #### Coercion and introspection
@@ -993,7 +998,7 @@ auto-lifted to its `value` form anywhere a `value` slot meets a
 primitive expression:
 
 - **Atom args** matching a `value`-typed column: `t(5)` over
-  `extensional t(j: value)` matches rows where the column's
+  `input predicate t(j: value)` matches rows where the column's
   contents are the numeric leaf `5`.
 - **Equality variants** (`==`, `!=`, `=`, `<>`): `J == 5` where
   `J : value` matches rows where `J` is the numeric leaf `5`.
@@ -1788,7 +1793,7 @@ in scenarios where some EDBs are intentionally unsourced.
 **Header matching.** Loaders that resolve declared column names against
 external column or key names (CSV, JSONL object form, Google Sheets)
 match them **by exact name** (case-sensitively). A declaration
-`extensional p(Name: string, Age: integer).` accepts a CSV with headers
+`input predicate p(Name: string, Age: integer).` accepts a CSV with headers
 `Name,Age`, a JSONL line `{"Name": "...", "Age": ...}`, or a Google
 Sheet whose first row reads `Name | Age`. Identifiers may be written in
 any case, so declared column names can be chosen to match the source's
@@ -1840,7 +1845,7 @@ JSON shape (object, array, primitive, null). This is the natural way
 to ingest a stream of heterogeneous self-describing records:
 
 ```prolog
-extensional event(payload: value).
+input predicate event(payload: value).
 ```
 
 with `event.jsonl` of the form
@@ -1881,7 +1886,7 @@ The extensional declaration must have exactly one column, and that
 column must be typed `value`:
 
 ```prolog
-extensional config(blob: value).
+input predicate config(blob: value).
 ```
 
 The whole file is parsed as a single JSON value (any shape — object,
@@ -2096,7 +2101,7 @@ are the reliable target for substantial proof-term manipulation.
 ### Transitive Closure (Recursion)
 
 ```
-extensional parent(name: string, child: string).
+input predicate parent(name: string, child: string).
 
 ancestor(X, Y) :- parent(X, Y).
 ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
@@ -2132,7 +2137,7 @@ prime(X) :- num(X), not composite(X).
 ### Aggregates (Grouping and Counting)
 
 ```
-extensional scores(student: string, subject: string, score: integer).
+input predicate scores(student: string, subject: string, score: integer).
 
 output predicate student_avg(Student, avg(Score)) :- scores(Student, _, Score).
 output predicate total_score(Student, sum(Score)) :- scores(Student, _, Score).
@@ -2143,7 +2148,7 @@ output predicate record_count(count(*)) :- scores(_, _, _).
 ### String Operations
 
 ```
-extensional words(w: string).
+input predicate words(w: string).
 
 prefixed(R) :- words(W), R = "hello_" + W.
 lengths(W, N) :- words(W), N = length(W).

@@ -39,7 +39,7 @@ directly — any JSON shape goes. From
 [`code/ch14/events.dl`](code/ch14/events.dl):
 
 ```prolog
-extensional event(payload: value).
+input predicate event(payload: value).
 ```
 
 with `event.jsonl`:
@@ -60,7 +60,7 @@ as exactly one row. From
 [`code/ch14/config.dl`](code/ch14/config.dl):
 
 ```prolog
-extensional config(blob: value).
+input predicate config(blob: value).
 ```
 
 with `config.json`:
@@ -266,7 +266,7 @@ Three routes move primitives *into* the `value` type:
   keys are written as string literals (mirroring JSON syntax).
 
 ```prolog
-extensional sample(name: string, raw: string).
+input predicate sample(name: string, raw: string).
 
 # Primitive auto-lift: comparing the primitive `length(N)` against
 # a `value`-typed column is fine — the lift fires implicitly.
@@ -315,7 +315,7 @@ Status)` view, filters to `/v1/`-prefixed `2xx` responses, and
 fans out per-event headers — all without leaving Datalog:
 
 ```prolog
-extensional event(payload: value).
+input predicate event(payload: value).
 
 request(Id, Method, Path, Status) :-
     event(E),

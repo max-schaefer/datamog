@@ -18,8 +18,8 @@
 #
 # (`value` is a reserved type keyword, so the wire-value relation is `signal`.)
 
-extensional init(wire: string, val: integer).
-extensional gate(wire: string, kind: string, a: string, b: string).
+input predicate init(wire: string, val: integer).
+input predicate gate(wire: string, kind: string, a: string, b: string).
 
 # Evaluate the DAG: a wire either starts with a value or is driven by a gate.
 signal(W, V) :- init(W, V).

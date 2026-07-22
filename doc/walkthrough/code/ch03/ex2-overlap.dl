@@ -4,8 +4,8 @@
 # dataset qualify via BOTH rules — but the resulting relation has
 # no duplicates.
 
-extensional parent(parent_name: string, child_name: string).
-extensional marriage(p1: string, p2: string).
+input predicate parent(parent_name: string, child_name: string).
+input predicate marriage(p1: string, p2: string).
 
 # Placeholder so the file parses; delete once you've added your rules.
 involved_in_family(P) :- parent(P, "__nobody__").

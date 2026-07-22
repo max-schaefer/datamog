@@ -15,7 +15,7 @@ test.describe("embed mini-playground", () => {
 
   test("syntax highlighting is applied and coloured", async ({ page }) => {
     await page.goto("/embed-demo.html");
-    // `extensional` is a keyword → gets the .tok-keyword class...
+    // `input` / `predicate` are keywords → get the .tok-keyword class...
     const keyword = page.locator(".datamog-embed .cm-editor .tok-keyword").first();
     await expect(keyword).toBeVisible();
     // ...and embed.css colours it (rgb of #7c3aed), proving the CSS is wired.

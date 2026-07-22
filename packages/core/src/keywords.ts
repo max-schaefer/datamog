@@ -8,9 +8,15 @@
 // the playground, TextMate grammar in the VS Code extension) consumes
 // these lists.
 
-/** Reserved-word keywords that can't be used as identifiers. */
+// Lexical keywords, for editor highlighting and keyword completion. `input`,
+// `output`, and `predicate` are *contextual* keywords: they lead the
+// `input predicate` / `output predicate` declaration forms but are otherwise
+// ordinary identifiers (the grammar's `Identifier` rule accepts them), so a
+// program may still name a predicate/column/variable after them. The rest
+// (`not`, `in`, `true`, `false`, `null`) are fully reserved. Both sets are
+// highlighted; this list is not used to reject identifiers.
 export const RESERVED_KEYWORDS = [
-  "extensional",
+  "input",
   "output",
   "predicate",
   "not",
@@ -20,5 +26,5 @@ export const RESERVED_KEYWORDS = [
   "null",
 ] as const;
 
-/** Built-in primitive types declarable on extensional columns. */
+/** Built-in primitive types declarable on input-predicate columns. */
 export const BUILTIN_TYPE_NAMES = ["string", "integer", "float", "boolean", "value"] as const;

@@ -8,9 +8,9 @@ tight: true
 A formula is **text**, turned into relations: one row per character, plus its length and the variable alphabet.
 
 ```prolog
-extensional char(idx: integer, char: string).
-extensional len(n: integer).
-extensional prop_var(name: string).
+input predicate char(idx: integer, char: string).
+input predicate len(n: integer).
+input predicate prop_var(name: string).
 ```
 
 For `p&q` we have:

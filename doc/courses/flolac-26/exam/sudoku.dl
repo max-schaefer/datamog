@@ -1,4 +1,4 @@
-extensional candidate(r: integer, c: integer, n: integer).
+input predicate candidate(r: integer, c: integer, n: integer).
 
 num(N) :- N in [1..9].
 row(N) :- num(N).

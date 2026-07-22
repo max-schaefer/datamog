@@ -2,7 +2,7 @@
 # file (the standalone JsonLoader). The single-row table holds the
 # root config object; rules destructure it.
 
-extensional config(blob: value).
+input predicate config(blob: value).
 
 # Pull a few top-level scalar fields out as primitive SQL types.
 app_name(N) :- config(C), N = as_string(C["name"]).

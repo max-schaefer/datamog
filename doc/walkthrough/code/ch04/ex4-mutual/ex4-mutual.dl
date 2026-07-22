@@ -9,7 +9,7 @@
 # SQLite needs because it doesn't accept multiple recursive CTEs
 # in one block); Postgres compiles to two sibling CTEs.
 
-extensional edge(src: string, dst: string, colour: string).
+input predicate edge(src: string, dst: string, colour: string).
 
 rr(X, Y) :- edge(X, Y, "red").
 rr(X, Y) :- bb(X, Z), edge(Z, Y, "red").

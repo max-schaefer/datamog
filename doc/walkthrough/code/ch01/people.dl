@@ -4,7 +4,7 @@
 # base predicate backed by a table; the data comes from the sibling
 # `person.csv` (auto-loaded by predicate name).
 
-extensional person(name: string, country: string, year_born: integer).
+input predicate person(name: string, country: string, year_born: integer).
 
 # A file runs a single query. This one prints every fact.
 ?- person(Name, Country, Year).

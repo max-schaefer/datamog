@@ -37,10 +37,10 @@
 # The AST is the same one step 2 used, De Morgan's law  ~(p & q) -> (~p | ~q),
 # a tautology, so we again expect a "yes" verdict and no counterexamples.
 
-extensional node(id: integer, kind: string).
-extensional node_var(id: integer, name: string).
-extensional node_child(id: integer, pos: integer, child: integer).
-extensional root(id: integer).
+input predicate node(id: integer, kind: string).
+input predicate node_var(id: integer, name: string).
+input predicate node_child(id: integer, pos: integer, child: integer).
+input predicate root(id: integer).
 
 # --- Tseitin variables ---
 #

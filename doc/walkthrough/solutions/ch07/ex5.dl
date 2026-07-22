@@ -4,7 +4,7 @@
 # variable from an already-safe expression. The analyser passes
 # because each fix-point iteration marks one more variable safe.
 
-extensional seed(x: integer).
+input predicate seed(x: integer).
 
 quad(A, B, C, D) :-
     seed(A),

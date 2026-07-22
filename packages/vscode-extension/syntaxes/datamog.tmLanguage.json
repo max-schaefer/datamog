@@ -4,7 +4,7 @@
   "patterns": [
     { "include": "#comment" },
     { "include": "#query" },
-    { "include": "#extensional" },
+    { "include": "#declaration" },
     { "include": "#string" },
     { "include": "#number" },
     { "include": "#keyword" },
@@ -23,8 +23,8 @@
       "match": "\\?-",
       "name": "keyword.control.query.datamog"
     },
-    "extensional": {
-      "match": "\\b(extensional)\\b",
+    "declaration": {
+      "match": "\\b(input|output|predicate)\\b",
       "name": "keyword.declaration.datamog"
     },
     "string": {

@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 // Loaded via `#p=` with `&norun` so nothing executes — we only care that
 // the data buffer survives a round-trip through the URL hash.
 const PROGRAM = [
-  "extensional person(name: string, age: integer).",
+  "input predicate person(name: string, age: integer).",
   "adult(N) :- person(N, A), A >= 18.",
   "?- adult(N).",
 ].join("\n");

@@ -31,7 +31,7 @@ function makeBackend(): { backend: never; inserts: CapturedInsert[] } {
 
 describe("InMemoryCsvLoader", () => {
   test("loads rows whose CSV headers match the declared columns", async () => {
-    const decl = getExtDecl("extensional p(name: string, country: string).");
+    const decl = getExtDecl("input predicate p(name: string, country: string).");
     const csvData = new Map([["p", "name,country\nalice,fr\nbob,jp"]]);
     const loader = new InMemoryCsvLoader(csvData);
     const { backend, inserts } = makeBackend();
@@ -55,7 +55,7 @@ describe("InMemoryCsvLoader", () => {
     // empty value. Distinguish `undefined` (missing) from `""`
     // (legitimately empty) and report with the same wording as the
     // header-missing path.
-    const decl = getExtDecl("extensional p(name: string, country: string).");
+    const decl = getExtDecl("input predicate p(name: string, country: string).");
     const csvData = new Map([["p", "name,country\nalice,fr\nbob"]]);
     const loader = new InMemoryCsvLoader(csvData);
     const { backend } = makeBackend();
@@ -66,7 +66,7 @@ describe("InMemoryCsvLoader", () => {
     // The browser loader used `i + 2` for data-row line numbers. With blank
     // lines after the header, a short row on source line 5 was reported as
     // line 3, sending the user to the wrong row in the playground editor.
-    const decl = getExtDecl("extensional p(name: string, country: string).");
+    const decl = getExtDecl("input predicate p(name: string, country: string).");
     const csvData = new Map([["p", "name,country\n\n\nalice,fr\nbob"]]);
     const loader = new InMemoryCsvLoader(csvData);
     const { backend } = makeBackend();
@@ -87,7 +87,7 @@ describe("InMemoryCsvLoader", () => {
     // "Invalid integer value ''" with no hint that the float cause was
     // a header typo. Compare with `JsonlLoader`, which throws a
     // dedicated "missing field" error with the actual column name.
-    const decl = getExtDecl("extensional p(name: string, country: string).");
+    const decl = getExtDecl("input predicate p(name: string, country: string).");
     const csvData = new Map([["p", "name,city\nalice,paris"]]);
     const loader = new InMemoryCsvLoader(csvData);
     const { backend } = makeBackend();
@@ -101,7 +101,7 @@ describe("InMemoryCsvLoader", () => {
     // so `name,country,country` turned `alice,fr,jp` into
     // `{ name: "alice", country: "jp" }` with no signal that one source
     // column was discarded.
-    const decl = getExtDecl("extensional p(name: string, country: string).");
+    const decl = getExtDecl("input predicate p(name: string, country: string).");
     const csvData = new Map([["p", "name,country,country\nalice,fr,jp"]]);
     const loader = new InMemoryCsvLoader(csvData);
     const { backend } = makeBackend();
@@ -111,7 +111,7 @@ describe("InMemoryCsvLoader", () => {
 
 describe("UrlCsvLoader", () => {
   test("fetches CSV data from an HTTP URL and loads it through the browser CSV path", async () => {
-    const decl = getExtDecl("extensional p(name: string, country: string).");
+    const decl = getExtDecl("input predicate p(name: string, country: string).");
     const url = "https://example.test/p.csv";
     const seenUrls: string[] = [];
     const oldFetch = globalThis.fetch;
@@ -136,7 +136,7 @@ describe("UrlCsvLoader", () => {
   });
 
   test("rejects non-HTTP URL schemes", async () => {
-    const decl = getExtDecl("extensional p(name: string).");
+    const decl = getExtDecl("input predicate p(name: string).");
     const loader = new UrlCsvLoader(new Map([["p", "file:///tmp/p.csv"]]));
     const { backend } = makeBackend();
     expect(loader.load(decl, backend)).rejects.toThrow(/must use HTTP or HTTPS/);

@@ -13,10 +13,10 @@ const executor = new DatamogExecutor(backend, [
 ]);
 ```
 
-The loader looks for `<predicate>.json` in the configured directory (e.g. `data/config.json` for an `extensional config(...)` declaration). The extensional declaration must have **exactly one column, typed `value`** — the file is parsed and inserted as one row whose single column holds the parsed contents:
+The loader looks for `<predicate>.json` in the configured directory (e.g. `data/config.json` for an `input predicate config(...)` declaration). The extensional declaration must have **exactly one column, typed `value`** — the file is parsed and inserted as one row whose single column holds the parsed contents:
 
 ```prolog
-extensional config(blob: value).
+input predicate config(blob: value).
 ```
 
 with `data/config.json`:

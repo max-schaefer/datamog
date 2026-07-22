@@ -46,8 +46,8 @@
 # Step 2 deletes these two declarations (and the CSVs) and grows clause_lit
 # and nvars into intensional predicates derived from a formula's AST.
 
-extensional clause_lit(c: string, v: integer, pol: integer).
-extensional nvars(n: integer).
+input predicate clause_lit(c: string, v: integer, pol: integer).
+input predicate nvars(n: integer).
 
 # --- The engine ---
 

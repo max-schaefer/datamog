@@ -11,7 +11,7 @@
 # `parent(X, Y)` means "X is a parent of Y". Data loads from
 # parent.csv next to this file.
 
-extensional parent(parent_name: string, child_name: string).
+input predicate parent(parent_name: string, child_name: string).
 
 # A grandparent of Z is a parent of some Y, whose Y is in turn a
 # parent of Z. Two body atoms, one shared variable — this is a join.

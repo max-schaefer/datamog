@@ -3,8 +3,8 @@ import { expect, test } from "@playwright/test";
 // Two short declarations: enough to shift-select from the start of line 1
 // to the start of line 2. Loaded via `#p=` with `&norun` so nothing runs.
 const PROGRAM = [
-  "extensional clause_lit(c: string, v: integer, pol: integer).",
-  "extensional nvars(n: integer).",
+  "input predicate clause_lit(c: string, v: integer, pol: integer).",
+  "input predicate nvars(n: integer).",
 ].join("\n");
 
 test.describe("active-line highlight vs. selection", () => {

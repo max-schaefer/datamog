@@ -29,7 +29,7 @@ Aggregation is too: a `count` can go up, an `avg` can shift, a `min` or `max` ca
 Spelled as function calls in the **rule head**:
 
 ```prolog
-extensional scores(student: string, subject: string, score: integer).
+input predicate scores(student: string, subject: string, score: integer).
 
 student_avg(Student, avg(Score))   :- scores(Student, _, Score).
 best(Student, max(Score))          :- scores(Student, _, Score).

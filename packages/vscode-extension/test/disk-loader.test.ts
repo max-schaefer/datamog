@@ -42,7 +42,7 @@ describe("DiskLoader", () => {
     try {
       await writeFile(join(dir, "t.csv"), "a,b\n1,2,3\n");
       const loader = new DiskLoader(dir);
-      const decl = getExtDecl("extensional t(a: integer, b: integer).");
+      const decl = getExtDecl("input predicate t(a: integer, b: integer).");
       expect(loader.load(decl, captureBackend())).rejects.toThrow(/expected 2 fields but got 3/);
     } finally {
       await rm(dir, { recursive: true });
@@ -59,7 +59,7 @@ describe("DiskLoader", () => {
     try {
       await writeFile(join(dir, "t.csv"), "a,b\n");
       const loader = new DiskLoader(dir);
-      const decl = getExtDecl("extensional t(a: integer, b: integer, c: integer).");
+      const decl = getExtDecl("input predicate t(a: integer, b: integer, c: integer).");
       expect(loader.load(decl, captureBackend())).rejects.toThrow(/missing field 'c'/);
     } finally {
       await rm(dir, { recursive: true });

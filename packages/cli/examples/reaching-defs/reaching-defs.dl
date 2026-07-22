@@ -13,7 +13,7 @@
 # Adapted from the Soufflé tutorial (https://souffle-lang.github.io/tutorial).
 
 # Control-flow graph edges, loaded from cfg.csv (one edge per row).
-extensional cfg(src: string, dst: string).
+input predicate cfg(src: string, dst: string).
 
 # Definitions generated at each block
 gen("b2", "d1").

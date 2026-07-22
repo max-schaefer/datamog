@@ -19,7 +19,7 @@
 # rule. Real day-24 inputs may need a few more patterns (and a dataflow check
 # for swaps that preserve local structure), but the shape is exactly this.
 
-extensional gate(wire: string, kind: string, a: string, b: string).
+input predicate gate(wire: string, kind: string, a: string, b: string).
 
 # --- how each wire is used ---
 wire_used(W) :- gate(_, _, W, _).

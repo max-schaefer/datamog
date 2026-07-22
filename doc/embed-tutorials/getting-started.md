@@ -2,7 +2,7 @@
 
 This page is a tutorial with **live** Datamog programs. Every code block below is
 editable: click `▸ run` next to a query to evaluate it (the result appears right
-under the line), and click the data chip next to an `extensional` declaration to
+under the line), and click the data chip next to an `input predicate` declaration to
 inspect, edit, or reset its rows.
 
 ## Facts
@@ -11,7 +11,7 @@ A directed graph is just a set of edges. We declare `edge` as an *extensional*
 predicate (its rows come from data, not rules) and ask for all of them:
 
 ```datamog
-extensional edge(src: string, dst: string).
+input predicate edge(src: string, dst: string).
 
 ?- edge(X, Y).
 ```
@@ -26,7 +26,7 @@ with everything one step from `"a"`; the second rule walks one more edge at a
 time until nothing new appears:
 
 ```datamog
-extensional edge(src: string, dst: string).
+input predicate edge(src: string, dst: string).
 
 reachable(X) :- edge("a", X).
 reachable(X) :- edge(Y, X), reachable(Y).
@@ -43,7 +43,7 @@ A query with no variables asks a yes/no question. This one is satisfied exactly
 when `"d"` is reachable from `"a"`:
 
 ```datamog
-extensional edge(src: string, dst: string).
+input predicate edge(src: string, dst: string).
 
 reachable(X) :- edge("a", X).
 reachable(X) :- edge(Y, X), reachable(Y).

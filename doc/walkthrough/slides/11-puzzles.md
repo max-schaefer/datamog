@@ -31,9 +31,9 @@ Four suspects. Two clues:
 2. The culprit is **right-handed**.
 
 ```prolog
-extensional person(name: string).
-extensional drinks(name: string, beverage: string).
-extensional hand(name: string, handedness: string).
+input predicate person(name: string).
+input predicate drinks(name: string, beverage: string).
+input predicate hand(name: string, handedness: string).
 
 drinks_tea(N)   :- drinks(N, "tea").
 right_handed(N) :- hand(N, "right").

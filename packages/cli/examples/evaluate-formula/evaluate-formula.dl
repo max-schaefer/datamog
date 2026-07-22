@@ -22,8 +22,8 @@
 # positions 0, 1, 2 the satisfying assignments are 1, 3, 4, 5, 7 -- the same
 # five the AST-based evaluator finds.
 
-extensional input(s: string).
-extensional prop_var(name: string, idx: integer).
+input predicate input(s: string).
+input predicate prop_var(name: string, idx: integer).
 
 char(I, C) :- input(S), I in [0 .. length(S) - 1], C = S[I].
 len(N) :- input(S), N = length(S).

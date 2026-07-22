@@ -63,7 +63,7 @@ Declare a single-`value`-column extensional predicate and bind it to the
 URL with the like-named `--pokedex` input flag (after the program):
 
 ```prolog
-extensional pokedex(data: value).
+input predicate pokedex(data: value).
 ```
 
 ```bash

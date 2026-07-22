@@ -3,8 +3,8 @@
 # Two rules that overlap on most people in the dataset. Datalog
 # set semantics removes the duplicates automatically.
 
-extensional parent(parent_name: string, child_name: string).
-extensional marriage(p1: string, p2: string).
+input predicate parent(parent_name: string, child_name: string).
+input predicate marriage(p1: string, p2: string).
 
 involved_in_family(P) :- parent(P, _).
 involved_in_family(P) :- marriage(P, _).

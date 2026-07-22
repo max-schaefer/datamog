@@ -17,7 +17,7 @@ before the rule using them fires.
 From [`code/ch08/orphans.dl`](code/ch08/orphans.dl):
 
 ```prolog
-extensional parent(parent_name: string, child_name: string).
+input predicate parent(parent_name: string, child_name: string).
 
 person(P) :- parent(P, _).
 person(P) :- parent(_, P).

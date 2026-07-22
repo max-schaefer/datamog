@@ -8,7 +8,7 @@ tight: true
 A predicate may have multiple rules, read as "or" (disjunction):
 
 ```datamog
-extensional type(id: integer, type: string).
+input predicate type(id: integer, type: string).
 
 watery_pokemon(Id) :- type(Id, "water").
 watery_pokemon(Id) :- type(Id, "ice").

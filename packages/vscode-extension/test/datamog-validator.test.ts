@@ -63,7 +63,7 @@ describe("datamog-validator", () => {
     // step, so a user editing in VS Code never saw the warnings their
     // playground-using collaborators were seeing for the same source.
     const source = `
-      extensional p(x: integer).
+      input predicate p(x: integer).
       grow(X) :- p(X).
       grow(X + 1) :- grow(X).
       ?- grow(Y).

@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { parseStructure } from "../src/embed/structure.ts";
 
-const PROGRAM = `extensional edge(src: string, dst: string).
-extensional node(id: integer).
+const PROGRAM = `input predicate edge(src: string, dst: string).
+input predicate node(id: integer).
 
 reachable(X) :- edge("a", X).
 
@@ -15,7 +15,9 @@ describe("parseStructure", () => {
     expect(extensionals.map((e) => e.predicate)).toEqual(["edge", "node"]);
     expect(extensionals[0]!.columns).toEqual(["src", "dst"]);
     // Span should cover the declaration text.
-    expect(PROGRAM.slice(extensionals[0]!.from, extensionals[0]!.to)).toContain("extensional edge");
+    expect(PROGRAM.slice(extensionals[0]!.from, extensionals[0]!.to)).toContain(
+      "input predicate edge",
+    );
   });
 
   test("indexes queries in source order", () => {
@@ -26,7 +28,7 @@ describe("parseStructure", () => {
   });
 
   test("tolerates incomplete source", () => {
-    const s = parseStructure("extensional edge(");
+    const s = parseStructure("input predicate edge(");
     expect(s.queries).toEqual([]);
     // A half-typed declaration may or may not yield a span; it must not throw.
     expect(Array.isArray(s.extensionals)).toBe(true);

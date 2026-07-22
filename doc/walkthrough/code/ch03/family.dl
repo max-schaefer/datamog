@@ -8,8 +8,8 @@
 #              /      \
 #           greg     helen
 
-extensional parent(parent_name: string, child_name: string).
-extensional marriage(p1: string, p2: string).
+input predicate parent(parent_name: string, child_name: string).
+input predicate marriage(p1: string, p2: string).
 
 # Symmetric relation: two rules that flip the argument order.
 spouse(X, Y) :- marriage(X, Y).

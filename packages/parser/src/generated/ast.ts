@@ -50,10 +50,10 @@ export type DatamogKeywordNames =
     | "]"
     | "^"
     | "boolean"
-    | "extensional"
     | "false"
     | "float"
     | "in"
+    | "input"
     | "integer"
     | "not"
     | "null"
@@ -289,10 +289,10 @@ export function isHeadTerm(item: unknown): item is HeadTerm {
     return reflection.isInstance(item, HeadTerm.$type);
 }
 
-export type Identifier = string;
+export type Identifier = 'input' | 'output' | 'predicate' | string;
 
 export function isIdentifier(item: unknown): item is Identifier {
-    return (typeof item === 'string' && (/[a-zA-Z_][a-zA-Z0-9_]*/.test(item) || /`(\\.|[^`\\\n\r])+`/.test(item)));
+    return item === 'input' || item === 'output' || item === 'predicate' || (typeof item === 'string' && (/[a-zA-Z_][a-zA-Z0-9_]*/.test(item) || /`(\\.|[^`\\\n\r])+`/.test(item)));
 }
 
 export interface Literal extends langium.AstNode {

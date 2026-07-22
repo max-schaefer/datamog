@@ -5,7 +5,7 @@
 # destructure it with subscript, iteration, and coercion — same
 # toolkit as JSONL ingestion, just with one source row.
 
-extensional config(blob: value).
+input predicate config(blob: value).
 
 app_name(N) :- config(C), N = as_string(C["name"]).
 

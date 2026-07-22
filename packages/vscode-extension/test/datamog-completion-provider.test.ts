@@ -64,7 +64,7 @@ function labels(list: CompletionList): string[] {
 
 describe("DatamogCompletionProvider", () => {
   test("proposes user predicate names inside a rule body", async () => {
-    const source = "extensional edge(s: string, d: string).\nreach(X, Y) :- |.\n";
+    const source = "input predicate edge(s: string, d: string).\nreach(X, Y) :- |.\n";
     const items = await getCompletions(source);
     expect(labels(items)).toContain("edge");
     expect(labels(items)).toContain("reach");
@@ -74,16 +74,16 @@ describe("DatamogCompletionProvider", () => {
   });
 
   test("proposes keywords (Langium default still active)", async () => {
-    // At program start, the grammar expects `extensional`, `?-`, or an
-    // Identifier (starting a rule). Confirm `extensional` is still
+    // At program start, the grammar expects `input` (for `input predicate`),
+    // `?-`, or an Identifier (starting a rule). Confirm `input` is still
     // proposed — our override must not stomp on super.completionFor.
     const source = "|";
     const items = await getCompletions(source);
-    expect(labels(items)).toContain("extensional");
+    expect(labels(items)).toContain("input");
   });
 
-  test("proposes column type keywords inside an extensional declaration", async () => {
-    const source = "extensional p(x: |";
+  test("proposes column type keywords inside an input predicate declaration", async () => {
+    const source = "input predicate p(x: |";
     const items = await getCompletions(source);
     // These come from Langium's default keyword completion.
     for (const t of ["string", "integer", "float", "boolean", "value"]) {
@@ -92,12 +92,12 @@ describe("DatamogCompletionProvider", () => {
   });
 
   test("tags predicate suggestions with arity-bearing detail", async () => {
-    const source = "extensional edge(s: string, d: string).\nq(X) :- |.";
+    const source = "input predicate edge(s: string, d: string).\nq(X) :- |.";
     const items = await getCompletions(source);
     const edge = items.items.find((i) => i.label === "edge");
     expect(edge).toBeDefined();
     expect(edge?.kind).toBe(CompletionItemKind.Struct);
-    expect(edge?.detail).toBe("extensional(s, d)");
+    expect(edge?.detail).toBe("input(s, d)");
   });
 
   test("proposes in-scope variables alongside predicates in a rule body", async () => {
@@ -105,7 +105,7 @@ describe("DatamogCompletionProvider", () => {
     // the terminal level — both go through `Identifier` — so completion
     // at a body-element start surfaces both groups. In-scope variables
     // come from the enclosing rule's existing atoms.
-    const source = "extensional edge(s: string, d: string).\nreach(X, Y) :- edge(X, Y), |.";
+    const source = "input predicate edge(s: string, d: string).\nreach(X, Y) :- edge(X, Y), |.";
     const items = await getCompletions(source);
     expect(labels(items)).toContain("X");
     expect(labels(items)).toContain("Y");

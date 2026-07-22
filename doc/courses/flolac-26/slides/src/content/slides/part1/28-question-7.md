@@ -8,9 +8,9 @@ tight: true
 Is the thief taller than 180 cm and shorter than 190 cm? **No.**
 
 ```datamog
-extensional villager(name: string, age: integer, height: integer).
-extensional hairColour(name: string, colour: string).
-extensional location(name: string, location: string).
+input predicate villager(name: string, age: integer, height: integer).
+input predicate hairColour(name: string, colour: string).
+input predicate location(name: string, location: string).
 
 bald(Name) :- villager(Name, _, _), not hairColour(Name, _).
 dark("black"). dark("brown").

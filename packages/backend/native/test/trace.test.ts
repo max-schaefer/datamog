@@ -123,7 +123,7 @@ describe("native backend — trace events", () => {
     ]);
     try {
       await executor.execute(`
-        extensional raw(x: integer).
+        input predicate raw(x: integer).
         derived(X) :- raw(X), X > 15.
         ?- derived(X).
       `);

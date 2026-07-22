@@ -63,10 +63,12 @@ describe("isFastCommitChunk", () => {
     expect(isFastCommitChunk("?- ancestor(X,\n   Y).")).toBe(true);
   });
 
-  test("extensional declaration fast-commits", () => {
-    expect(isFastCommitChunk("extensional p(x: integer).")).toBe(true);
-    expect(isFastCommitChunk("extensional p(\n  x: integer\n).")).toBe(true);
-    expect(isFastCommitChunk("extensional(p, x).")).toBe(true);
+  test("input predicate declaration fast-commits", () => {
+    expect(isFastCommitChunk("input predicate p(x: integer).")).toBe(true);
+    expect(isFastCommitChunk("input predicate p(\n  x: integer\n).")).toBe(true);
+    // `input(...)` is a predicate atom named `input` (a fact), not a
+    // declaration, so it accumulates like any other fact.
+    expect(isFastCommitChunk("input(p, x).")).toBe(false);
   });
 
   test("rules do not fast-commit", () => {
@@ -74,23 +76,23 @@ describe("isFastCommitChunk", () => {
     expect(isFastCommitChunk("ancestor(X, Y) :- parent(X, Y).")).toBe(false);
   });
 
-  test("identifiers that share a prefix with `extensional` do not match", () => {
-    // No real Datamog program would write this, but the keyword check
-    // must still be precise — an arbitrary identifier prefix is not a
-    // declaration.
-    expect(isFastCommitChunk("extensionalize(X).")).toBe(false);
+  test("identifiers that share a prefix with `input` do not match", () => {
+    // A predicate named `inputs` starts with the keyword `input` but is an
+    // ordinary identifier, so the check must require a keyword boundary and
+    // not fast-commit it.
+    expect(isFastCommitChunk("inputs(X).")).toBe(false);
   });
 
   test("leading whitespace is skipped", () => {
     expect(isFastCommitChunk("  \n  ?- p(X).")).toBe(true);
-    expect(isFastCommitChunk("\n\n  extensional p(x: integer).")).toBe(true);
+    expect(isFastCommitChunk("\n\n  input predicate p(x: integer).")).toBe(true);
   });
 
   test("leading comments are skipped", () => {
     expect(isFastCommitChunk("# describe what this does\n?- p(X).")).toBe(true);
-    expect(isFastCommitChunk("# the parent table\nextensional parent(p: string, c: string).")).toBe(
-      true,
-    );
+    expect(
+      isFastCommitChunk("# the parent table\ninput predicate parent(p: string, c: string)."),
+    ).toBe(true);
   });
 
   test("rule following a comment does not fast-commit", () => {

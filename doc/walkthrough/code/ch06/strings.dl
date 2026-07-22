@@ -5,7 +5,7 @@
 # slicing (`W[0:3]` — a substring). All work inside rule bodies
 # and heads.
 
-extensional words(w: string).
+input predicate words(w: string).
 
 # Concatenation.
 greeting(G) :- words(W), G = "hello, " + W.

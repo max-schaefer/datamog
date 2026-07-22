@@ -7,7 +7,7 @@ section: "Pokémon"
 Query extensional predicates with the `?-` syntax: **check** whether a tuple is present, or **look up** tuples by leaving some components as variables.
 
 ```datamog
-extensional pokemon(id: integer, name: string, hp: integer).
+input predicate pokemon(id: integer, name: string, hp: integer).
 
 ?- pokemon(1, "Bulbasaur", 45).   # check: yes
 ```

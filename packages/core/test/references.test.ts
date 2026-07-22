@@ -13,19 +13,19 @@ function refsOf(source: string) {
 }
 
 describe("findPredicateReferences", () => {
-  test("body atom references jump to extensional declaration", () => {
-    const source = "extensional p(x: integer).\nq(X) :- p(X).";
+  test("body atom references jump to input predicate declaration", () => {
+    const source = "input predicate p(x: integer).\nq(X) :- p(X).";
     expect(refsOf(source)).toEqual([{ name: "p", span: "p", target: "p" }]);
   });
 
   test("query atom references count too", () => {
-    const source = "extensional p(x: integer).\n?- p(X).";
+    const source = "input predicate p(x: integer).\n?- p(X).";
     expect(refsOf(source)).toEqual([{ name: "p", span: "p", target: "p" }]);
   });
 
   test("references to an IDB jump to its first rule head", () => {
     const source = `
-      extensional edge(s: string, d: string).
+      input predicate edge(s: string, d: string).
       reach(X, Y) :- edge(X, Y).
       reach(X, Y) :- edge(X, Z), reach(Z, Y).
       ?- reach(X, Y).
@@ -46,8 +46,8 @@ describe("findPredicateReferences", () => {
     // any whitespace, otherwise Cmd+click on `bar` would land
     // outside the link region (or on `not` itself).
     const source = `
-      extensional foo(x: string).
-      extensional bar(x: string).
+      input predicate foo(x: string).
+      input predicate bar(x: string).
       r(X) :- foo(X), not bar(X).
     `;
     const refs = refsOf(source);
@@ -56,26 +56,26 @@ describe("findPredicateReferences", () => {
     expect(negated!.span).toBe("bar");
   });
 
-  test("rule head and extensional declaration are not references", () => {
+  test("rule head and input predicate declaration are not references", () => {
     // The predicate name in a rule head (`reach(X, Y) :- …`) and in
     // an `extensional` declaration is the *target* of jump-to-def,
     // not a reference. We don't want clicking a head to jump to
     // itself, so they must not appear in the reference list.
     const source = `
-      extensional edge(s: string, d: string).
+      input predicate edge(s: string, d: string).
       reach(X, Y) :- edge(X, Y).
     `;
     const refs = refsOf(source);
     // Only `edge` in the body is a reference; `reach` (head) and
-    // `edge` (extensional decl) aren't.
+    // `edge` (input predicate decl) aren't.
     expect(refs).toHaveLength(1);
     expect(refs[0]!.name).toBe("edge");
   });
 
   test("references are returned in source order", () => {
     const source = `
-      extensional a(x: integer).
-      extensional b(x: integer).
+      input predicate a(x: integer).
+      input predicate b(x: integer).
       r(X) :- b(X), a(X).
       ?- a(X).
     `;

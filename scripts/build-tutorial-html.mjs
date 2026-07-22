@@ -6,7 +6,7 @@
 // replaced by a `<div data-datamog>` placeholder carrying a JSON payload
 // (the program plus any pre-baked data), which `src/embed/index.ts` mounts at
 // load time. Data is pulled from `doc/embed-tutorials/data/<predicate>.csv`
-// (or `.jsonl`), matched by the block's `extensional` declarations — the same
+// (or `.jsonl`), matched by the block's `input predicate` declarations — the same
 // file-per-predicate convention the CLI examples use.
 //
 // The output is a generated artifact (gitignored); regenerate with
@@ -25,13 +25,13 @@ const OUT_HTML = join(root, "packages", "playground", "tutorial.html");
 
 marked.setOptions({ gfm: true });
 
-// Predicate names declared `extensional` in a code block, skipping comments.
+// Predicate names declared `input predicate` in a code block, skipping comments.
 function extensionalNames(source) {
   const names = [];
   for (const line of source.split("\n")) {
     const trimmed = line.trim();
     if (trimmed.startsWith("#")) continue;
-    const m = trimmed.match(/^extensional\s+([A-Za-z_]\w*)/);
+    const m = trimmed.match(/^input\s+predicate\s+([A-Za-z_]\w*)/);
     if (m) names.push(m[1]);
   }
   return names;

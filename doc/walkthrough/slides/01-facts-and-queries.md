@@ -58,7 +58,7 @@ Eight facts, one query. Run it and you see all eight rows.
 For non-toy data, declare a typed predicate and load values from a file:
 
 ```prolog
-extensional person(name: string, country: string, year_born: integer).
+input predicate person(name: string, country: string, year_born: integer).
 
 ?- person(Name, Country, Year).
 # A file runs one query; swap one in to ask another:
@@ -72,7 +72,7 @@ Datamog looks for a sibling `person.csv` (or `.jsonl` / `.mmd`) and loads it.
 
 # Extensional vs. intensional
 
-- **Extensional** — meaning given by **enumeration** (a list of facts, a table). Declared with `extensional`.
+- **Extensional** — meaning given by **enumeration** (a list of facts, a table). Declared with `input predicate`.
 - **Intensional** — meaning given by a **definition** (a rule).
 
 Everything in this chapter is extensional. Intensional predicates arrive in Chapter 2.
@@ -126,7 +126,7 @@ SELECT DISTINCT "name" AS "Name", "country" AS "Country",
        "year_born" AS "Year" FROM "person";
 ```
 
-- `extensional` → `CREATE TABLE`
+- `input predicate` → `CREATE TABLE`
 - query → `SELECT DISTINCT`
 - variables → `AS` aliases
 - swap in a constant (`?- person(Name, "uk", Year).`) → a `WHERE` condition
@@ -153,9 +153,9 @@ Four questions → four functions. The Datalog version is **one predicate, four 
 # Recap
 
 - A program is **facts** + **queries**.
-- `extensional` declares a typed predicate; data lives in a sibling file. Inline facts are fine for small examples.
+- `input predicate` declares a typed predicate; data lives in a sibling file. Inline facts are fine for small examples.
 - **Logic lens** — predicates are relations, queries ask for witnesses.
-- **SQL lens** — `extensional` is `CREATE TABLE`; a query is `SELECT DISTINCT`.
+- **SQL lens** — `input predicate` is `CREATE TABLE`; a query is `SELECT DISTINCT`.
 - **Imperative lens** — one predicate replaces a fistful of direction-specific Python functions.
 
 ---

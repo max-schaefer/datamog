@@ -9,7 +9,7 @@
 # + `parse_json`, but at a high cost in readability and canonicalisation
 # noise; the literals are the direct path.
 
-extensional employee(id: integer, name: string, salary: integer).
+input predicate employee(id: integer, name: string, salary: integer).
 
 # Pack each row into an object `value` whose keys are sorted on the
 # native and Postgres backends; the SQLite/sql.js path preserves source

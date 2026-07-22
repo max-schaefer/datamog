@@ -9,7 +9,7 @@ The full non-recursive `reach` used one rule for each number of stops.
 Each rule is its own expression; the relation is their **union**.
 
 ```datamog
-extensional line(from: string, to: string).
+input predicate line(from: string, to: string).
 
 reach(X, Y) :- line(X, Y).                 # one stop
 reach(X, Y) :- line(X, Z), line(Z, Y).     # two stops

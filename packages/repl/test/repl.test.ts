@@ -26,7 +26,7 @@ describe("DatamogRepl", () => {
   test("declaration emits a declared event", async () => {
     const repl = makeRepl();
     try {
-      const events = await repl.feed("extensional p(x: integer).");
+      const events = await repl.feed("input predicate p(x: integer).");
       expect(events).toEqual([{ kind: "declared", predicate: "p", arity: 1, rowsLoaded: 0 }]);
     } finally {
       await repl.close();
@@ -36,7 +36,7 @@ describe("DatamogRepl", () => {
   test("rule emits a rule event", async () => {
     const repl = makeRepl();
     try {
-      await repl.feed("extensional q(x: integer).");
+      await repl.feed("input predicate q(x: integer).");
       const events = await repl.feed("p(X) :- q(X).");
       const rule = findEvent(events, "rule");
       expect(rule).toEqual({ kind: "rule", predicate: "p", arity: 1 });
@@ -48,7 +48,7 @@ describe("DatamogRepl", () => {
   test("query emits a result event with column types", async () => {
     const repl = makeRepl();
     try {
-      await repl.feed("extensional q(x: integer).");
+      await repl.feed("input predicate q(x: integer).");
       const events = await repl.feed("?- q(X).");
       const result = findEvent(events, "result");
       expect(result).toBeDefined();
@@ -65,7 +65,7 @@ describe("DatamogRepl", () => {
     try {
       // Two rules for `ancestor` in one chunk define a recursive view.
       await repl.feed(`
-        extensional parent(p: string, c: string).
+        input predicate parent(p: string, c: string).
         ancestor(X, Y) :- parent(X, Y).
         ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
       `);
@@ -82,8 +82,8 @@ describe("DatamogRepl", () => {
   test("re-declaring an EDB across chunks is rejected with chunk-relative position", async () => {
     const repl = makeRepl();
     try {
-      await repl.feed("extensional p(x: integer).");
-      const events = await repl.feed("\nextensional p(y: string).");
+      await repl.feed("input predicate p(x: integer).");
+      const events = await repl.feed("\ninput predicate p(y: string).");
       const err = findEvent(events, "error");
       expect(err).toBeDefined();
       expect(err!.phase).toBe("analyze");
@@ -101,7 +101,7 @@ describe("DatamogRepl", () => {
     const repl = makeRepl();
     try {
       await repl.feed(`
-        extensional q(x: integer).
+        input predicate q(x: integer).
         p(X) :- q(X).
       `);
       const events = await repl.feed("p(X) :- q(X), q(Y).");
@@ -147,11 +147,11 @@ describe("DatamogRepl", () => {
   test(":reset clears state and allows re-declaration", async () => {
     const repl = makeRepl();
     try {
-      await repl.feed("extensional p(x: integer).");
+      await repl.feed("input predicate p(x: integer).");
       const reset = await repl.feed(":reset");
       expect(reset[0]?.kind).toBe("info");
       // After reset, the predicate name is free again.
-      const events = await repl.feed("extensional p(y: string).");
+      const events = await repl.feed("input predicate p(y: string).");
       const decl = findEvent(events, "declared");
       expect(decl).toBeDefined();
     } finally {
@@ -186,7 +186,7 @@ describe("DatamogRepl", () => {
     const repl = makeRepl();
     try {
       await repl.feed(`
-        extensional q(x: integer).
+        input predicate q(x: integer).
         p(X) :- q(X).
       `);
       const events = await repl.feed(":schema");
@@ -208,7 +208,7 @@ describe("DatamogRepl", () => {
   test(":sql previews the generated SQL without executing", async () => {
     const repl = makeRepl();
     try {
-      await repl.feed("extensional q(x: integer).");
+      await repl.feed("input predicate q(x: integer).");
       const events = await repl.feed(":sql ?- q(X).");
       const sql = findEvent(events, "sql");
       expect(sql).toBeDefined();
@@ -222,7 +222,7 @@ describe("DatamogRepl", () => {
   test(":sql with a non-query rejects", async () => {
     const repl = makeRepl();
     try {
-      await repl.feed("extensional q(x: integer).");
+      await repl.feed("input predicate q(x: integer).");
       const events = await repl.feed(":sql p(X) :- q(X).");
       const err = findEvent(events, "error");
       expect(err).toBeDefined();
@@ -235,12 +235,12 @@ describe("DatamogRepl", () => {
   test(":show prints accumulated statements", async () => {
     const repl = makeRepl();
     try {
-      await repl.feed("extensional q(x: integer).");
+      await repl.feed("input predicate q(x: integer).");
       await repl.feed("p(X) :- q(X).");
       const events = await repl.feed(":show");
       expect(events[0]?.kind).toBe("info");
       const msg = (events[0] as { message: string }).message;
-      expect(msg).toContain("extensional q");
+      expect(msg).toContain("input predicate q");
       expect(msg).toContain("p(X) :- q(X).");
     } finally {
       await repl.close();
@@ -253,7 +253,7 @@ describe("DatamogRepl", () => {
       // Build an inline rule that produces deterministic rows so we don't
       // need a CSV loader for this test.
       const events = await repl.feed(`
-        extensional pair(a: integer, b: integer).
+        input predicate pair(a: integer, b: integer).
         sum_pair(A, B, S) :- pair(A, B), S = A + B.
       `);
       expect(findEvent(events, "rule")).toBeDefined();

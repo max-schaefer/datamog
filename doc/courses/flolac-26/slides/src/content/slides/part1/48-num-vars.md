@@ -9,7 +9,7 @@ Nothing above is tied to three variables.
 Make the variable count data too, and size `var` and `assignment` from it:
 
 ```prolog
-extensional num_vars(n: integer).
+input predicate num_vars(n: integer).
 
 var(V)        :- num_vars(N), V in [0 .. N - 1].
 assignment(A) :- num_vars(N), A in [0 .. (1 << N) - 1].

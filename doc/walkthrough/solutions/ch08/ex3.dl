@@ -1,7 +1,7 @@
 # Exercise 8.3 solution.
 
-extensional a(x: string).
-extensional b(x: string).
+input predicate a(x: string).
+input predicate b(x: string).
 
 only_in_a(X) :- a(X), not b(X).
 output predicate only_in_b(X) :- b(X), not a(X).

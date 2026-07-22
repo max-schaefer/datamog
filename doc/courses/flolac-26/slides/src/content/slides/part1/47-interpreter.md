@@ -9,7 +9,7 @@ One fixed set of rules solves any CNF.
 No separate predicate per clause is needed:
 
 ```datamog
-extensional literal(clause: integer, var: integer, polarity: integer).
+input predicate literal(clause: integer, var: integer, polarity: integer).
 
 assignment(A) :- A in [0b000 .. 0b111].
 var(V)        :- V in [0 .. 2].

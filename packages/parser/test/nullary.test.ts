@@ -6,7 +6,7 @@ import { parse } from "../src/index.ts";
 // so the empty parens are what mark an atom.
 describe("nullary predicates", () => {
   test("nullary head", () => {
-    const program = parse("extensional q(x: integer).\np() :- q(1).");
+    const program = parse("input predicate q(x: integer).\np() :- q(1).");
     const rule = program.statements.find((s) => s.$type === "Rule") as Rule;
     expect(rule.head.predicate).toBe("p");
     expect(rule.head.args).toHaveLength(0);

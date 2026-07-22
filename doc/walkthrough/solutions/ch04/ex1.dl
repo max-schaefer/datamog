@@ -3,7 +3,7 @@
 # Three separate rules, one per value of K. Non-recursive — each
 # rule references `edge` directly the right number of times.
 
-extensional edge(src: string, dst: string).
+input predicate edge(src: string, dst: string).
 
 reach_in("1", X, Y) :- edge(X, Y).
 reach_in("2", X, Y) :- edge(X, Z), edge(Z, Y).

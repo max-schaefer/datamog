@@ -11,7 +11,7 @@
 #
 # native/seminaive only: Add and Mul each recurse on two sub-spans (non-linear).
 
-extensional token(pos: integer, kind: string, val: integer?).
+input predicate token(pos: integer, kind: string, val: integer?).
 
 # A number token is a Lit leaf spanning one position.
 ast(i, i + 1)[Lit(V)] :- token(i, "num", V).

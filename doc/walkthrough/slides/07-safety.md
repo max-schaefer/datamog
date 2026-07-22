@@ -88,7 +88,7 @@ EDBs declare types explicitly. IDBs have types **inferred** by a fixed-point wal
 # Inference in action
 
 ```prolog
-extensional person(name: string, age: integer).
+input predicate person(name: string, age: integer).
 
 grown_up(Name) :- person(Name, A), A >= 18.
 ```
@@ -99,15 +99,15 @@ The inferencer walks the body:
 - `A >= 18` is consistent (integer vs. integer literal).
 - Head `grown_up(Name)` therefore has column 1 of type `string`.
 
-No explicit `extensional grown_up(...)` declaration needed.
+No explicit `input predicate grown_up(...)` declaration needed.
 
 ---
 
 # Type conflicts
 
 ```prolog
-extensional a(x: integer).
-extensional b(x: string).
+input predicate a(x: integer).
+input predicate b(x: string).
 
 c(X) :- a(X).
 c(X) :- b(X).
@@ -147,7 +147,7 @@ Cannot compare 'integer' and 'string' in comparison
 `true` / `false` are reserved words. Equality and inequality work fine:
 
 ```prolog
-extensional account(name: string, active: boolean).
+input predicate account(name: string, active: boolean).
 
 live(N)     :- account(N, true).
 disabled(N) :- account(N, false).

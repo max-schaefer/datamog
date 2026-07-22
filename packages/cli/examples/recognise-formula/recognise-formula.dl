@@ -31,8 +31,8 @@
 # prop_var is the variable alphabet; the input string lives in input.csv and is
 # the hypothetical syllogism (p->q)&(q->r)->(p->r), a well-formed formula.
 
-extensional input(s: string).
-extensional prop_var(name: string).
+input predicate input(s: string).
+input predicate prop_var(name: string).
 
 # A formula is text, turned into relations: one row per character, plus its length.
 char(I, C) :- input(S), I in [0 .. length(S) - 1], C = S[I].

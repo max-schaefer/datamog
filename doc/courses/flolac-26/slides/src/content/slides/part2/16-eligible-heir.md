@@ -8,8 +8,8 @@ tight: true
 Only living descendants are eligible, and criminals are not.
 
 ```datamog
-extensional parent(parent: string, child: string).
-extensional deceased(name: string).
+input predicate parent(parent: string, child: string).
+input predicate deceased(name: string).
 
 ancestor(X, Y) :- parent(X, Y).
 ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).

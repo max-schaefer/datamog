@@ -54,7 +54,7 @@ output predicate reach(X, Z) :- reach(X, Y), edge(Y, Z).
   supplied from outside the module's rules: at the CLI from `P.csv` in the
   module's own directory (per the conservative doc's decision 1), or, when the
   module is imported, by an actual the importer wires in. This replaces the
-  `extensional` keyword; `extensional` stops meaning "table-backed" and starts
+  `input predicate` keyword; `input predicate` stops meaning "table-backed" and starts
   meaning "supplied from outside these rules", so the rename reflects the real
   role.
 - **`output predicate Head :- body.`** marks a rule as defining a named export.
@@ -218,7 +218,7 @@ from the conservative doc, delivered as the native model instead of a bolt-on.
 Beyond the conservative doc's list (grammar, keywords, resolver, per-module
 diagnostics, per-module EDB directories):
 
-- **parser / keywords**: replace `extensional` with `input predicate`; add
+- **parser / keywords**: replace `input predicate` with `input predicate`; add
   `output predicate`; add the module-reference default form on input
   declarations (`= "path".name(actual = pred, ...)`). Reserve `input`, `output`,
   and `predicate`.

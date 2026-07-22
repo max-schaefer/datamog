@@ -11,7 +11,7 @@ export const titanicExample = {
 # The passenger table is loaded from pandas' CORS-enabled raw GitHub CSV
 # via the gh: shorthand (gh:pandas-dev/pandas/doc/data/titanic.csv).
 
-extensional passenger(
+input predicate passenger(
     PassengerId: integer,
     Survived: integer,
     Pclass: integer,

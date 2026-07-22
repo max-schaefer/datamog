@@ -1,6 +1,6 @@
 # Exercise 6.1 solution.
 
-extensional score(student: string, subject: string, points: integer).
+input predicate score(student: string, subject: string, points: integer).
 
 grade_a(S, Sub) :- score(S, Sub, P), P >= 90.
 output predicate grade_b(S, Sub) :- score(S, Sub, P), P >= 80, P < 90.

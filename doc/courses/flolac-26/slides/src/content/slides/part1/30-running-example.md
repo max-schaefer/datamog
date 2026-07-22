@@ -8,7 +8,7 @@ tight: true
 We'll explain Datalog evaluation using this small program over a set of numbers:
 
 ```datamog
-extensional num(n: integer).
+input predicate num(n: integer).
 
 even(N)       :- num(N), N % 2 = 0.
 odd(N)        :- num(N), not even(N).

@@ -30,10 +30,10 @@
 #
 # which is a tautology, so we expect a "yes" verdict and no counterexamples.
 
-extensional node(id: integer, kind: string).
-extensional node_var(id: integer, name: string).
-extensional node_child(id: integer, pos: integer, child: integer).
-extensional root(id: integer).
+input predicate node(id: integer, kind: string).
+input predicate node_var(id: integer, name: string).
+input predicate node_child(id: integer, pos: integer, child: integer).
+input predicate root(id: integer).
 
 # --- Deriving the CNF (the polarity trick) ---
 #

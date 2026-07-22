@@ -15,7 +15,7 @@
 # Swapping the rule order doesn't change the answer — as advertised
 # in Chapter 2, rule order is cosmetic.
 
-extensional edge(src: string, dst: string, colour: string).
+input predicate edge(src: string, dst: string, colour: string).
 
 rr(X, Y) :- edge(X, Y, "red").
 rr(X, Y) :- bb(X, Z), edge(Z, Y, "red").

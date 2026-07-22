@@ -44,9 +44,9 @@ describe("UrlJsonLoader", () => {
       urls: { configured: "https://example.test/data.json", blank: "  " },
     });
 
-    expect(await loader.canLoad(getExtDecl("extensional configured(blob: value)."))).toBe(true);
-    expect(await loader.canLoad(getExtDecl("extensional blank(blob: value)."))).toBe(false);
-    expect(await loader.canLoad(getExtDecl("extensional missing(blob: value)."))).toBe(false);
+    expect(await loader.canLoad(getExtDecl("input predicate configured(blob: value)."))).toBe(true);
+    expect(await loader.canLoad(getExtDecl("input predicate blank(blob: value)."))).toBe(false);
+    expect(await loader.canLoad(getExtDecl("input predicate missing(blob: value)."))).toBe(false);
   });
 
   test("HTTP failure surfaces a useful diagnostic", async () => {
@@ -54,14 +54,14 @@ describe("UrlJsonLoader", () => {
     const loader = new UrlJsonLoader({
       urls: { p: "https://example.test/missing.json" },
     });
-    const decl = getExtDecl("extensional p(blob: value).");
+    const decl = getExtDecl("input predicate p(blob: value).");
 
     expect(loader.readRows(decl)).rejects.toThrow(/Failed to fetch JSON for 'p': 404/);
   });
 
   test("non-HTTP URLs are rejected", async () => {
     const loader = new UrlJsonLoader({ urls: { p: "file:///etc/passwd" } });
-    const decl = getExtDecl("extensional p(blob: value).");
+    const decl = getExtDecl("input predicate p(blob: value).");
 
     expect(loader.readRows(decl)).rejects.toThrow(/must use HTTP or HTTPS/);
   });
@@ -69,7 +69,7 @@ describe("UrlJsonLoader", () => {
   test("malformed remote JSON carries the URL in the error", async () => {
     restore = mockFetch(new Map([["https://example.test/p.json", "{bad json}"]]));
     const loader = new UrlJsonLoader({ urls: { p: "https://example.test/p.json" } });
-    const decl = getExtDecl("extensional p(blob: value).");
+    const decl = getExtDecl("input predicate p(blob: value).");
 
     expect(loader.readRows(decl)).rejects.toThrow(/example\.test\/p\.json/);
   });
@@ -79,7 +79,7 @@ describe("UrlJsonLoader", () => {
     const loader = new UrlJsonLoader({
       urls: { p: "https://example.test/p.json" },
     });
-    const decl = getExtDecl("extensional p(blob: value).");
+    const decl = getExtDecl("input predicate p(blob: value).");
 
     const inserted: { query: string; params: unknown[] }[] = [];
     const mockBackend = {
@@ -101,7 +101,7 @@ describe("UrlJsonLoader", () => {
     // document becomes one row.
     restore = mockFetch(new Map([["https://example.test/cfg.json", '{"name":"datamog"}']]));
     const loader = new UrlJsonLoader({ urls: { cfg: "https://example.test/cfg.json" } });
-    const decl = getExtDecl("extensional cfg(blob: value).");
+    const decl = getExtDecl("input predicate cfg(blob: value).");
 
     await expect(loader.readRows(decl)).resolves.toEqual([{ blob: { name: "datamog" } }]);
   });

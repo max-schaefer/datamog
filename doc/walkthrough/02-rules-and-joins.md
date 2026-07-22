@@ -43,7 +43,7 @@ graph TD
 
 (If you're curious: this Mermaid source is identical to what Datamog's
 built-in Mermaid loader would read. Save it as `parent.mmd` alongside
-a `.dl` file declaring `extensional parent(parent_name: string,
+a `.dl` file declaring `input predicate parent(parent_name: string,
 child_name: string).` and you get the same eight facts as the CSV.)
 
 Four people at the top, two in the middle, two at the bottom.
@@ -52,7 +52,7 @@ Nothing clever; just enough structure to play with.
 ## Your first rule
 
 Open [`code/ch02/family.dl`](code/ch02/family.dl). Along with the
-now-familiar `extensional` declaration, you'll see:
+now-familiar `input predicate` declaration, you'll see:
 
 ```prolog
 has_a_parent(C) :- parent(_, C).
@@ -68,7 +68,7 @@ defining); on the right, the **rule body** (what must hold for the
 head to be true).
 
 The head predicate `has_a_parent` is new; we're not loading it from
-anywhere, and we haven't declared it with `extensional`. It is an
+anywhere, and we haven't declared it with `input predicate`. It is an
 **intensional** predicate — defined by rules rather than by data.
 
 ### Seeing a predicate's results

@@ -19,7 +19,7 @@ Back in Chapter 0 we teased this. Open
 [`code/ch04/ancestor.dl`](code/ch04/ancestor.dl):
 
 ```prolog
-extensional parent(parent_name: string, child_name: string).
+input predicate parent(parent_name: string, child_name: string).
 
 ancestor(X, Y) :- parent(X, Y).
 ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
@@ -93,7 +93,7 @@ graph LR
 From [`code/ch04/reach.dl`](code/ch04/reach.dl):
 
 ```prolog
-extensional edge(src: string, dst: string).
+input predicate edge(src: string, dst: string).
 
 reach(X, Y) :- edge(X, Y).
 reach(X, Y) :- edge(X, Z), reach(Z, Y).
@@ -328,7 +328,7 @@ Given a graph with coloured edges, define two predicates that
 alternate colours:
 
 ```prolog
-extensional edge(src: string, dst: string, colour: string).
+input predicate edge(src: string, dst: string, colour: string).
 
 # rr = reachable ending on a red step
 rr(X, Y) :- edge(X, Y, "red").

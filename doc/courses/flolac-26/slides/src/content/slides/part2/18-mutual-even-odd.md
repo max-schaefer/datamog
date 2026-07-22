@@ -11,7 +11,7 @@ There, `even` was defined directly with `% 2`.
 Here is a definition that only looks at the **previous** number:
 
 ```datamog
-extensional num(n: integer).
+input predicate num(n: integer).
 
 even(0).
 even(N) :- num(N), odd(N - 1).

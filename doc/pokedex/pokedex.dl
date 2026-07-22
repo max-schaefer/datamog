@@ -27,11 +27,11 @@
 #     --learnsets https://play.pokemonshowdown.com/data/learnsets.json \
 #     --showdex https://play.pokemonshowdown.com/data/pokedex.json
 
-extensional pokedex(data: value).     # array of Pokemon species
-extensional types(data: value).       # array of 18 types + effectiveness
-extensional moves(data: value).       # object keyed by move id (Showdown)
-extensional learnsets(data: value).   # object keyed by Pokemon id (Showdown)
-extensional showdex(data: value).     # Showdown pokedex: id -> {num, ...}
+input predicate pokedex(data: value).     # array of Pokemon species
+input predicate types(data: value).       # array of 18 types + effectiveness
+input predicate moves(data: value).       # object keyed by move id (Showdown)
+input predicate learnsets(data: value).   # object keyed by Pokemon id (Showdown)
+input predicate showdex(data: value).     # Showdown pokedex: id -> {num, ...}
 
 # --- From pokedex.json (keyed by national-dex Id) --------------------
 

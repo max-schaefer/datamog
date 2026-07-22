@@ -6,7 +6,7 @@
 # and coerce leaves to primitive SQL types so we can compare them
 # with regular literals.
 
-extensional event(payload: value).
+input predicate event(payload: value).
 
 # Coerce the top-level scalar fields to primitive SQL types.
 request(Id, Method, Path, Status) :-

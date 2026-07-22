@@ -26,20 +26,20 @@ describe("CsvLoader", () => {
   test("canLoad returns true when file exists", async () => {
     await Bun.write(join(tempDir, "parent.csv"), "name,child\nalice,bob\n");
     const loader = new CsvLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     expect(await loader.canLoad(decl)).toBe(true);
   });
 
   test("canLoad returns false when file does not exist", async () => {
     const loader = new CsvLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     expect(await loader.canLoad(decl)).toBe(false);
   });
 
   test("parseCsv parses simple CSV", async () => {
     await Bun.write(join(tempDir, "parent.csv"), "name,child\nalice,bob\ncarol,dave\n");
     const loader = new CsvLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     const rows = await loader.readRows(decl);
     expect(rows).toEqual([
       { name: "alice", child: "bob" },
@@ -53,7 +53,7 @@ describe("CsvLoader", () => {
     // swapped `name` and `child`.
     await Bun.write(join(tempDir, "parent.csv"), "child,name\nbob,alice\n");
     const loader = new CsvLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     const rows = await loader.readRows(decl);
     expect(rows).toEqual([{ name: "alice", child: "bob" }]);
   });
@@ -61,7 +61,7 @@ describe("CsvLoader", () => {
   test("headered CSV ignores extra columns", async () => {
     await Bun.write(join(tempDir, "parent.csv"), "child,unused,name\nbob,ignored,alice\n");
     const loader = new CsvLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     const rows = await loader.readRows(decl);
     expect(rows).toEqual([{ name: "alice", child: "bob" }]);
   });
@@ -69,7 +69,7 @@ describe("CsvLoader", () => {
   test("headered CSV rejects a missing declared column", async () => {
     await Bun.write(join(tempDir, "parent.csv"), "name\nalice\n");
     const loader = new CsvLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     expect(loader.readRows(decl)).rejects.toThrow(/missing field 'child'/);
   });
 
@@ -85,7 +85,7 @@ describe("CsvLoader", () => {
     // which `JSON.stringify` omits) — wrong data with no diagnostic. The
     // gsheet and vscode disk loaders don't pre-guard headers with
     // `includes`, so they relied on this shared primitive being correct.
-    const decl = getExtDecl("extensional t(toString: string, x: integer).");
+    const decl = getExtDecl("input predicate t(toString: string, x: integer).");
     expect(() => csvRowsFromKeyed([{ x: "1" }], decl, { source: "t.csv" })).toThrow(
       /missing field 'toString'/,
     );
@@ -97,14 +97,14 @@ describe("CsvLoader", () => {
     // earlier cell for that name.
     await Bun.write(join(tempDir, "parent.csv"), "name,name,child\nalice,eve,bob\n");
     const loader = new CsvLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     expect(loader.readRows(decl)).rejects.toThrow(/duplicate field 'name'/);
   });
 
   test("parseCsv handles quoted fields with commas", async () => {
     await Bun.write(join(tempDir, "data.csv"), 'a,b\n"hello, world",42\n');
     const loader = new CsvLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional data(a: string, b: integer).");
+    const decl = getExtDecl("input predicate data(a: string, b: integer).");
     const rows = await loader.readRows(decl);
     expect(rows).toEqual([{ a: "hello, world", b: 42 }]);
   });
@@ -112,7 +112,7 @@ describe("CsvLoader", () => {
   test("parseCsv handles quoted fields with escaped quotes", async () => {
     await Bun.write(join(tempDir, "data.csv"), 'a\n"say ""hi"""\n');
     const loader = new CsvLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional data(a: string).");
+    const decl = getExtDecl("input predicate data(a: string).");
     const rows = await loader.readRows(decl);
     expect(rows).toEqual([{ a: 'say "hi"' }]);
   });
@@ -120,7 +120,7 @@ describe("CsvLoader", () => {
   test("coerces types based on ext declaration", async () => {
     await Bun.write(join(tempDir, "t.csv"), "a,b,c,d\nhello,42,3.14,true\n");
     const loader = new CsvLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional t(a: string, b: integer, c: float, d: boolean).");
+    const decl = getExtDecl("input predicate t(a: string, b: integer, c: float, d: boolean).");
     const rows = await loader.readRows(decl);
     expect(rows).toEqual([{ a: "hello", b: 42, c: 3.14, d: true }]);
   });
@@ -128,7 +128,7 @@ describe("CsvLoader", () => {
   test("nullable columns accept empty CSV cells as null", async () => {
     await Bun.write(join(tempDir, "t.csv"), "name,score,active\nalice,,\nbob,7,true\n");
     const loader = new CsvLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional t(name: string, score: integer?, active: boolean?).");
+    const decl = getExtDecl("input predicate t(name: string, score: integer?, active: boolean?).");
     const rows = await loader.readRows(decl);
     expect(rows).toEqual([
       { name: "alice", score: null, active: null },
@@ -139,7 +139,7 @@ describe("CsvLoader", () => {
   test("boolean coercion accepts various values", async () => {
     await Bun.write(join(tempDir, "t.csv"), "x\ntrue\nfalse\n1\n0\nyes\nno\n");
     const loader = new CsvLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional t(x: boolean).");
+    const decl = getExtDecl("input predicate t(x: boolean).");
     const rows = await loader.readRows(decl);
     expect(rows.map((r) => r.x)).toEqual([true, false, true, false, true, false]);
   });
@@ -149,7 +149,7 @@ describe("CsvLoader", () => {
     // which was inconsistent and rejected whitespace-padded CSV fields.
     await Bun.write(join(tempDir, "t.csv"), "x\n true\n\tyes\n false \n");
     const loader = new CsvLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional t(x: boolean).");
+    const decl = getExtDecl("input predicate t(x: boolean).");
     const rows = await loader.readRows(decl);
     expect(rows.map((r) => r.x)).toEqual([true, true, false]);
   });
@@ -157,7 +157,7 @@ describe("CsvLoader", () => {
   test("CSV without header row", async () => {
     await Bun.write(join(tempDir, "parent.csv"), "alice,bob\ncarol,dave\n");
     const loader = new CsvLoader({ directory: tempDir, hasHeader: false });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     const rows = await loader.readRows(decl);
     expect(rows).toEqual([
       { name: "alice", child: "bob" },
@@ -168,7 +168,7 @@ describe("CsvLoader", () => {
   test("custom delimiter", async () => {
     await Bun.write(join(tempDir, "parent.csv"), "name\tchild\nalice\tbob\n");
     const loader = new CsvLoader({ directory: tempDir, delimiter: "\t" });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     const rows = await loader.readRows(decl);
     expect(rows).toEqual([{ name: "alice", child: "bob" }]);
   });
@@ -176,7 +176,7 @@ describe("CsvLoader", () => {
   test("skips empty trailing lines", async () => {
     await Bun.write(join(tempDir, "parent.csv"), "name,child\nalice,bob\n\n\n");
     const loader = new CsvLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     const rows = await loader.readRows(decl);
     expect(rows).toHaveLength(1);
   });
@@ -184,14 +184,14 @@ describe("CsvLoader", () => {
   test("rejects rows with wrong number of fields", async () => {
     await Bun.write(join(tempDir, "parent.csv"), "name,child\nalice\n");
     const loader = new CsvLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     expect(loader.readRows(decl)).rejects.toThrow(/expected 2 fields but got 1/);
   });
 
   test("rejects invalid integer value", async () => {
     await Bun.write(join(tempDir, "t.csv"), "val\nhello\n");
     const loader = new CsvLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional t(val: integer).");
+    const decl = getExtDecl("input predicate t(val: integer).");
     expect(loader.readRows(decl)).rejects.toThrow(/Invalid integer/);
   });
 
@@ -210,14 +210,14 @@ describe("CsvLoader", () => {
     //   line 5: bad
     await Bun.write(join(tempDir, "t.csv"), "val\n1\n\n\nbad\n");
     const loader = new CsvLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional t(val: integer).");
+    const decl = getExtDecl("input predicate t(val: integer).");
     expect(loader.readRows(decl)).rejects.toThrow(/line 5/);
   });
 
   test("rejects invalid float value", async () => {
     await Bun.write(join(tempDir, "t.csv"), "val\nabc\n");
     const loader = new CsvLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional t(val: float).");
+    const decl = getExtDecl("input predicate t(val: float).");
     expect(loader.readRows(decl)).rejects.toThrow(/Invalid float/);
   });
 
@@ -234,7 +234,7 @@ describe("CsvLoader", () => {
     // `coerceValue` with the same gate.
     await Bun.write(join(tempDir, "t.csv"), 'val\n"[1e500]"\n');
     const loader = new CsvLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional t(val: value).");
+    const decl = getExtDecl("input predicate t(val: value).");
     expect(loader.readRows(decl)).rejects.toThrow(/Invalid JSON/);
   });
 
@@ -248,7 +248,7 @@ describe("CsvLoader", () => {
     // validation should match.
     await Bun.write(join(tempDir, "t.csv"), "val\n9007199254740993\n");
     const loader = new CsvLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional t(val: integer).");
+    const decl = getExtDecl("input predicate t(val: integer).");
     expect(loader.readRows(decl)).rejects.toThrow(/Invalid integer/);
   });
 
@@ -262,13 +262,13 @@ describe("CsvLoader", () => {
     // same source file behaves consistently across backends.
     const loader = new CsvLoader({ directory: tempDir });
 
-    const intDecl = getExtDecl("extensional i(val: integer).");
+    const intDecl = getExtDecl("input predicate i(val: integer).");
     for (const value of ["01", "-0", "1000000000"]) {
       await Bun.write(join(tempDir, "i.csv"), `val\n${value}\n`);
       expect(loader.readRows(intDecl)).rejects.toThrow(/Invalid integer/);
     }
 
-    const floatDecl = getExtDecl("extensional f(val: float).");
+    const floatDecl = getExtDecl("input predicate f(val: float).");
     for (const value of ["01.5", "-0", "1e3"]) {
       await Bun.write(join(tempDir, "f.csv"), `val\n${value}\n`);
       expect(loader.readRows(floatDecl)).rejects.toThrow(/Invalid float/);
@@ -278,35 +278,35 @@ describe("CsvLoader", () => {
   test("rejects '3.5' as an integer instead of silently truncating", async () => {
     await Bun.write(join(tempDir, "t.csv"), "val\n3.5\n");
     const loader = new CsvLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional t(val: integer).");
+    const decl = getExtDecl("input predicate t(val: integer).");
     expect(loader.readRows(decl)).rejects.toThrow(/Invalid integer/);
   });
 
   test("rejects '3abc' as an integer instead of silently truncating", async () => {
     await Bun.write(join(tempDir, "t.csv"), "val\n3abc\n");
     const loader = new CsvLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional t(val: integer).");
+    const decl = getExtDecl("input predicate t(val: integer).");
     expect(loader.readRows(decl)).rejects.toThrow(/Invalid integer/);
   });
 
   test("rejects '3abc' as a float instead of silently truncating", async () => {
     await Bun.write(join(tempDir, "t.csv"), "val\n3abc\n");
     const loader = new CsvLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional t(val: float).");
+    const decl = getExtDecl("input predicate t(val: float).");
     expect(loader.readRows(decl)).rejects.toThrow(/Invalid float/);
   });
 
   test("rejects unrecognised boolean value instead of silently coercing to false", async () => {
     await Bun.write(join(tempDir, "t.csv"), "x\nmaybe\n");
     const loader = new CsvLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional t(x: boolean).");
+    const decl = getExtDecl("input predicate t(x: boolean).");
     expect(loader.readRows(decl)).rejects.toThrow(/Invalid boolean/);
   });
 
   test("preserves trailing empty field after a trailing delimiter", async () => {
     await Bun.write(join(tempDir, "t.csv"), "a,b,c\nx,y,\n");
     const loader = new CsvLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional t(a: string, b: string, c: string).");
+    const decl = getExtDecl("input predicate t(a: string, b: string, c: string).");
     const rows = await loader.readRows(decl);
     expect(rows).toEqual([{ a: "x", b: "y", c: "" }]);
   });
@@ -314,7 +314,7 @@ describe("CsvLoader", () => {
   test("load calls sql with correct inserts", async () => {
     await Bun.write(join(tempDir, "parent.csv"), "name,child\nalice,bob\n");
     const loader = new CsvLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
 
     const insertedQueries: { query: string; params: unknown[] }[] = [];
     const mockBackend = {

@@ -9,9 +9,9 @@ Not every priority move is useful.
 Drop moves that only work in doubles battles, and the special move `bide`.
 
 ```datamog
-extensional learns(name: string, move: string).
-extensional move_priority(move: string, priority: integer).
-extensional doubles_move(move: string).
+input predicate learns(name: string, move: string).
+input predicate move_priority(move: string, priority: integer).
+input predicate doubles_move(move: string).
 
 learns_priority(Name, Move, Priority) :-
   learns(Name, Move),

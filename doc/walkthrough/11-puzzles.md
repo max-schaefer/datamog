@@ -22,9 +22,9 @@ Someone broke the vase. You have four suspects and two clues:
 From [`code/ch11/thief.dl`](code/ch11/thief.dl):
 
 ```prolog
-extensional person(name: string).
-extensional drinks(name: string, beverage: string).
-extensional hand(name: string, handedness: string).
+input predicate person(name: string).
+input predicate drinks(name: string, beverage: string).
+input predicate hand(name: string, handedness: string).
 
 drinks_tea(N)  :- drinks(N, "tea").
 right_handed(N) :- hand(N, "right").

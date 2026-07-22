@@ -7,7 +7,7 @@
 # leaves to primitive SQL types via as_string / as_integer / as_float /
 # as_boolean / length / type_of.
 
-extensional event(payload: value).
+input predicate event(payload: value).
 
 # Coerce top-level fields to primitive SQL types so we can compare
 # them with string/integer literals downstream.

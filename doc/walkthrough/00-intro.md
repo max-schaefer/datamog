@@ -45,7 +45,7 @@ later. For now, let them wash over you.
 ### 1. Ancestors (recursion)
 
 ```prolog
-extensional parent(name: string, child: string).
+input predicate parent(name: string, child: string).
 
 ancestor(X, Y) :- parent(X, Y).
 ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).

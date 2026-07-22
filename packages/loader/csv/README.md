@@ -15,7 +15,7 @@ const executor = new DatamogExecutor(backend, [
 ]);
 ```
 
-The loader looks for `<predicate>.csv` in the configured directory (e.g. `data/parent.csv` for an `extensional parent(...)` declaration). CSV files have a header row by default; the header must contain the declared column names, and extra header columns are ignored.
+The loader looks for `<predicate>.csv` in the configured directory (e.g. `data/parent.csv` for an `input predicate parent(...)` declaration). CSV files have a header row by default; the header must contain the declared column names, and extra header columns are ignored.
 
 ## Options
 

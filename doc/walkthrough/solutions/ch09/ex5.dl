@@ -4,7 +4,7 @@
 # SQL has one SELECT with three aggregate functions and a single
 # GROUP BY on Subject.
 
-extensional scores(student: string, subject: string, score: integer).
+input predicate scores(student: string, subject: string, score: integer).
 
 subject_stats(Subject, min(Score), avg(Score), max(Score)) :-
     scores(_, Subject, Score).

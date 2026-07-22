@@ -11,7 +11,7 @@ views we've developed across the tutorial.
 | `p(X, Y)` (body atom) | positive atom in rule body        | `FROM p` alias                   | iteration over `p`               |
 | `h(X) :- b1, b2.`     | `∀X. (b1 ∧ b2) → h(X)`            | `CREATE VIEW h AS SELECT ...`    | `def h(): return [X for ...]`    |
 | `?- q(X).`            | `∃X. q(X)` (with witness)         | `SELECT DISTINCT * FROM q`       | `list_of_rows_satisfying(q)`     |
-| `extensional e(...).` | base relation / EDB               | `CREATE TABLE e`                 | initial data list                |
+| `input predicate e(...).` | base relation / EDB               | `CREATE TABLE e`                 | initial data list                |
 | two rules, same head  | ∨ at predicate level              | `UNION` inside the view          | two loops, results concatenated  |
 
 ## Variables

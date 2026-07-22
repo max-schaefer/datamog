@@ -7,7 +7,7 @@ section: "Recursion"
 With recursion, we need only two rules:
 
 ```datamog
-extensional line(from: string, to: string).
+input predicate line(from: string, to: string).
 
 reach(X, Y) :- line(X, Y).                 # base case: one stop
 reach(X, Y) :- line(X, Z), reach(Z, Y).    # recursive step, along any known path

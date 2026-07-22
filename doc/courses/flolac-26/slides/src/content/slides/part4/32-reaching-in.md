@@ -9,7 +9,7 @@ Subscripts reach **into** a value: a key picks an object's field, a position pic
 Given a tree `T`:
 
 ```datamog
-extensional tree(t: value).
+input predicate tree(t: value).
 
 kind(T["type"])                 :- tree(T).   # "and"
 left(T["args"][0])              :- tree(T).   # {"type": "var", "name": "p"}

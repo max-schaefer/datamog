@@ -8,8 +8,8 @@ tight: true
 Does the thief have blond hair? **No.**
 
 ```datamog
-extensional villager(name: string, age: integer, height: integer).
-extensional hairColour(name: string, colour: string).
+input predicate villager(name: string, age: integer, height: integer).
+input predicate hairColour(name: string, colour: string).
 
 suspect(Name) :- villager(Name, _, Height),
                  Height > 150,

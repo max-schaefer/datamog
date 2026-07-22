@@ -74,11 +74,11 @@ Writing eight facts inline is fine for a toy. At any realistic size
 you want the data somewhere else — a CSV, a JSONL file, a Google
 Sheet — and you want Datamog to know what *type* each column has.
 
-For that we use `extensional`, which declares a predicate and names
+For that we use `input predicate`, which declares a predicate and names
 its columns. Look at [`code/ch01/people.dl`](code/ch01/people.dl):
 
 ```prolog
-extensional person(name: string, country: string, year_born: integer).
+input predicate person(name: string, country: string, year_born: integer).
 
 # A file runs a single query. Edit it to ask a different question.
 ?- person(Name, Country, Year).
@@ -110,7 +110,7 @@ several results from a single file at once, as *named outputs*.
 
 ### "Extensional" vs. "intensional"
 
-The word `extensional` is Datalog jargon; it comes straight from
+The word `input predicate` is Datalog jargon; it comes straight from
 logic. A predicate is *extensional* when its meaning is given by
 explicit enumeration (a list of facts, or a table). It is
 *intensional* when its meaning is given by a *definition* — a rule
@@ -179,7 +179,7 @@ more than one atom in a query body, which we'll see in Chapter 2.
 > SELECT DISTINCT "name" AS "Name", "country" AS "Country", "year_born" AS "Year" FROM "person";
 > ```
 >
-> The `extensional` declaration became `CREATE TABLE`, and the query
+> The `input predicate` declaration became `CREATE TABLE`, and the query
 > became a `SELECT DISTINCT`. Variables in the query turned into `AS`
 > aliases. Swap a constant into the query (say `?- person(Name, "uk",
 > Year).`) and re-run `--dry-run`: the constant becomes a `WHERE`
@@ -238,11 +238,11 @@ version control).
 - A Datalog program is a collection of **facts** (ground atoms)
   and a **query** (an atom with variables, prefixed with `?-`) whose
   answers are the program's default output.
-- `extensional` declares a typed predicate whose extent lives in
+- `input predicate` declares a typed predicate whose extent lives in
   a data file; inline facts work for small examples.
 - Through the **logic lens**, predicates are relations and facts
   are atomic formulas; queries ask for the set of witnesses.
-  Through the **SQL lens**, `extensional` is a `CREATE TABLE` and
+  Through the **SQL lens**, `input predicate` is a `CREATE TABLE` and
   a query is a `SELECT DISTINCT`. Through the **imperative lens**,
   each question that would be its own Python function is instead
   one query against the same predicate.

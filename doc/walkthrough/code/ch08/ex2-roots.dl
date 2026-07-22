@@ -4,7 +4,7 @@
 # prerequisite". Find the courses that appear as a prerequisite
 # for something but themselves have no prerequisites.
 
-extensional prereq(course: string, requires: string).
+input predicate prereq(course: string, requires: string).
 
 # Placeholder.
 starter_course(C) :- prereq(C, _), C = "__never_matches__".

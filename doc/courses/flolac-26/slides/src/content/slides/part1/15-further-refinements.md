@@ -10,10 +10,10 @@ Adding conditions means adding body literals.
 Also rule out protection moves:
 
 ```datamog
-extensional learns(name: string, move: string).
-extensional move_priority(move: string, priority: integer).
-extensional doubles_move(move: string).
-extensional protection_move(move: string).
+input predicate learns(name: string, move: string).
+input predicate move_priority(move: string, priority: integer).
+input predicate doubles_move(move: string).
+input predicate protection_move(move: string).
 
 learns_priority(Name, Move, Priority) :-
   learns(Name, Move),

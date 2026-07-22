@@ -5,8 +5,8 @@
 # costs and delivery times. Demonstrates transitive closure, negation
 # for extremal queries, and arithmetic comparisons.
 
-extensional assembly(part: string, subpart: string, qty: integer).
-extensional part_cost(part: string, supplier: string, cost: float, time: integer).
+input predicate assembly(part: string, subpart: string, qty: integer).
+input predicate part_cost(part: string, supplier: string, cost: float, time: integer).
 
 # Transitive closure: find all subparts of a given assembly
 all_subparts(Part, Sub) :- assembly(Part, Sub, _).

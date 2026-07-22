@@ -3,7 +3,7 @@
 # A thief has stolen the king's golden crown. Using clues from witnesses,
 # narrow down the list of 20 villagers to find the culprit.
 
-extensional person(name: string, age: integer, hair: string, height: integer, location: string).
+input predicate person(name: string, age: integer, hair: string, height: integer, location: string).
 
 # Helper: hair colors that count as "dark"
 dark_hair("black").

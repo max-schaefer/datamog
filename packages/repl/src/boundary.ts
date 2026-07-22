@@ -94,8 +94,8 @@ export function isInputComplete(buffer: string): boolean {
  * Heuristic: should the interactive REPL commit this buffer as soon as
  * it parses, or wait for a blank line first? Fast-commit fires on
  * chunks whose first significant token is `?` (a `?-` query) or the
- * `extensional` keyword (an EDB declaration). Both are stand-alone
- * statements: a query produces a result and an extensional declaration
+ * `input` keyword (an `input predicate` declaration). Both are stand-alone
+ * statements: a query produces a result and an input-predicate declaration
  * names a new predicate that can't be extended later anyway.
  *
  * Rules are deliberately *not* fast-committed: rules for one predicate
@@ -120,19 +120,16 @@ export function isFastCommitChunk(buffer: string): boolean {
       continue;
     }
     if (c === "?") return true;
-    // `extensional` is a reserved keyword in the grammar, so an exact
-    // string match followed by a non-identifier char is unambiguous.
-    const KW = "extensional";
+    // `input` is a reserved keyword that only ever begins an `input predicate`
+    // declaration, so an exact match followed by a non-identifier char (the
+    // space before `predicate`) is unambiguous.
+    const KW = "input";
     if (buffer.startsWith(KW, i)) {
+      // The keyword is followed by whitespace then `predicate`. `input(` would
+      // be a predicate atom named `input` (a fact), not a declaration, so it
+      // is not fast-committed — like any other fact.
       const next = buffer[i + KW.length];
-      if (
-        next === undefined ||
-        next === " " ||
-        next === "\t" ||
-        next === "\n" ||
-        next === "\r" ||
-        next === "("
-      ) {
+      if (next === undefined || next === " " || next === "\t" || next === "\n" || next === "\r") {
         return true;
       }
     }

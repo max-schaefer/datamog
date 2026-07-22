@@ -7,6 +7,6 @@
 # Hint: one of the three arguments to `person(...)` should be a
 # string literal; the other two should be variables.
 
-extensional person(name: string, country: string, year_born: integer).
+input predicate person(name: string, country: string, year_born: integer).
 
 # TODO: add a `?- person(...).` query that answers the exercise.

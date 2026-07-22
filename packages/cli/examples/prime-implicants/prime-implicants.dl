@@ -20,7 +20,7 @@
 # the essentials are 0-1 and 11-, since -11 is redundant (both minterms it
 # covers are covered by another prime).
 
-extensional minterm(bits: string).
+input predicate minterm(bits: string).
 
 len(N) :- minterm(S), N = length(S).
 

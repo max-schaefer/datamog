@@ -26,13 +26,13 @@ describe("JsonlLoader", () => {
   test("canLoad returns true when file exists", async () => {
     await Bun.write(join(tempDir, "parent.jsonl"), '{"name":"alice","child":"bob"}\n');
     const loader = new JsonlLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     expect(await loader.canLoad(decl)).toBe(true);
   });
 
   test("canLoad returns false when file does not exist", async () => {
     const loader = new JsonlLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     expect(await loader.canLoad(decl)).toBe(false);
   });
 
@@ -42,7 +42,7 @@ describe("JsonlLoader", () => {
       '{"name":"alice","child":"bob"}\n{"name":"carol","child":"dave"}\n',
     );
     const loader = new JsonlLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     const rows = await loader.readRows(decl);
     expect(rows).toEqual([
       { name: "alice", child: "bob" },
@@ -53,7 +53,7 @@ describe("JsonlLoader", () => {
   test("single value column consumes each JSON line as the column value", async () => {
     await Bun.write(join(tempDir, "event.jsonl"), '{"a":1}\n[1,2]\n"text"\n42\ntrue\nnull\n');
     const loader = new JsonlLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional event(payload: value).");
+    const decl = getExtDecl("input predicate event(payload: value).");
     const rows = await loader.readRows(decl);
     expect(rows).toEqual([
       { payload: { a: 1 } },
@@ -68,7 +68,7 @@ describe("JsonlLoader", () => {
   test("validates native JSON types", async () => {
     await Bun.write(join(tempDir, "t.jsonl"), '{"a":"hello","b":42,"c":3.14,"d":true}\n');
     const loader = new JsonlLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional t(a: string, b: integer, c: float, d: boolean).");
+    const decl = getExtDecl("input predicate t(a: string, b: integer, c: float, d: boolean).");
     const rows = await loader.readRows(decl);
     expect(rows).toEqual([{ a: "hello", b: 42, c: 3.14, d: true }]);
   });
@@ -79,7 +79,7 @@ describe("JsonlLoader", () => {
       '{"name":"alice","score":null}\n{"name":"bob","score":7}\n',
     );
     const loader = new JsonlLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional t(name: string, score: integer?).");
+    const decl = getExtDecl("input predicate t(name: string, score: integer?).");
     const rows = await loader.readRows(decl);
     expect(rows).toEqual([
       { name: "alice", score: null },
@@ -90,7 +90,7 @@ describe("JsonlLoader", () => {
   test("skips empty lines", async () => {
     await Bun.write(join(tempDir, "parent.jsonl"), '{"name":"alice","child":"bob"}\n\n\n');
     const loader = new JsonlLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     const rows = await loader.readRows(decl);
     expect(rows).toHaveLength(1);
   });
@@ -98,7 +98,7 @@ describe("JsonlLoader", () => {
   test("rejects rows with missing fields", async () => {
     await Bun.write(join(tempDir, "parent.jsonl"), '{"name":"alice"}\n');
     const loader = new JsonlLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     expect(loader.readRows(decl)).rejects.toThrow(/missing field 'child'/);
   });
 
@@ -112,7 +112,7 @@ describe("JsonlLoader", () => {
     // confusing "got function" type error (and a `__proto__` column would
     // silently bind the prototype object). It must report the field as
     // missing.
-    const decl = getExtDecl("extensional t(toString: value, x: integer).");
+    const decl = getExtDecl("input predicate t(toString: value, x: integer).");
     expect(() => parseJsonlContent('{"x": 1}', decl, { source: "t.jsonl" })).toThrow(
       /missing field 'toString'/,
     );
@@ -121,7 +121,7 @@ describe("JsonlLoader", () => {
   test("rejects wrong type in JSONL", async () => {
     await Bun.write(join(tempDir, "t.jsonl"), '{"val":"hello"}\n');
     const loader = new JsonlLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional t(val: integer).");
+    const decl = getExtDecl("input predicate t(val: integer).");
     expect(loader.readRows(decl)).rejects.toThrow(/Expected integer/);
   });
 
@@ -131,7 +131,7 @@ describe("JsonlLoader", () => {
     // backend's INTEGER column (Postgres int4). So a JSONL integer above
     // ~10^9 loaded on sqlite/native but overflowed int4 on Postgres, a
     // cross-backend split. Both loaders must reject the same range.
-    const decl = getExtDecl("extensional t(n: integer).");
+    const decl = getExtDecl("input predicate t(n: integer).");
     expect(() => parseJsonlContent('{"n": 3000000000}', decl, { source: "t.jsonl" })).toThrow(
       /integer/i,
     );
@@ -153,7 +153,7 @@ describe("JsonlLoader", () => {
     //   line 4: {"val":"bad"}
     await Bun.write(join(tempDir, "t.jsonl"), '{"val":1}\n\n\n{"val":"bad"}\n');
     const loader = new JsonlLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional t(val: integer).");
+    const decl = getExtDecl("input predicate t(val: integer).");
     expect(loader.readRows(decl)).rejects.toThrow(/line 4/);
   });
 
@@ -169,7 +169,7 @@ describe("JsonlLoader", () => {
     // the file-on-disk path.
     const rows = parseJsonlContent(
       '﻿{"val":1}\n{"val":2}\n',
-      getExtDecl("extensional t(val: integer)."),
+      getExtDecl("input predicate t(val: integer)."),
     );
     expect(rows).toEqual([{ val: 1 }, { val: 2 }]);
   });
@@ -185,7 +185,7 @@ describe("JsonlLoader", () => {
     // loader-side validation should match.
     await Bun.write(join(tempDir, "t.jsonl"), '{"val":1e500}\n');
     const loader = new JsonlLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional t(val: float).");
+    const decl = getExtDecl("input predicate t(val: float).");
     expect(loader.readRows(decl)).rejects.toThrow(/Expected float/);
   });
 
@@ -199,14 +199,14 @@ describe("JsonlLoader", () => {
     // mirror that here so loader-side validation agrees.
     await Bun.write(join(tempDir, "t.jsonl"), '{"val":9007199254740993}\n');
     const loader = new JsonlLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional t(val: integer).");
+    const decl = getExtDecl("input predicate t(val: integer).");
     expect(loader.readRows(decl)).rejects.toThrow(/Expected integer/);
   });
 
   test("rejects stringified number in JSONL", async () => {
     await Bun.write(join(tempDir, "t.jsonl"), '{"val":"42"}\n');
     const loader = new JsonlLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional t(val: integer).");
+    const decl = getExtDecl("input predicate t(val: integer).");
     expect(loader.readRows(decl)).rejects.toThrow(/Expected integer/);
   });
 
@@ -216,7 +216,7 @@ describe("JsonlLoader", () => {
       '{"name":"alice","child":"bob","extra":"ignored","score":99}\n',
     );
     const loader = new JsonlLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     const rows = await loader.readRows(decl);
     expect(rows).toEqual([{ name: "alice", child: "bob" }]);
   });
@@ -224,7 +224,7 @@ describe("JsonlLoader", () => {
   test("reads flat array rows from JSONL", async () => {
     await Bun.write(join(tempDir, "parent.jsonl"), '["alice","bob"]\n["carol","dave"]\n');
     const loader = new JsonlLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     const rows = await loader.readRows(decl);
     expect(rows).toEqual([
       { name: "alice", child: "bob" },
@@ -235,7 +235,7 @@ describe("JsonlLoader", () => {
   test("validates types in flat array rows", async () => {
     await Bun.write(join(tempDir, "t.jsonl"), '["hello",42,3.14,true]\n');
     const loader = new JsonlLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional t(a: string, b: integer, c: float, d: boolean).");
+    const decl = getExtDecl("input predicate t(a: string, b: integer, c: float, d: boolean).");
     const rows = await loader.readRows(decl);
     expect(rows).toEqual([{ a: "hello", b: 42, c: 3.14, d: true }]);
   });
@@ -243,21 +243,21 @@ describe("JsonlLoader", () => {
   test("rejects flat array with wrong arity", async () => {
     await Bun.write(join(tempDir, "parent.jsonl"), '["alice"]\n');
     const loader = new JsonlLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     expect(loader.readRows(decl)).rejects.toThrow(/expected 2 fields but got 1/);
   });
 
   test("rejects flat array with excess values", async () => {
     await Bun.write(join(tempDir, "parent.jsonl"), '["alice","bob","extra"]\n');
     const loader = new JsonlLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     expect(loader.readRows(decl)).rejects.toThrow(/expected 2 fields but got 3/);
   });
 
   test("rejects wrong type in flat array", async () => {
     await Bun.write(join(tempDir, "t.jsonl"), '["hello"]\n');
     const loader = new JsonlLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional t(val: integer).");
+    const decl = getExtDecl("input predicate t(val: integer).");
     expect(loader.readRows(decl)).rejects.toThrow(/Expected integer/);
   });
 
@@ -267,7 +267,7 @@ describe("JsonlLoader", () => {
       '{"name":"alice","child":"bob"}\n["carol","dave"]\n',
     );
     const loader = new JsonlLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
     const rows = await loader.readRows(decl);
     expect(rows).toEqual([
       { name: "alice", child: "bob" },
@@ -278,7 +278,7 @@ describe("JsonlLoader", () => {
   test("rejects non-object non-array JSON line", async () => {
     await Bun.write(join(tempDir, "t.jsonl"), "42\n");
     const loader = new JsonlLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional t(val: integer).");
+    const decl = getExtDecl("input predicate t(val: integer).");
     expect(loader.readRows(decl)).rejects.toThrow(/expected object or array/);
   });
 
@@ -292,14 +292,14 @@ describe("JsonlLoader", () => {
     // context.
     await Bun.write(join(tempDir, "t.jsonl"), '{"name":"alice"}\n{bad json}\n{"name":"carol"}\n');
     const loader = new JsonlLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional t(name: string).");
+    const decl = getExtDecl("input predicate t(name: string).");
     expect(loader.readRows(decl)).rejects.toThrow(/t\.jsonl line 2/);
   });
 
   test("load calls backend with correct inserts", async () => {
     await Bun.write(join(tempDir, "parent.jsonl"), '{"name":"alice","child":"bob"}\n');
     const loader = new JsonlLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional parent(name: string, child: string).");
+    const decl = getExtDecl("input predicate parent(name: string, child: string).");
 
     const insertedQueries: { query: string; params: unknown[] }[] = [];
     const mockBackend = {

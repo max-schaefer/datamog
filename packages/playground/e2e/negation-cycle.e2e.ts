@@ -6,7 +6,7 @@ import { expect, test } from "@playwright/test";
 // as the finiteness warnings — the cycle here is at the predicate
 // level, with one edge marked as the offending `not`.
 const NEGATION_PROGRAM = [
-  "extensional input(x: integer).",
+  "input predicate input(x: integer).",
   "a(X) :- input(X), not b(X).",
   "b(X) :- a(X).",
 ].join("\n");

@@ -1063,7 +1063,7 @@ describe("native backend — more body shapes", () => {
     ]);
     try {
       const results = await executor.execute(`
-        extensional flag(name: string, on: boolean, target: boolean).
+        input predicate flag(name: string, on: boolean, target: boolean).
         matched(N) :- flag(N, B, B).
         ?- matched(N).
       `);
@@ -1163,7 +1163,7 @@ describe("native backend — stratification and dependency depth", () => {
     // evaluator leaves the relation empty. Rules over it should compute
     // to the empty set without error.
     const results = await run(`
-      extensional raw(x: integer).
+      input predicate raw(x: integer).
       derived(X) :- raw(X), X > 0.
       ?- derived(X).
     `);
@@ -1310,7 +1310,7 @@ describe("native backend — backend lifecycle", () => {
     ]);
     try {
       const results = await executor.execute(`
-        extensional score(name: string, n: integer).
+        input predicate score(name: string, n: integer).
         winners(Who) :- score(Who, N), N > 15.
         ?- winners(Who).
       `);
@@ -1323,7 +1323,7 @@ describe("native backend — backend lifecycle", () => {
   test("Regression: direct insertRows after a completed run feeds the next execute", async () => {
     // `createEvaluatorBackend` kept the previous evaluator instance after
     // execute() returned, so a later direct insertRows() appended to stale
-    // program state. If the next program used a different extensional
+    // program state. If the next program used a different input predicate
     // predicate this threw immediately; if it reused a predicate name, the
     // inserted rows were silently lost when the next evaluator was created.
     const { create } = await import("datamog-backend-native");
@@ -1335,7 +1335,7 @@ describe("native backend — backend lifecycle", () => {
       await executor.execute("p(1). ?- p(X).");
 
       const source = `
-        extensional score(name: string, n: integer).
+        input predicate score(name: string, n: integer).
         ?- score(Name, N).
       `;
       const decl = DatamogExecutor.prepare(source).extDecls.get("score")!;
@@ -1373,7 +1373,7 @@ describe("native backend — backend lifecycle", () => {
     const backend = await create();
     const executor = new DatamogExecutor(backend, [loader]);
     const first = executor.execute(`
-      extensional p(x: integer).
+      input predicate p(x: integer).
       ?- p(X).
     `);
     await Promise.resolve();
@@ -1383,7 +1383,7 @@ describe("native backend — backend lifecycle", () => {
     await expect(first).rejects.toThrow(/closed/);
     await expect(
       executor.execute(`
-        extensional p(x: integer).
+        input predicate p(x: integer).
         ?- p(X).
       `),
     ).rejects.toThrow(/closed/);

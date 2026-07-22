@@ -8,7 +8,7 @@ tight: true
 Let's find Pokémon with high HPs:
 
 ```datamog
-extensional pokemon(id: integer, name: string, hp: integer).
+input predicate pokemon(id: integer, name: string, hp: integer).
 
 ?- pokemon(_, Name, HP), HP > 150.
 ```

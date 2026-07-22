@@ -21,13 +21,13 @@
     <p>
       Reachability over a small directed graph. Click <code>▸ run</code> next to a
       query to evaluate it (the result appears below the line), or click the data
-      chip next to <code>extensional edge</code> to view, edit, or reset its rows.
+      chip next to <code>input predicate edge</code> to view, edit, or reset its rows.
     </p>
 
     <div data-datamog>
       <script type="application/json">
       {
-        "source": "extensional edge(src: string, dst: string).\n\nreachable(X) :- edge(\"a\", X).\nreachable(X) :- edge(Y, X), reachable(Y).\n\n?- reachable(X).",
+        "source": "input predicate edge(src: string, dst: string).\n\nreachable(X) :- edge(\"a\", X).\nreachable(X) :- edge(Y, X), reachable(Y).\n\n?- reachable(X).",
         "csv": { "edge": "src,dst\na,b\nb,c\nc,d\nx,y" }
       }
       </script>
@@ -38,7 +38,7 @@
     <div data-datamog>
       <script type="application/json">
       {
-        "source": "extensional edge(src: string, dst: string).\n\nreachable(X) :- edge(\"a\", X).\nreachable(X) :- edge(Y, X), reachable(Y).\n\n?- reachable(\"d\").",
+        "source": "input predicate edge(src: string, dst: string).\n\nreachable(X) :- edge(\"a\", X).\nreachable(X) :- edge(Y, X), reachable(Y).\n\n?- reachable(\"d\").",
         "csv": { "edge": "src,dst\na,b\nb,c\nc,d" }
       }
       </script>

@@ -1,7 +1,7 @@
 # Exercise 3.5 solution — refactored form.
 
-extensional same_room(person1: string, person2: string).
-extensional connected_window(person1: string, person2: string).
+input predicate same_room(person1: string, person2: string).
+input predicate connected_window(person1: string, person2: string).
 
 # Three named intermediate predicates, each with a single clear
 # semantic meaning.

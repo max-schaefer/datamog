@@ -6,7 +6,7 @@ tight: true
 ---
 
 ```prolog
-extensional passenger(id: integer, survived: integer, class: integer, sex: string, fare: float).
+input predicate passenger(id: integer, survived: integer, class: integer, sex: string, fare: float).
 ```
 
 <br>

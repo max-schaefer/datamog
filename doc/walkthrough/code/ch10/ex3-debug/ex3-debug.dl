@@ -4,7 +4,7 @@
 # meant to express that, but returns something else. Run it; look
 # at the generated SQL with --dry-run; explain what you find.
 
-extensional parent(parent_name: string, child_name: string).
+input predicate parent(parent_name: string, child_name: string).
 
 # Meant to be: X is a grandparent of Z if X has a child Y who
 # is a parent of Z. But the rule below has a subtle mistake —

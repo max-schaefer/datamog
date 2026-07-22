@@ -48,7 +48,7 @@ describe("DatamogExecutor", () => {
     // insertRows used to skip that gate and canonicalise Infinity to JSON
     // null through JSON.stringify's non-finite-number behaviour.
     const backend = await createSqlite();
-    const decl = (await import("datamog-parser")).parse("extensional data(j: value).")
+    const decl = (await import("datamog-parser")).parse("input predicate data(j: value).")
       .statements[0] as ExtDecl;
     await backend.execute(`CREATE TABLE "data" ("j" TEXT NOT NULL)`);
     try {
@@ -69,7 +69,7 @@ describe("DatamogExecutor", () => {
     // string leaf like "true" became boolean true and a string leaf like
     // "hello" threw as invalid JSON text.
     const program = `
-      extensional data(j: value).
+      input predicate data(j: value).
       string_leaf(J, S) :- data(J), S = as_string(J).
       ?- string_leaf(J, S).
     `;
@@ -108,7 +108,7 @@ describe("DatamogExecutor", () => {
     // table constraints. Native has no DDL layer, so insertRows must enforce
     // the same non-null check before rows reach the backend.
     const program = `
-      extensional data(j: value).
+      input predicate data(j: value).
       ?- data(J).
     `;
 
@@ -139,7 +139,7 @@ describe("DatamogExecutor", () => {
 
   test("nullable direct value inserts accept null", async () => {
     const program = `
-      extensional data(j: value?).
+      input predicate data(j: value?).
       ?- data(J).
     `;
 
@@ -467,7 +467,7 @@ describe("DatamogExecutor", () => {
     const executor = new DatamogExecutor(backend);
     try {
       const results = await executor.execute(`
-        extensional source(x: integer).
+        input predicate source(x: integer).
         p(X) :- source(X), q(X).
         q(X) :- p(X).
         ?- p(X).
@@ -539,8 +539,8 @@ describe("DatamogExecutor", () => {
     const executor = new DatamogExecutor(backend);
     try {
       const results = await executor.execute(`
-        extensional arr(j: value).
-        extensional idx(i: integer).
+        input predicate arr(j: value).
+        input predicate idx(i: integer).
         result(V) :- arr(J), idx(I), V = J[I].
         ?- result(V).
       `);
@@ -561,7 +561,7 @@ describe("DatamogExecutor", () => {
     // output across every backend — make native render via
     // `canonicalizeJson` when the aggregate arg is value-typed.
     const program = `
-      extensional data(j: value).
+      input predicate data(j: value).
       result(concat(J)) :- data(J).
       ?- result(R).
     `;
@@ -582,7 +582,7 @@ describe("DatamogExecutor", () => {
 
     const { create: createNative } = await import("../../backend/native/src/index.ts");
     const native = await createNative();
-    const decl = (await import("datamog-parser")).parse("extensional data(j: value).")
+    const decl = (await import("datamog-parser")).parse("input predicate data(j: value).")
       .statements[0] as ExtDecl;
     if (!native.insertRows) throw new Error("native backend missing insertRows");
     await native.insertRows(decl, [{ j: [1, 2, 3] }, { j: { a: 1 } }]);
@@ -605,7 +605,7 @@ describe("DatamogExecutor", () => {
     // input rows are NULL; the all-NULL case is covered separately
     // by the native test.
     const program = `
-      extensional data(j: value).
+      input predicate data(j: value).
       result(list(J)) :- data(J).
       ?- result(R).
     `;
@@ -626,7 +626,7 @@ describe("DatamogExecutor", () => {
 
     const { create: createNative } = await import("../../backend/native/src/index.ts");
     const native = await createNative();
-    const decl = (await import("datamog-parser")).parse("extensional data(j: value).")
+    const decl = (await import("datamog-parser")).parse("input predicate data(j: value).")
       .statements[0] as ExtDecl;
     if (!native.insertRows) throw new Error("native backend missing insertRows");
     await native.insertRows(decl, [{ j: [1, 2, 3] }, { j: { a: 1 } }]);
@@ -699,7 +699,7 @@ describe("DatamogExecutor", () => {
     // catch any per-dialect regression in `toJson` or the FILTER
     // clause.
     const program = `
-      extensional t(n: integer).
+      input predicate t(n: integer).
       result(list(N)) :- t(N).
       ?- result(R).
     `;
@@ -717,7 +717,7 @@ describe("DatamogExecutor", () => {
 
     const { create: createNative } = await import("../../backend/native/src/index.ts");
     const native = await createNative();
-    const decl = (await import("datamog-parser")).parse("extensional t(n: integer).")
+    const decl = (await import("datamog-parser")).parse("input predicate t(n: integer).")
       .statements[0] as ExtDecl;
     if (!native.insertRows) throw new Error("native backend missing insertRows");
     await native.insertRows(decl, [{ n: 2 }, { n: 10 }, { n: 7 }]);
@@ -802,7 +802,7 @@ describe("DatamogExecutor", () => {
     // by value builtins must apply the same boundary; otherwise native
     // reports Infinity as a value number and SQLite renders it as `Inf`.
     const program = `
-      extensional data(x: float).
+      input predicate data(x: float).
       r(T, S) :- data(X), T = type_of(X * X), S = to_json(X * X).
       ?- r(T, S).
     `;
@@ -1033,7 +1033,7 @@ describe("DatamogExecutor", () => {
     const executor = new DatamogExecutor(backend);
     try {
       const results = await executor.execute(`
-        extensional flags(b: boolean).
+        input predicate flags(b: boolean).
         result(concat(B)) :- flags(B).
         ?- result(R).
       `);
@@ -1060,7 +1060,7 @@ describe("DatamogExecutor", () => {
     const executor = new DatamogExecutor(backend);
     try {
       const results = await executor.execute(`
-        extensional raw(s: string).
+        input predicate raw(s: string).
         parsed(S, J) :- raw(S), J = parse_json(S).
         ?- parsed(S, J).
       `);
@@ -1115,7 +1115,7 @@ describe("DatamogExecutor", () => {
     const executor = new DatamogExecutor(backend);
     try {
       const results = await executor.execute(`
-        extensional raw(s: string).
+        input predicate raw(s: string).
         parsed(S, J) :- raw(S), J = parse_json(S).
         ?- parsed(S, J).
       `);
@@ -1150,8 +1150,8 @@ describe("DatamogExecutor", () => {
     const executor = new DatamogExecutor(backend);
     try {
       const results = await executor.execute(`
-        extensional data(j: value).
-        extensional k(v: string).
+        input predicate data(j: value).
+        input predicate k(v: string).
         result(K, V) :- data(J), k(K), V = J[K].
         ?- result(K, V).
       `);
@@ -1271,9 +1271,9 @@ describe("DatamogExecutor", () => {
     const executor = new DatamogExecutor(backend);
     try {
       const results = await executor.execute(`
-        extensional arr(j: value).
-        extensional lo(v: integer).
-        extensional hi(v: integer).
+        input predicate arr(j: value).
+        input predicate lo(v: integer).
+        input predicate hi(v: integer).
         result(V) :- arr(J), lo(L), hi(H), V = J[L:H].
         ?- result(V).
       `);
@@ -1309,7 +1309,7 @@ describe("DatamogExecutor", () => {
     const executor = new DatamogExecutor(backend);
     try {
       const results = await executor.execute(`
-        extensional things(t: value).
+        input predicate things(t: value).
         r(S) :- things(T), S = T["missing"][0:5].
         ?- r(S).
       `);
@@ -1574,7 +1574,7 @@ describe("DatamogExecutor", () => {
     const executor = new DatamogExecutor(backend);
     try {
       const results = await executor.execute(`
-        extensional raw(j: value).
+        input predicate raw(j: value).
         r(F) :- raw(J), F = as_float(J).
         ?- r(F).
       `);
@@ -1724,7 +1724,7 @@ describe("DatamogExecutor", () => {
     const executor = new DatamogExecutor(backend);
     try {
       const results = await executor.execute(`
-        extensional t(x: float).
+        input predicate t(x: float).
         mapped(E) :- t(X), E = 2.0 ** X.
         total(sum(E)) :- mapped(E).
         ?- total(S).
@@ -1792,7 +1792,7 @@ describe("DatamogExecutor", () => {
     // The FROM splice point was lost and the padded rule emitted
     // `... FROM "e" AS __b0, NULL` (a syntax error). Native was unaffected.
     const src = [
-      "extensional e(`o'brien`: string).",
+      "input predicate e(`o'brien`: string).",
       "`hi`(V) :- e(V).",
       "`hi`(V) :- q(V, _).",
       "q(X, X) :- `hi`(X).",

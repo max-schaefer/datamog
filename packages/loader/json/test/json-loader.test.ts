@@ -26,15 +26,15 @@ describe("JsonLoader", () => {
     await Bun.write(join(tempDir, "cfg.json"), '{"name":"datamog"}');
     const loader = new JsonLoader({ directory: tempDir });
 
-    expect(await loader.canLoad(getExtDecl("extensional cfg(blob: value)."))).toBe(true);
-    expect(await loader.canLoad(getExtDecl("extensional cfg(name: string)."))).toBe(true);
-    expect(await loader.canLoad(getExtDecl("extensional missing(blob: value)."))).toBe(false);
+    expect(await loader.canLoad(getExtDecl("input predicate cfg(blob: value)."))).toBe(true);
+    expect(await loader.canLoad(getExtDecl("input predicate cfg(name: string)."))).toBe(true);
+    expect(await loader.canLoad(getExtDecl("input predicate missing(blob: value)."))).toBe(false);
   });
 
   test("loads a whole JSON file as one canonical value row", async () => {
     await Bun.write(join(tempDir, "cfg.json"), '{"b":2,"a":1}');
     const loader = new JsonLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional cfg(blob: value).");
+    const decl = getExtDecl("input predicate cfg(blob: value).");
 
     const insertedQueries: { query: string; params: unknown[] }[] = [];
     const mockBackend = {
@@ -56,7 +56,7 @@ describe("JsonLoader", () => {
   test("readRows exposes the parsed whole-file JSON row", async () => {
     await Bun.write(join(tempDir, "cfg.json"), '{"b":2,"a":1}');
     const loader = new JsonLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional cfg(blob: value).");
+    const decl = getExtDecl("input predicate cfg(blob: value).");
 
     await expect(loader.readRows(decl)).resolves.toEqual([{ blob: { a: 1, b: 2 } }]);
   });
@@ -70,7 +70,7 @@ describe("JsonLoader", () => {
     // file surfaces actionable context.
     await Bun.write(join(tempDir, "cfg.json"), "{bad json}");
     const loader = new JsonLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional cfg(blob: value).");
+    const decl = getExtDecl("input predicate cfg(blob: value).");
     const mockBackend = {
       sqlDialect: null,
       async execute() {
@@ -84,12 +84,12 @@ describe("JsonLoader", () => {
   test("Regression: JSON file with an incompatible declaration fails closed", async () => {
     // Whole-file JSON is only meaningful for a single `value` column.
     // The loader previously treated an existing `cfg.json` as ineligible
-    // for `extensional cfg(name: string)`, so the executor skipped it and
+    // for `input predicate cfg(name: string)`, so the executor skipped it and
     // left `cfg` empty with no diagnostic. Once a matching JSON file
     // exists, reject the declaration shape explicitly.
     await Bun.write(join(tempDir, "cfg.json"), '{"name":"datamog"}');
     const loader = new JsonLoader({ directory: tempDir });
-    const decl = getExtDecl("extensional cfg(name: string).");
+    const decl = getExtDecl("input predicate cfg(name: string).");
 
     expect(await loader.canLoad(decl)).toBe(true);
     expect(loader.readRows(decl)).rejects.toThrow(/exactly one value column/);

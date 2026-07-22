@@ -14,11 +14,11 @@ tight: true
 <div>
 
 ```prolog
-extensional node(id: integer, kind: string).
-extensional node_child(id: integer,
+input predicate node(id: integer, kind: string).
+input predicate node_child(id: integer,
                        pos: integer, child: integer).
-extensional node_var(id: integer, idx: integer).
-extensional root(id: integer).
+input predicate node_var(id: integer, idx: integer).
+input predicate root(id: integer).
 ```
 
 - `node` specifies node kinds (`and`, `or`, `not`, `var`).

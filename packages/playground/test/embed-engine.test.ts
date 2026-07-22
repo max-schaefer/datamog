@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { collectCompletionCandidates, lintSource, runProgram } from "../src/embed/engine.ts";
 
-const REACHABILITY = `extensional edge(src: string, dst: string).
+const REACHABILITY = `input predicate edge(src: string, dst: string).
 
 reachable(X) :- edge("a", X).
 reachable(X) :- edge(Y, X), reachable(Y).
@@ -38,7 +38,7 @@ describe("embed engine", () => {
   });
 
   test("lintSource: parse error becomes a positioned error diagnostic", () => {
-    const { diagnostics, hasQueries } = lintSource("extensional edge(");
+    const { diagnostics, hasQueries } = lintSource("input predicate edge(");
     const errors = diagnostics.filter((d) => d.severity === "error");
     expect(errors).toHaveLength(1);
     expect(errors[0]!.from).toBeGreaterThanOrEqual(0);
