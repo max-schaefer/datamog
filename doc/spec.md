@@ -311,8 +311,11 @@ same Datamog base type for type inference, but loaders and the generated table
 permit runtime `NULL` values.
 
 An input predicate may be **bound** to a source with `:=` — a specific data file
-or an instance of another module (§9). An unbound input is a free parameter,
-supplied at the CLI (from `<name>.csv` by convention, or a `--input` flag).
+or an instance of another module (§9). An unbound input is a free parameter. In
+the *entry* program it is supplied at the frontend — the CLI and playground load
+it from `<name>.csv` by convention, or a `--input` flag — but that convention is
+not part of the language. An input of an *imported* module must instead be
+supplied explicitly (wired or `:=`-bound); a module never auto-loads (§9).
 
 ### 2.3 Rules
 
@@ -2154,7 +2157,9 @@ module `mod.dl` and binds this input to one of its outputs:
   (`:= from "mod.dl"(...)`) to take the module's unnamed `?-` default output.
 - The parenthesised **actuals** wire the module's own inputs by name
   (`moduleInput = localPredicate`), where `localPredicate` is any predicate in
-  the importing file's scope. An unwired module input stays free.
+  the importing file's scope. A module input the actuals do not wire must be
+  `:=`-bound inside the module; one that is neither wired nor bound is an error
+  (§9.3) — a module never auto-loads.
 
 ```
 # reach.dl: reachability, parameterised by an edge relation
@@ -2194,6 +2199,11 @@ names; the module's own head-variable names are not exposed.
 
 ### 9.3 Constraints
 
+- **Every module input must be supplied.** Each input of an imported module must
+  be wired by an actual or bound with `:=`; an input that is neither is a static
+  error. A module never auto-loads its inputs — the `<name>.csv`-by-convention
+  loading is a frontend (CLI / playground) convenience for the entry program's
+  free inputs only, not a language feature.
 - **The instantiation graph must be acyclic.** Two modules whose inputs each
   default to an instance of the other are rejected. This is distinct from
   recursion *within* a module (an ordinary least fixed point, always allowed):

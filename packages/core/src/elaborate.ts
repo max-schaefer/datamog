@@ -124,6 +124,7 @@ export function elaborate(
       stmt.columns.map((c) => c.name),
       [entryFile, id],
       ctx,
+      binding.source,
     );
   }
 
@@ -221,6 +222,7 @@ function instantiate(
   relabelColumns: string[] | undefined,
   stack: (string | undefined)[],
   ctx: Context,
+  sourceRef: string,
 ): void {
   const localNames = new Set<string>();
   for (const s of module.statements) if (isRule(s)) localNames.add(s.head.predicate);
@@ -262,9 +264,22 @@ function instantiate(
       undefined,
       [...stack, id],
       ctx,
+      binding.source,
     );
     // The nested instance's (prefix-freshened) selected output feeds this input.
     inputSubst[s.predicate] = `${childPrefix}${childExport}`;
+  }
+
+  // Every module input must be supplied — wired by an actual (now in
+  // `inputSubst`) or bound with `:=` (a data or module binding). A free input
+  // that is neither is an error: a module never auto-loads its inputs; supplying
+  // them is the importer's job (wire it) or the module's (`:= "file"`).
+  for (const s of module.statements) {
+    if (isExtDecl(s) && !s.binding && !Object.hasOwn(inputSubst, s.predicate)) {
+      throw new AnalyzerError(
+        `module '${sourceRef}' input '${s.predicate}' is not supplied; wire it with an actual (${s.predicate} = ...) or bind it with ':='`,
+      );
+    }
   }
 
   const expanded = expandModule(module, { prefix, inputs: inputSubst, exportAs });

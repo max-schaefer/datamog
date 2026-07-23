@@ -253,10 +253,12 @@ expose a type through functions, or expose its constructors; your call.
   they never clash with yours.
 - **The instantiation graph must be acyclic.** Mutually recursive predicates
   share a file.
-- **Free inputs are shared, not freshened.** A module's own unwired input keeps
-  its bare name, so two instances read the same bundled data (and it can clash
-  by name with an importer predicate spelled the same). Wire an input as an
-  actual when you want a per-instance relation.
+- **A module never auto-loads its inputs.** Every input of an imported module
+  must be *supplied* — wired with an actual, or bound with `:= "file"` (resolved
+  relative to the module). An input that is neither is an error, not an empty
+  relation. Auto-loading `<name>.csv` by convention is a convenience the CLI (and
+  the playground) offer for the *entry* program's own inputs only, so a module is
+  self-contained and behaves the same wherever it is imported.
 
 ## Exercises
 

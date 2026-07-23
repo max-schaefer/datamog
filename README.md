@@ -138,7 +138,7 @@ input predicate flight_reach(a: integer, b: integer) := reach from "reach.dl"(ed
 ?- road_reach(1, X).
 ```
 
-`from` marks a module binding (`<export> from "mod.dl"(input = pred, ...)`; omit the export to take the module's `?-` default output); a bare string is a data-file binding (`as csv` forces the loader when the extension does not say). `datamog main.dl` resolves imports from disk relative to the entry, instantiating each module (duplicated per use, freshened so instances never collide) and merging everything into one program. The instantiation graph must be acyclic, and boundary column types are checked. See [spec §9](doc/spec.md) for the full semantics.
+`from` marks a module binding (`<export> from "mod.dl"(input = pred, ...)`; omit the export to take the module's `?-` default output); a bare string is a data-file binding (`as csv` forces the loader when the extension does not say). `datamog main.dl` resolves imports from disk relative to the entry, instantiating each module (duplicated per use, freshened so instances never collide) and merging everything into one program. Every input of an imported module must be supplied (wired or `:=`-bound) — an unsupplied one is an error, since modules never auto-load; auto-loading `<name>.csv` is an entry-only convenience. The instantiation graph must be acyclic, and boundary column types are checked. See [spec §9](doc/spec.md) for the full semantics.
 
 ## Packages
 

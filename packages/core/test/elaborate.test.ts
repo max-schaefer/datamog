@@ -124,6 +124,13 @@ describe("elaborate", () => {
     const entry = parseRaw('input predicate top(x: integer) := q from "a.dl".');
     expect(() => elaborate(entry, resolve, "main.dl")).toThrow(/module import cycle/);
   });
+
+  test("rejects an unsupplied module input (not wired or bound)", () => {
+    // reach.dl's `edge` input is neither wired nor `:=`-bound here; a module
+    // never auto-loads, so this is an error rather than an empty relation.
+    const entry = parseRaw('input predicate d(a: integer, b: integer) := reach from "reach.dl".');
+    expect(() => elaborate(entry, resolve, "main.dl")).toThrow(/input 'edge' is not supplied/);
+  });
 });
 
 describe("module boundary type-checking", () => {

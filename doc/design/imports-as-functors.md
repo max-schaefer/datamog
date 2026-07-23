@@ -172,18 +172,19 @@ Per instantiation:
    affix, which decisions 2 and 4 had introduced to dodge the old global
    constructor-uniqueness rule.)
 
-After expansion, the transitive **free inputs** (those with no module default,
-at the leaves) are the merged program's EDBs, loaded from CSV relative to their
-owning module's directory. Everything derived is IDB. The chosen output is the
-query. So the merged program is an ordinary single-file Datamog program, and the
-backends need no functor-specific code.
+Every input of an imported module must be **supplied** — wired by an actual, or
+bound with `:= "file"` (a data source resolved relative to the module). An input
+that is neither is an error (raised during elaboration); a module never
+auto-loads. So the merged program's EDBs are the *entry* program's own free
+inputs plus every `:=` data binding (entry or module). Everything derived is
+IDB, the chosen output is the query, and the result is an ordinary single-file
+Datamog program the backends run unchanged.
 
-Free inputs, unlike private and output predicates, are **not** freshened per
-instance: they keep their bare name. So two instances of the same module share
-one EDB (its bundled data, the same for every instance), and a free input
-collides by name with an importer predicate spelled the same. This is the
-deliberate reading (a free input is the module's own data dependency); wire an
-input as an actual when you want a per-instance relation instead.
+Auto-loading `<name>.csv` by convention is therefore not a language feature — it
+is a CLI/playground convenience applied to the entry program's free inputs only.
+A module carries its own data dependencies explicitly (via `:=`), so it behaves
+identically wherever it is imported, regardless of files sitting next to the
+importer.
 
 ## Consequences and limitations
 
@@ -269,8 +270,9 @@ diagnostics, per-module EDB directories):
   module's `?-` default output synthesises a named `$default` output rule so it
   reuses the named-export path; an instance exposes only its selected output (its
   other outputs and its `?-` do not leak into the merged program). (All done.)
-- **engine**: no backend changes; free inputs become the merged program's EDBs.
-  `DatamogExecutor.prepareElaborated(source, resolve, file)` runs the elaborate
+- **engine**: no backend changes; the entry's free inputs (and every `:=` data
+  binding) become the merged program's EDBs — a module input must be supplied, so
+  it is never left free. `DatamogExecutor.prepareElaborated(source, resolve, file)` runs the elaborate
   pipeline (parseRaw → elaborate → postProcess → analyze → inferTypes →
   `checkModuleBoundaries`) with the resolver injected, so the engine core stays
   filesystem-free (for the playground); the Node/Bun `createNodeModuleResolver`
