@@ -15,6 +15,21 @@ describe("type inference", () => {
     expect(typed.columnTypes.get("t")).toEqual(["string", "integer", "float", "boolean"]);
   });
 
+  test("unannotated EDB columns default to string", () => {
+    const typed = getTypes("input predicate person(name, age: integer, city).");
+    expect(typed.columnTypes.get("person")).toEqual(["string", "integer", "string"]);
+  });
+
+  test("an unannotated column used numerically is a type error", () => {
+    // string default: arithmetic needs an explicit `: integer`/`: float`.
+    expect(() =>
+      getTypes(`
+        input predicate nums(x).
+        doubled(Y) :- nums(X), Y = X * 2.
+      `),
+    ).toThrow(/requires numeric operands.*'string'/);
+  });
+
   test("IDB inherits types from EDB via variable binding", () => {
     const typed = getTypes(`
       input predicate parent(name: string, child: string).

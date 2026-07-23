@@ -210,7 +210,8 @@ export function coerceValue(value: string, type: PrimitiveType, context?: string
  */
 export function coerceColumnValue(value: string, column: ColumnDecl, context?: string): unknown {
   if (column.nullable && value.trim() === "") return null;
-  return coerceValue(value, column.type, context);
+  // An unannotated column defaults to `string` (parseRaw already sets this).
+  return coerceValue(value, column.type ?? "string", context);
 }
 
 /**
@@ -264,5 +265,5 @@ export function checkValue(value: unknown, type: PrimitiveType, context?: string
 /** Validate an already-typed value for a declared extensional column. */
 export function checkColumnValue(value: unknown, column: ColumnDecl, context?: string): unknown {
   if (value === null && column.nullable) return null;
-  return checkValue(value, column.type, context);
+  return checkValue(value, column.type ?? "string", context);
 }

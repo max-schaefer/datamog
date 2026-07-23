@@ -36,6 +36,16 @@ describe("parser", () => {
     expect(decl.columns[4]).toMatchObject({ name: "e", type: "value" });
   });
 
+  test("unannotated columns default to string", () => {
+    const program = parse("input predicate person(name, age: integer, city, note?).");
+    const decl = program.statements[0] as ExtDecl;
+    expect(decl.columns[0]).toMatchObject({ name: "name", type: "string" });
+    expect(decl.columns[1]).toMatchObject({ name: "age", type: "integer" });
+    expect(decl.columns[2]).toMatchObject({ name: "city", type: "string" });
+    // `note?` is a nullable untyped column: string, nullable.
+    expect(decl.columns[3]).toMatchObject({ name: "note", type: "string", nullable: true });
+  });
+
   test("quoted predicate and column identifiers", () => {
     const program = parse(`
       input predicate \`http-event\`(\`content-type\`: string, \`in\`: integer).

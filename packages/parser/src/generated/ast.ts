@@ -231,7 +231,7 @@ export interface ColumnDecl extends langium.AstNode {
     readonly $type: 'ColumnDecl';
     name: Identifier;
     nullable: boolean;
-    type: PrimitiveType;
+    type?: PrimitiveType;
 }
 
 export const ColumnDecl = {

@@ -32,7 +32,7 @@ ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
 ?- ancestor("alice", X).
 ```
 
-- **Input predicate declarations** (`input predicate`) define extensional predicates (EDB) backed by tables with typed columns (`string`, `integer`, `float`, `boolean`, `value`); add `?` for nullable input columns. An input can be bound to a source with `:=` (see [Modules](#modules)).
+- **Input predicate declarations** (`input predicate`) define extensional predicates (EDB) backed by tables with typed columns (`string`, `integer`, `float`, `boolean`, `value`); add `?` for nullable input columns. The column type is optional and defaults to `string` (`input predicate edge(a, b)`); annotate when you need a narrower type. An input can be bound to a source with `:=` (see [Modules](#modules)).
 - **Rules** define intensional predicates. Multiple rules for the same predicate are combined with `UNION`. Recursive predicates use recursive views. Column types are inferred, but head arguments may carry optional, checked type annotations (`ancestor(X: string, Y: string) :- ...`): all-or-nothing per predicate, verified against inference.
 - **Facts** are rules with no body: `base_case("x").`
 - **Queries** target a predicate directly: `?- p(X).`

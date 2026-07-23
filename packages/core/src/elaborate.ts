@@ -155,7 +155,8 @@ function collectBoundaries(
     if (!inputDecl) continue;
     ctx.boundaries.push({
       predicate: mergedActual(actual.arg),
-      expected: inputDecl.columns.map((c) => c.type),
+      // An unannotated column defaults to `string` (parseRaw already sets this).
+      expected: inputDecl.columns.map((c) => c.type ?? "string"),
       note: `actual '${actual.arg}' wired to input '${actual.param}' of "${binding.source}"`,
       pos: nodePos(importerDecl),
       file: importerFile,
@@ -163,7 +164,7 @@ function collectBoundaries(
   }
   ctx.boundaries.push({
     predicate: aliasedOutput,
-    expected: importerDecl.columns.map((c) => c.type),
+    expected: importerDecl.columns.map((c) => c.type ?? "string"),
     note: `output of "${binding.source}" bound to '${importerDecl.predicate}'`,
     pos: nodePos(importerDecl),
     file: importerFile,

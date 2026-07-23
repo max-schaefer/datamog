@@ -39,8 +39,11 @@ Binding:
 Actual:
     param=Identifier '=' arg=Identifier;
 
+// The type annotation is optional; an unannotated column defaults to `string`
+// (applied in `parseRaw` via `defaultColumnTypes`, so every later stage sees a
+// concrete type). `a?` is a nullable untyped column, `a: integer?` a typed one.
 ColumnDecl:
-    name=Identifier ':' type=PrimitiveType (nullable?='?')?;
+    name=Identifier (':' type=PrimitiveType)? (nullable?='?')?;
 
 PrimitiveType returns string:
     'string' | 'integer' | 'float' | 'boolean' | 'value';

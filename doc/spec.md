@@ -291,7 +291,7 @@ output**, §2.3). Results are reported in source order.
 
 ```
 ExtDecl     ::= 'input' 'predicate' Identifier '(' ColumnDecl (',' ColumnDecl)* ')' (':=' Binding)? '.'
-ColumnDecl  ::= Identifier ':' PrimitiveType ('?')?
+ColumnDecl  ::= Identifier (':' PrimitiveType)? ('?')?
 PrimitiveType ::= 'string' | 'integer' | 'float' | 'boolean' | 'value'
 ```
 
@@ -301,9 +301,16 @@ a type. At execution time the predicate is populated from an external data
 source (CSV, JSONL, JSON, Google Sheets, or Mermaid diagram) via a loader
 plugin.
 
+The type annotation is optional; a column declared without one defaults to
+`string`, so its cells load verbatim. Annotate a column when you need a narrower
+type -- for example `integer`/`float` for arithmetic or range bounds, or `value`
+to parse JSON. A column used in a position its default `string` cannot satisfy
+(say, `X * 2`) is a static type error until annotated.
+
 ```
-input predicate scores(student: string, subject: string, score: integer).
+input predicate scores(student, subject, score: integer).  # student, subject: string
 input predicate survey(name: string, age: integer?, email: string?).
+input predicate edges(from, to).                            # both string
 ```
 
 The optional `?` suffix marks a column as nullable. Nullable columns keep the
@@ -1097,7 +1104,7 @@ Program        ::= Statement*
 Statement      ::= ExtDecl | Rule | Query
 
 ExtDecl        ::= 'input' 'predicate' Identifier '(' ColumnDecl (',' ColumnDecl)* ')' (':=' Binding)? '.'
-ColumnDecl     ::= Identifier ':' PrimitiveType ('?')?
+ColumnDecl     ::= Identifier (':' PrimitiveType)? ('?')?
 PrimitiveType  ::= 'string' | 'integer' | 'float' | 'boolean' | 'value'
 Binding        ::= (Identifier? 'from' STRING ('(' Actual (',' Actual)* ')')?)   -- module
                  | (STRING ('as' Identifier)?)                                    -- data file
@@ -1308,7 +1315,8 @@ work on `value`s.
 Types are inferred automatically via fixed-point iteration over the
 predicate dependency graph (processed stratum-by-stratum):
 
-1. **EDB types** are taken directly from extensional declarations.
+1. **EDB types** are taken directly from extensional declarations (an
+   unannotated column is `string`, §2.2).
 2. **Fact types** are inferred from literal values in rules with empty
    bodies (`"hello"` is `string`, `42` is `integer`, `3.14` is `float`,
    `true`/`false` is `boolean`).

@@ -197,7 +197,8 @@ function translateTables(analyzed: TypedProgram, dialect: SqlDialect): string[] 
   for (const decl of analyzed.extDecls.values()) {
     const cols = decl.columns.map((c) => {
       const nullable = (c as { nullable?: boolean }).nullable;
-      return `  ${ident(c.name)} ${sqlTypeFor(dialect, c.type)}${nullable ? "" : " NOT NULL"}`;
+      // An unannotated column defaults to `string` (parseRaw already sets this).
+      return `  ${ident(c.name)} ${sqlTypeFor(dialect, c.type ?? "string")}${nullable ? "" : " NOT NULL"}`;
     });
     tables.push(`CREATE TABLE IF NOT EXISTS ${ident(decl.predicate)} (\n${cols.join(",\n")}\n);`);
   }

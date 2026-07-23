@@ -271,6 +271,20 @@ export function liftHeadAnnotations(program: Program): void {
   }
 }
 
+/**
+ * Fill in the default type for unannotated input-predicate columns. A column
+ * declared without `: type` defaults to `string`, so its cells load verbatim.
+ * Runs in `parseRaw`, so every later stage sees a concrete column type.
+ */
+export function defaultColumnTypes(program: Program): void {
+  for (const stmt of program.statements) {
+    if (!isExtDecl(stmt)) continue;
+    for (const col of stmt.columns) {
+      if (col.type === undefined) col.type = "string";
+    }
+  }
+}
+
 export function postProcess(program: Program): void {
   for (const node of streamAll(program)) {
     if (isExtDecl(node)) {
