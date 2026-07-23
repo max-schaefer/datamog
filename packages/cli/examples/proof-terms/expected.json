@@ -3,19 +3,19 @@
     {
       "S": {
         "args": [],
-        "$proof": "Diamonds"
+        "$proof": "suit::Diamonds"
       }
     },
     {
       "S": {
         "args": [],
-        "$proof": "Hearts"
+        "$proof": "suit::Hearts"
       }
     },
     {
       "S": {
         "args": [],
-        "$proof": "Spades"
+        "$proof": "suit::Spades"
       }
     }
   ],
@@ -24,7 +24,7 @@
       "Len": 0,
       "Xs": {
         "args": [],
-        "$proof": "Nil"
+        "$proof": "num_list::Nil"
       }
     },
     {
@@ -34,10 +34,10 @@
           1,
           {
             "args": [],
-            "$proof": "Nil"
+            "$proof": "num_list::Nil"
           }
         ],
-        "$proof": "Cons"
+        "$proof": "num_list::Cons"
       }
     },
     {
@@ -47,10 +47,10 @@
           2,
           {
             "args": [],
-            "$proof": "Nil"
+            "$proof": "num_list::Nil"
           }
         ],
-        "$proof": "Cons"
+        "$proof": "num_list::Cons"
       }
     },
     {
@@ -63,13 +63,13 @@
               1,
               {
                 "args": [],
-                "$proof": "Nil"
+                "$proof": "num_list::Nil"
               }
             ],
-            "$proof": "Cons"
+            "$proof": "num_list::Cons"
           }
         ],
-        "$proof": "Cons"
+        "$proof": "num_list::Cons"
       }
     },
     {
@@ -82,13 +82,13 @@
               1,
               {
                 "args": [],
-                "$proof": "Nil"
+                "$proof": "num_list::Nil"
               }
             ],
-            "$proof": "Cons"
+            "$proof": "num_list::Cons"
           }
         ],
-        "$proof": "Cons"
+        "$proof": "num_list::Cons"
       }
     },
     {
@@ -101,13 +101,13 @@
               2,
               {
                 "args": [],
-                "$proof": "Nil"
+                "$proof": "num_list::Nil"
               }
             ],
-            "$proof": "Cons"
+            "$proof": "num_list::Cons"
           }
         ],
-        "$proof": "Cons"
+        "$proof": "num_list::Cons"
       }
     },
     {
@@ -120,13 +120,13 @@
               2,
               {
                 "args": [],
-                "$proof": "Nil"
+                "$proof": "num_list::Nil"
               }
             ],
-            "$proof": "Cons"
+            "$proof": "num_list::Cons"
           }
         ],
-        "$proof": "Cons"
+        "$proof": "num_list::Cons"
       }
     },
     {
@@ -142,16 +142,16 @@
                   1,
                   {
                     "args": [],
-                    "$proof": "Nil"
+                    "$proof": "num_list::Nil"
                   }
                 ],
-                "$proof": "Cons"
+                "$proof": "num_list::Cons"
               }
             ],
-            "$proof": "Cons"
+            "$proof": "num_list::Cons"
           }
         ],
-        "$proof": "Cons"
+        "$proof": "num_list::Cons"
       }
     },
     {
@@ -167,16 +167,16 @@
                   1,
                   {
                     "args": [],
-                    "$proof": "Nil"
+                    "$proof": "num_list::Nil"
                   }
                 ],
-                "$proof": "Cons"
+                "$proof": "num_list::Cons"
               }
             ],
-            "$proof": "Cons"
+            "$proof": "num_list::Cons"
           }
         ],
-        "$proof": "Cons"
+        "$proof": "num_list::Cons"
       }
     },
     {
@@ -192,16 +192,16 @@
                   1,
                   {
                     "args": [],
-                    "$proof": "Nil"
+                    "$proof": "num_list::Nil"
                   }
                 ],
-                "$proof": "Cons"
+                "$proof": "num_list::Cons"
               }
             ],
-            "$proof": "Cons"
+            "$proof": "num_list::Cons"
           }
         ],
-        "$proof": "Cons"
+        "$proof": "num_list::Cons"
       }
     },
     {
@@ -217,16 +217,16 @@
                   1,
                   {
                     "args": [],
-                    "$proof": "Nil"
+                    "$proof": "num_list::Nil"
                   }
                 ],
-                "$proof": "Cons"
+                "$proof": "num_list::Cons"
               }
             ],
-            "$proof": "Cons"
+            "$proof": "num_list::Cons"
           }
         ],
-        "$proof": "Cons"
+        "$proof": "num_list::Cons"
       }
     },
     {
@@ -242,16 +242,16 @@
                   2,
                   {
                     "args": [],
-                    "$proof": "Nil"
+                    "$proof": "num_list::Nil"
                   }
                 ],
-                "$proof": "Cons"
+                "$proof": "num_list::Cons"
               }
             ],
-            "$proof": "Cons"
+            "$proof": "num_list::Cons"
           }
         ],
-        "$proof": "Cons"
+        "$proof": "num_list::Cons"
       }
     },
     {
@@ -267,16 +267,16 @@
                   2,
                   {
                     "args": [],
-                    "$proof": "Nil"
+                    "$proof": "num_list::Nil"
                   }
                 ],
-                "$proof": "Cons"
+                "$proof": "num_list::Cons"
               }
             ],
-            "$proof": "Cons"
+            "$proof": "num_list::Cons"
           }
         ],
-        "$proof": "Cons"
+        "$proof": "num_list::Cons"
       }
     },
     {
@@ -292,16 +292,16 @@
                   2,
                   {
                     "args": [],
-                    "$proof": "Nil"
+                    "$proof": "num_list::Nil"
                   }
                 ],
-                "$proof": "Cons"
+                "$proof": "num_list::Cons"
               }
             ],
-            "$proof": "Cons"
+            "$proof": "num_list::Cons"
           }
         ],
-        "$proof": "Cons"
+        "$proof": "num_list::Cons"
       }
     },
     {
@@ -317,16 +317,16 @@
                   2,
                   {
                     "args": [],
-                    "$proof": "Nil"
+                    "$proof": "num_list::Nil"
                   }
                 ],
-                "$proof": "Cons"
+                "$proof": "num_list::Cons"
               }
             ],
-            "$proof": "Cons"
+            "$proof": "num_list::Cons"
           }
         ],
-        "$proof": "Cons"
+        "$proof": "num_list::Cons"
       }
     }
   ]

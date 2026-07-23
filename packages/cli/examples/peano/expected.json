@@ -3,7 +3,7 @@
     {
       "N": {
         "args": [],
-        "$proof": "Zero"
+        "$proof": "nat::Zero"
       }
     },
     {
@@ -11,10 +11,10 @@
         "args": [
           {
             "args": [],
-            "$proof": "Zero"
+            "$proof": "nat::Zero"
           }
         ],
-        "$proof": "Succ"
+        "$proof": "nat::Succ"
       }
     },
     {
@@ -24,13 +24,13 @@
             "args": [
               {
                 "args": [],
-                "$proof": "Zero"
+                "$proof": "nat::Zero"
               }
             ],
-            "$proof": "Succ"
+            "$proof": "nat::Succ"
           }
         ],
-        "$proof": "Succ"
+        "$proof": "nat::Succ"
       }
     },
     {
@@ -42,16 +42,16 @@
                 "args": [
                   {
                     "args": [],
-                    "$proof": "Zero"
+                    "$proof": "nat::Zero"
                   }
                 ],
-                "$proof": "Succ"
+                "$proof": "nat::Succ"
               }
             ],
-            "$proof": "Succ"
+            "$proof": "nat::Succ"
           }
         ],
-        "$proof": "Succ"
+        "$proof": "nat::Succ"
       }
     }
   ],
@@ -65,16 +65,16 @@
                 "args": [
                   {
                     "args": [],
-                    "$proof": "Zero"
+                    "$proof": "nat::Zero"
                   }
                 ],
-                "$proof": "Succ"
+                "$proof": "nat::Succ"
               }
             ],
-            "$proof": "Succ"
+            "$proof": "nat::Succ"
           }
         ],
-        "$proof": "Succ"
+        "$proof": "nat::Succ"
       }
     }
   ],
@@ -82,52 +82,52 @@
     {
       "M": {
         "args": [],
-        "$proof": "Zero"
+        "$proof": "nat::Zero"
       },
       "N": {
         "args": [],
-        "$proof": "Zero"
-      }
-    },
-    {
-      "M": {
-        "args": [],
-        "$proof": "Zero"
-      },
-      "N": {
-        "args": [
-          {
-            "args": [],
-            "$proof": "Zero"
-          }
-        ],
-        "$proof": "Succ"
+        "$proof": "nat::Zero"
       }
     },
     {
       "M": {
         "args": [],
-        "$proof": "Zero"
+        "$proof": "nat::Zero"
       },
       "N": {
         "args": [
           {
-            "args": [
-              {
-                "args": [],
-                "$proof": "Zero"
-              }
-            ],
-            "$proof": "Succ"
+            "args": [],
+            "$proof": "nat::Zero"
           }
         ],
-        "$proof": "Succ"
+        "$proof": "nat::Succ"
       }
     },
     {
       "M": {
         "args": [],
-        "$proof": "Zero"
+        "$proof": "nat::Zero"
+      },
+      "N": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [],
+                "$proof": "nat::Zero"
+              }
+            ],
+            "$proof": "nat::Succ"
+          }
+        ],
+        "$proof": "nat::Succ"
+      }
+    },
+    {
+      "M": {
+        "args": [],
+        "$proof": "nat::Zero"
       },
       "N": {
         "args": [
@@ -137,16 +137,16 @@
                 "args": [
                   {
                     "args": [],
-                    "$proof": "Zero"
+                    "$proof": "nat::Zero"
                   }
                 ],
-                "$proof": "Succ"
+                "$proof": "nat::Succ"
               }
             ],
-            "$proof": "Succ"
+            "$proof": "nat::Succ"
           }
         ],
-        "$proof": "Succ"
+        "$proof": "nat::Succ"
       }
     },
     {
@@ -154,19 +154,19 @@
         "args": [
           {
             "args": [],
-            "$proof": "Zero"
+            "$proof": "nat::Zero"
           }
         ],
-        "$proof": "Succ"
+        "$proof": "nat::Succ"
       },
       "N": {
         "args": [
           {
             "args": [],
-            "$proof": "Zero"
+            "$proof": "nat::Zero"
           }
         ],
-        "$proof": "Succ"
+        "$proof": "nat::Succ"
       }
     },
     {
@@ -174,10 +174,10 @@
         "args": [
           {
             "args": [],
-            "$proof": "Zero"
+            "$proof": "nat::Zero"
           }
         ],
-        "$proof": "Succ"
+        "$proof": "nat::Succ"
       },
       "N": {
         "args": [
@@ -185,13 +185,13 @@
             "args": [
               {
                 "args": [],
-                "$proof": "Zero"
+                "$proof": "nat::Zero"
               }
             ],
-            "$proof": "Succ"
+            "$proof": "nat::Succ"
           }
         ],
-        "$proof": "Succ"
+        "$proof": "nat::Succ"
       }
     },
     {
@@ -199,10 +199,10 @@
         "args": [
           {
             "args": [],
-            "$proof": "Zero"
+            "$proof": "nat::Zero"
           }
         ],
-        "$proof": "Succ"
+        "$proof": "nat::Succ"
       },
       "N": {
         "args": [
@@ -212,46 +212,16 @@
                 "args": [
                   {
                     "args": [],
-                    "$proof": "Zero"
+                    "$proof": "nat::Zero"
                   }
                 ],
-                "$proof": "Succ"
+                "$proof": "nat::Succ"
               }
             ],
-            "$proof": "Succ"
+            "$proof": "nat::Succ"
           }
         ],
-        "$proof": "Succ"
-      }
-    },
-    {
-      "M": {
-        "args": [
-          {
-            "args": [
-              {
-                "args": [],
-                "$proof": "Zero"
-              }
-            ],
-            "$proof": "Succ"
-          }
-        ],
-        "$proof": "Succ"
-      },
-      "N": {
-        "args": [
-          {
-            "args": [
-              {
-                "args": [],
-                "$proof": "Zero"
-              }
-            ],
-            "$proof": "Succ"
-          }
-        ],
-        "$proof": "Succ"
+        "$proof": "nat::Succ"
       }
     },
     {
@@ -261,13 +231,43 @@
             "args": [
               {
                 "args": [],
-                "$proof": "Zero"
+                "$proof": "nat::Zero"
               }
             ],
-            "$proof": "Succ"
+            "$proof": "nat::Succ"
           }
         ],
-        "$proof": "Succ"
+        "$proof": "nat::Succ"
+      },
+      "N": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [],
+                "$proof": "nat::Zero"
+              }
+            ],
+            "$proof": "nat::Succ"
+          }
+        ],
+        "$proof": "nat::Succ"
+      }
+    },
+    {
+      "M": {
+        "args": [
+          {
+            "args": [
+              {
+                "args": [],
+                "$proof": "nat::Zero"
+              }
+            ],
+            "$proof": "nat::Succ"
+          }
+        ],
+        "$proof": "nat::Succ"
       },
       "N": {
         "args": [
@@ -277,16 +277,16 @@
                 "args": [
                   {
                     "args": [],
-                    "$proof": "Zero"
+                    "$proof": "nat::Zero"
                   }
                 ],
-                "$proof": "Succ"
+                "$proof": "nat::Succ"
               }
             ],
-            "$proof": "Succ"
+            "$proof": "nat::Succ"
           }
         ],
-        "$proof": "Succ"
+        "$proof": "nat::Succ"
       }
     },
     {
@@ -298,16 +298,16 @@
                 "args": [
                   {
                     "args": [],
-                    "$proof": "Zero"
+                    "$proof": "nat::Zero"
                   }
                 ],
-                "$proof": "Succ"
+                "$proof": "nat::Succ"
               }
             ],
-            "$proof": "Succ"
+            "$proof": "nat::Succ"
           }
         ],
-        "$proof": "Succ"
+        "$proof": "nat::Succ"
       },
       "N": {
         "args": [
@@ -317,16 +317,16 @@
                 "args": [
                   {
                     "args": [],
-                    "$proof": "Zero"
+                    "$proof": "nat::Zero"
                   }
                 ],
-                "$proof": "Succ"
+                "$proof": "nat::Succ"
               }
             ],
-            "$proof": "Succ"
+            "$proof": "nat::Succ"
           }
         ],
-        "$proof": "Succ"
+        "$proof": "nat::Succ"
       }
     }
   ]

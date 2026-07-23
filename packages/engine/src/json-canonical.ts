@@ -95,7 +95,11 @@ export function formatProofTerm(value: unknown): string | undefined {
   if (keys.length !== 2 || !keys.includes("$proof") || !keys.includes("args")) return undefined;
   const { $proof, args } = value as { $proof: unknown; args: unknown };
   if (typeof $proof !== "string" || !Array.isArray(args)) return undefined;
-  return `${$proof}(${args.map(formatProofArg).join(", ")})`;
+  // `$proof` is the qualified name `pred::Ctor`; display the bare constructor
+  // (`Ctor(...)`), since the predicate is clear from context in output.
+  const sep = $proof.lastIndexOf("::");
+  const ctor = sep === -1 ? $proof : $proof.slice(sep + 2);
+  return `${ctor}(${args.map(formatProofArg).join(", ")})`;
 }
 
 /**

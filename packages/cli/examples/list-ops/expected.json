@@ -9,13 +9,13 @@
               1,
               {
                 "args": [],
-                "$proof": "Nil"
+                "$proof": "num_list::Nil"
               }
             ],
-            "$proof": "Cons"
+            "$proof": "num_list::Cons"
           }
         ],
-        "$proof": "Cons"
+        "$proof": "num_list::Cons"
       }
     }
   ],
@@ -37,13 +37,13 @@
               2,
               {
                 "args": [],
-                "$proof": "Nil"
+                "$proof": "num_list::Nil"
               }
             ],
-            "$proof": "Cons"
+            "$proof": "num_list::Cons"
           }
         ],
-        "$proof": "Cons"
+        "$proof": "num_list::Cons"
       }
     },
     {
@@ -52,16 +52,16 @@
           2,
           {
             "args": [],
-            "$proof": "Nil"
+            "$proof": "num_list::Nil"
           }
         ],
-        "$proof": "Cons"
+        "$proof": "num_list::Cons"
       }
     },
     {
       "S": {
         "args": [],
-        "$proof": "Nil"
+        "$proof": "num_list::Nil"
       }
     }
   ],
@@ -78,16 +78,16 @@
                   2,
                   {
                     "args": [],
-                    "$proof": "Nil"
+                    "$proof": "num_list::Nil"
                   }
                 ],
-                "$proof": "Cons"
+                "$proof": "num_list::Cons"
               }
             ],
-            "$proof": "Cons"
+            "$proof": "num_list::Cons"
           }
         ],
-        "$proof": "Cons"
+        "$proof": "num_list::Cons"
       }
     }
   ]

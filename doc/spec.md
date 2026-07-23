@@ -187,6 +187,7 @@ Comparison:    <  >  <=  >=  ==  !=  =  <>
 Rule:          :-
 Query:         ?-
 Binding:       :=
+Constructor:   ::
 Range:         ..
 Grouping:      (  )  [  ]
 Separators:    ,  :  .
@@ -229,9 +230,10 @@ constraints below are the only exceptions.
   spelling in a different rule is unrelated. Names are case-sensitive, so `X`
   and `x` are distinct.
 - **Constructor names**: the rule names introduced by a head annotation
-  `p(args)[Ctor]` (Section 8). Written only inside `[...]`, globally unique, and
-  disjoint from every namespace above, since they never appear in a term or call
-  position.
+  `p(args)[Ctor]` or `p(args) :: Ctor` (Section 8). Scoped to their predicate —
+  unique *within* a predicate but able to recur across predicates — so the full
+  name is `predicate::Ctor`, referenced bare (`Ctor(...)`) when unambiguous or
+  qualified (`p::Ctor(...)`) otherwise.
 
 **Two reservation mechanisms.** Keywords and type names are rejected by the
 *parser*, a hard syntax error in any position (predicate, column, or variable).
@@ -1936,21 +1938,27 @@ an inhabitant.
 
 ### 8.1 Named rules and proof-carrying predicates
 
-A rule head may carry a constructor name in brackets after the closing
-parenthesis:
+A rule head may carry a constructor name, either in brackets after the closing
+parenthesis or after a `::`. The two forms are equivalent:
 
 ```prolog
 suit()[Hearts].
 suit()[Spades].
-num_list(0)[Nil].
-num_list(n + 1)[Cons] :- num(Car), n <= 9, num_list(n).
+num_list(0) :: Nil.
+num_list(n + 1) :: Cons :- num(Car), n <= 9, num_list(n).
 ```
 
 A predicate is *proof-carrying* if any of its rules is named. Naming is
 all-or-nothing: either every rule for the predicate is named or none is, and
-mixing the two is an error. Constructor names form their own namespace (§1.8):
-they are written only inside `[...]` and must be unique across the whole
-program. A proof-carrying predicate may not use aggregates.
+mixing the two is an error. A proof-carrying predicate may not use aggregates.
+
+Constructors are scoped to their predicate (§1.8): a tag is unique *within* a
+predicate but may recur across predicates, so a constructor's full name is
+`predicate::Ctor` (for example `num_list::Cons`). As a term (§8.4) it is
+referenced either **bare** — `Cons(...)`, resolved to the one predicate that
+declares that tag — or **qualified** — `num_list::Cons(...)`. Bare suffices
+whenever exactly one predicate declares the tag; when several share it, the
+reference must be qualified.
 
 ### 8.2 Proof-term structure
 
@@ -1966,13 +1974,16 @@ nothing, and a don't-care `_` is never a witness. A proof term is a `value`
 (§2.9), specifically the object
 
 ```
-{ "$proof": "<Ctor>", "args": [ <arg>, ... ] }
+{ "$proof": "<predicate>::<Ctor>", "args": [ <arg>, ... ] }
 ```
 
 The reserved `$proof` key keeps proof terms from colliding with ordinary JSON
-data. The proof terms of `num_list` above are therefore
-`{"$proof":"Nil","args":[]}`, `{"$proof":"Cons","args":[7,{"$proof":"Nil","args":[]}]}`,
-and so on: the proof terms *are* the lists.
+data, and holds the *qualified* constructor name so two predicates' same-named
+constructors stay distinct. The proof terms of `num_list` above are therefore
+`{"$proof":"num_list::Nil","args":[]}`,
+`{"$proof":"num_list::Cons","args":[7,{"$proof":"num_list::Nil","args":[]}]}`,
+and so on: the proof terms *are* the lists. Output renders a proof bare —
+`Cons(7, Nil())` — dropping the qualifier, which is clear from context.
 
 A rule may instead **list the constructor's arguments explicitly**,
 `[Ctor(a1, ..., an)]`, and then the proof term carries exactly those expressions

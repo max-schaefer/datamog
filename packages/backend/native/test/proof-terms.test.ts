@@ -52,7 +52,11 @@ describe("proof terms", () => {
       `)
     )[0]!;
     expect(sortRows(rows)).toEqual(
-      sortRows([{ C: proof("Red", []) }, { C: proof("Green", []) }, { C: proof("Blue", []) }]),
+      sortRows([
+        { C: proof("colour::Red", []) },
+        { C: proof("colour::Green", []) },
+        { C: proof("colour::Blue", []) },
+      ]),
     );
   });
 
@@ -66,10 +70,10 @@ describe("proof terms", () => {
     )[0]!;
     expect(sortRows(rows)).toEqual(
       sortRows([
-        { P: proof("MkPair", [1, 1]) },
-        { P: proof("MkPair", [1, 2]) },
-        { P: proof("MkPair", [2, 1]) },
-        { P: proof("MkPair", [2, 2]) },
+        { P: proof("num_pair::MkPair", [1, 1]) },
+        { P: proof("num_pair::MkPair", [1, 2]) },
+        { P: proof("num_pair::MkPair", [2, 1]) },
+        { P: proof("num_pair::MkPair", [2, 2]) },
       ]),
     );
   });
@@ -86,7 +90,7 @@ describe("proof terms", () => {
       `)
     )[0]!;
     expect(sortRows(rows)).toEqual(
-      sortRows([{ P: proof("Only", [1]) }, { P: proof("Only", [2]) }]),
+      sortRows([{ P: proof("pick::Only", [1]) }, { P: proof("pick::Only", [2]) }]),
     );
   });
 
@@ -100,7 +104,11 @@ describe("proof terms", () => {
       `)
     )[0]!;
     expect(sortRows(rows)).toEqual(
-      sortRows([{ P: proof("None", []) }, { P: proof("Some", [1]) }, { P: proof("Some", [2]) }]),
+      sortRows([
+        { P: proof("num_opt::None", []) },
+        { P: proof("num_opt::Some", [1]) },
+        { P: proof("num_opt::Some", [2]) },
+      ]),
     );
   });
 
@@ -113,8 +121,8 @@ describe("proof terms", () => {
         ?- P : short_num_list(L).
       `)
     )[0]!;
-    const nil = proof("Nil", []);
-    const cons = (tail: unknown): unknown => proof("Cons", [7, tail]);
+    const nil = proof("short_num_list::Nil", []);
+    const cons = (tail: unknown): unknown => proof("short_num_list::Cons", [7, tail]);
     expect(sortRows(rows)).toEqual(
       sortRows([
         { L: 0, P: nil },
@@ -134,7 +142,9 @@ describe("proof terms", () => {
         ?- seen(C).
       `)
     )[0]!;
-    expect(sortRows(rows)).toEqual(sortRows([{ C: proof("Red", []) }, { C: proof("Green", []) }]));
+    expect(sortRows(rows)).toEqual(
+      sortRows([{ C: proof("colour::Red", []) }, { C: proof("colour::Green", []) }]),
+    );
   });
 
   test("suppress (_ :) omits a sub-proof; a bare atom includes it", async () => {
@@ -149,9 +159,9 @@ describe("proof terms", () => {
     // Step records only the intermediate node (Y), not the nested sub-proof.
     expect(sortRows(suppressed)).toEqual(
       sortRows([
-        { X: 1, Z: 2, P: proof("Direct", []) },
-        { X: 2, Z: 3, P: proof("Direct", []) },
-        { X: 1, Z: 3, P: proof("Step", [2]) },
+        { X: 1, Z: 2, P: proof("reach::Direct", []) },
+        { X: 2, Z: 3, P: proof("reach::Direct", []) },
+        { X: 1, Z: 3, P: proof("reach::Step", [2]) },
       ]),
     );
 
@@ -166,9 +176,9 @@ describe("proof terms", () => {
     // A bare recursive atom nests the sub-proof.
     expect(sortRows(included)).toEqual(
       sortRows([
-        { X: 1, Z: 2, P: proof("Direct", []) },
-        { X: 2, Z: 3, P: proof("Direct", []) },
-        { X: 1, Z: 3, P: proof("Step", [2, proof("Direct", [])]) },
+        { X: 1, Z: 2, P: proof("reach::Direct", []) },
+        { X: 2, Z: 3, P: proof("reach::Direct", []) },
+        { X: 1, Z: 3, P: proof("reach::Step", [2, proof("reach::Direct", [])]) },
       ]),
     );
   });
@@ -186,9 +196,9 @@ describe("proof terms", () => {
     )[0]!;
     expect(sortRows(rows)).toEqual(
       sortRows([
-        { P: proof("FromOne", []) },
-        { P: proof("FromAny", [1]) },
-        { P: proof("FromAny", [2]) },
+        { P: proof("ok::FromOne", []) },
+        { P: proof("ok::FromAny", [1]) },
+        { P: proof("ok::FromAny", [2]) },
       ]),
     );
   });
@@ -200,10 +210,31 @@ describe("proof terms", () => {
       );
     });
 
-    test("rejects a constructor name used by more than one rule", async () => {
-      await expect(run("a()[Dup].\nb()[Dup].\n?- P : a().")).rejects.toThrow(
-        /used by more than one rule/,
+    test("rejects a constructor name reused within one predicate", async () => {
+      await expect(run("a()[Dup].\na()[Dup].\n?- P : a().")).rejects.toThrow(
+        /used by more than one rule of 'a'/,
       );
+    });
+
+    test("two predicates may share a constructor tag", async () => {
+      // Per-predicate scoping: a::Both and b::Both are distinct constructors.
+      const rows = (
+        await run("a()[Both].\nb()[Both].\nseen(X) :- X : a.\nseen(X) :- X : b.\n?- seen(X).")
+      )[0]!;
+      expect(rows.length).toBe(2);
+    });
+
+    test("a bare constructor shared across predicates is ambiguous", async () => {
+      await expect(run("a()[Both].\nb()[Both].\nq(X) :- X = Both().\n?- q(X).")).rejects.toThrow(
+        /ambiguous.*qualify/,
+      );
+    });
+
+    test("a qualified constructor selects one predicate's proofs", async () => {
+      const rows = (
+        await run("a()[Both].\nb()[Both].\nonly_a(X) :- X = a::Both().\n?- only_a(X).")
+      )[0]!;
+      expect(rows.length).toBe(1);
     });
 
     test("rejects capturing a proof from a predicate with no named rules", async () => {
@@ -298,7 +329,7 @@ describe("proof terms", () => {
           bad(X) :- P : num_list(_), P = Cons(X).
           ?- bad(X).
         `),
-      ).rejects.toThrow(/'Cons' takes 2/);
+      ).rejects.toThrow(/'num_list::Cons'.*takes 2/);
     });
 
     test("rejects a constructor name that collides with a built-in", async () => {
@@ -317,7 +348,7 @@ describe("proof terms", () => {
       append(Nil(), B, B) :- B : num_list(_).
       append(Cons(H, T), B, Cons(H, R)) :- append(T, B, R).
     `;
-    const nil = proof("Nil", []);
+    const nil = proof("num_list::Nil", []);
 
     test("a constructor term in an argument position matches a proof", async () => {
       const rows = (
@@ -328,7 +359,7 @@ describe("proof terms", () => {
       )[0]!;
       // [1] ++ [2] = [1, 2], which is within the enumerated universe.
       expect(sortRows(rows)).toEqual(
-        sortRows([{ C: proof("Cons", [1, proof("Cons", [2, nil])]) }]),
+        sortRows([{ C: proof("num_list::Cons", [1, proof("num_list::Cons", [2, nil])]) }]),
       );
     });
 
@@ -342,7 +373,7 @@ describe("proof terms", () => {
       )[0]!;
       expect(rows.length).toBe(1);
       expect(Object.keys(rows[0]!)).toEqual(["C"]);
-      expect(rows[0]!.C).toEqual(proof("Cons", [1, proof("Cons", [2, nil])]));
+      expect(rows[0]!.C).toEqual(proof("num_list::Cons", [1, proof("num_list::Cons", [2, nil])]));
     });
 
     test("a result outside the enumerated universe is clipped", async () => {
@@ -369,7 +400,7 @@ describe("proof terms", () => {
       )[0]!;
       // reverse([1, 2]) = [2, 1]
       expect(sortRows(rows)).toEqual(
-        sortRows([{ R: proof("Cons", [2, proof("Cons", [1, nil])]) }]),
+        sortRows([{ R: proof("num_list::Cons", [2, proof("num_list::Cons", [1, nil])]) }]),
       );
     });
 
@@ -382,7 +413,7 @@ describe("proof terms", () => {
           bad(Cons(7)).
           ?- bad(X).
         `),
-      ).rejects.toThrow(/'Cons' takes 2/);
+      ).rejects.toThrow(/'num_list::Cons'.*takes 2/);
     });
   });
 
@@ -428,7 +459,9 @@ describe("proof terms", () => {
           ?- P : pick().
         `)
       )[0]!;
-      expect(sortRows(rows)).toEqual(sortRows([{ P: proof("Mk", [1]) }, { P: proof("Mk", [2]) }]));
+      expect(sortRows(rows)).toEqual(
+        sortRows([{ P: proof("pick::Mk", [1]) }, { P: proof("pick::Mk", [2]) }]),
+      );
     });
 
     test("a chart parser builds clean AST proof terms", async () => {
@@ -443,7 +476,7 @@ describe("proof terms", () => {
         `)
       )[0]!;
       expect(sortRows(rows)).toEqual(
-        sortRows([{ A: proof("Add", [proof("Lit", [2]), proof("Lit", [3])]) }]),
+        sortRows([{ A: proof("ast::Add", [proof("ast::Lit", [2]), proof("ast::Lit", [3])]) }]),
       );
     });
   });

@@ -406,8 +406,9 @@ export function postProcess(program: Program): void {
       proofCarrying.add(stmt.head.predicate);
     }
   }
-  // Constructor name -> arity, filled in as each named rule's constructor is
-  // built; consumed by the destructuring desugar to validate pattern arity.
+  // Qualified constructor name (`pred::Ctor`) -> arity, filled in as each named
+  // rule's constructor is built; consumed by the destructuring desugar to
+  // validate pattern arity.
   const ctorArity = new Map<string, number>();
 
   // Sub-proof columns must be ordinary (non-anonymous) variables: the native
@@ -421,13 +422,15 @@ export function postProcess(program: Program): void {
   };
 
   // Validate naming: every rule of a proof-carrying predicate must be named,
-  // aggregates cannot be combined with proofs, and constructor names are unique.
-  const seenCtors = new Set<string>();
-  // Constructor -> the predicate it belongs to, and predicate -> its declared
-  // column count (before the proof column is appended). The constructor-term
-  // desugar uses these to synthesise the `scrut : Pred(_)` capture that
-  // range-restricts a matched proof.
-  const ctorPred = new Map<string, string>();
+  // aggregates cannot be combined with proofs, and a constructor tag is unique
+  // *within* its predicate.
+  // Constructor tag -> the predicates that declare it, and predicate -> its
+  // declared column count (before the proof column is appended). Constructors
+  // are scoped per predicate: a tag may recur across predicates (`p::Cons`,
+  // `q::Cons`) but not within one. The desugar resolves a bare tag to its unique
+  // predicate (erroring if several share it) and a `p::Cons` term to `p`, then
+  // synthesises the `scrut : Pred(_)` capture that range-restricts the match.
+  const ctorTags = new Map<string, Set<string>>();
   const predArity = new Map<string, number>();
   for (const stmt of program.statements) {
     if (!isRule(stmt) || !proofCarrying.has(stmt.head.predicate)) continue;
@@ -442,11 +445,15 @@ export function postProcess(program: Program): void {
       throw parseErrorAtNode(`Proof-carrying predicate '${pred}' cannot use aggregates`, stmt.head);
     }
     const ctor = decodeQuotedIdentifier(stmt.ruleName, stmt.head);
-    if (seenCtors.has(ctor)) {
-      throw parseErrorAtNode(`Constructor name '${ctor}' is used by more than one rule`, stmt.head);
+    const preds = ctorTags.get(ctor) ?? new Set<string>();
+    if (preds.has(pred)) {
+      throw parseErrorAtNode(
+        `Constructor '${ctor}' is used by more than one rule of '${pred}'`,
+        stmt.head,
+      );
     }
-    seenCtors.add(ctor);
-    ctorPred.set(ctor, pred);
+    preds.add(pred);
+    ctorTags.set(ctor, preds);
     predArity.set(pred, stmt.head.args.length);
   }
 
@@ -558,8 +565,11 @@ export function postProcess(program: Program): void {
         ...subProofs.map((name) => mkVar(name, stmt.head.$cstNode)),
       ];
     }
-    ctorArity.set(ctor, argExprs.length);
-    const proofTerm = buildProofTerm(ctor, argExprs, stmt.head.$cstNode);
+    // The `$proof` tag is the qualified name `<predicate>::<Ctor>`, so a match
+    // can tell two predicates' same-named constructors apart.
+    const qualified = `${stmt.head.predicate}::${ctor}`;
+    ctorArity.set(qualified, argExprs.length);
+    const proofTerm = buildProofTerm(qualified, argExprs, stmt.head.$cstNode);
     setContainer(proofTerm, stmt.head, "args", stmt.head.args.length);
     (stmt.head.args as Expression[]).push(proofTerm);
   }
@@ -577,7 +587,7 @@ export function postProcess(program: Program): void {
   // scrutinee is range-restricted to the predicate's (finite) proofs -- so a
   // constructor in an output position relates to an existing proof rather than
   // inventing a new value. See spec section 8.4.
-  if (seenCtors.size > 0) {
+  if (ctorTags.size > 0) {
     let patVarCounter = 0;
     const freshPat = (): string => {
       let name = `$pat${patVarCounter++}`;
@@ -585,15 +595,42 @@ export function postProcess(program: Program): void {
       return name;
     };
 
+    // Resolve a `FunctionCall` to the constructor it names (predicate + qualified
+    // `pred::Ctor` name), or `undefined` if it is not a constructor term (an
+    // ordinary function / aggregate call). A `p::Ctor` form names predicate `p`;
+    // a bare `Ctor` resolves to the unique predicate declaring it, erroring when
+    // several predicates share the tag.
+    const resolveCtor = (
+      e: Expression | undefined,
+    ): { pred: string; qualified: string } | undefined => {
+      if (e === undefined || e.$type !== "FunctionCall") return undefined;
+      const fc = e as FunctionCall;
+      const preds = ctorTags.get(fc.name);
+      if (fc.qualifier !== undefined) {
+        const pred = decodeQuotedIdentifier(fc.qualifier, fc);
+        if (!preds?.has(pred)) {
+          throw parseErrorAtNode(`Predicate '${pred}' has no constructor '${fc.name}'`, fc);
+        }
+        return { pred, qualified: `${pred}::${fc.name}` };
+      }
+      if (!preds || preds.size === 0) return undefined;
+      if (preds.size > 1) {
+        const options = [...preds].map((p) => `${p}::${fc.name}`).join(", ");
+        throw parseErrorAtNode(
+          `Constructor '${fc.name}' is ambiguous across predicates; qualify it (${options})`,
+          fc,
+        );
+      }
+      return { pred: [...preds][0]!, qualified: `${[...preds][0]}::${fc.name}` };
+    };
     const isCtorTerm = (e: Expression | undefined): e is FunctionCall =>
-      e !== undefined && e.$type === "FunctionCall" && seenCtors.has(e.name);
+      resolveCtor(e) !== undefined;
 
     // Synthesise `scrutVar : Pred(_)` as a fully-injected atom: one don't-care
     // per declared column, then `scrutVar` in the trailing proof-column slot.
     // Built directly in post-injection shape because injectProofColumns has
     // already run by now.
-    const captureAtom = (ctor: string, scrutVar: string, cst: Cst): BodyElement => {
-      const pred = ctorPred.get(ctor)!;
+    const captureAtom = (pred: string, scrutVar: string, cst: Cst): BodyElement => {
       const declared = predArity.get(pred) ?? 0;
       const args: Expression[] = [];
       for (let i = 0; i < declared; i++) args.push(mkVar(freshAnon(), cst));
@@ -620,21 +657,21 @@ export function postProcess(program: Program): void {
       cst: Cst,
       out: BodyElement[],
     ): void => {
-      const ctor = pattern.name;
-      const arity = ctorArity.get(ctor);
+      const { qualified } = resolveCtor(pattern)!;
+      const arity = ctorArity.get(qualified);
       if (arity !== undefined && pattern.args.length !== arity) {
         throw parseErrorAtNode(
-          `Constructor pattern '${ctor}' has ${pattern.args.length} argument(s) but '${ctor}' takes ${arity}`,
+          `Constructor pattern '${qualified}' has ${pattern.args.length} argument(s) but takes ${arity}`,
           pattern,
         );
       }
-      // Tag guard: as_string(S["$proof"]) = "Ctor".
+      // Tag guard: as_string(S["$proof"]) = "pred::Ctor".
       const tag = mkFunctionCall(
         "as_string",
         [mkSubscript(mkVar(scrutVar, cst), mkStringLiteral("$proof", cst), cst)],
         cst,
       );
-      out.push(mkEquality(tag, mkStringLiteral(ctor, cst), cst));
+      out.push(mkEquality(tag, mkStringLiteral(qualified, cst), cst));
       for (let i = 0; i < pattern.args.length; i++) {
         const p = pattern.args[i]!;
         // Accessor: S["args"][i].
@@ -661,7 +698,7 @@ export function postProcess(program: Program): void {
       cst: Cst,
       out: BodyElement[],
     ): void => {
-      out.push(captureAtom(pattern.name, scrutVar, cst));
+      out.push(captureAtom(resolveCtor(pattern)!.pred, scrutVar, cst));
       expandPattern(scrutVar, pattern, cst, out);
     };
 
@@ -726,7 +763,7 @@ export function postProcess(program: Program): void {
     const hasCtorAncestor = (node: AstNode): boolean => {
       let cur = node.$container;
       while (cur) {
-        if (isFunctionCall(cur) && seenCtors.has(cur.name)) return true;
+        if (isFunctionCall(cur) && isCtorTerm(cur)) return true;
         cur = cur.$container;
       }
       return false;
@@ -748,7 +785,7 @@ export function postProcess(program: Program): void {
 
     const topLevel: FunctionCall[] = [];
     for (const node of streamAll(program)) {
-      if (isFunctionCall(node) && seenCtors.has(node.name) && !hasCtorAncestor(node)) {
+      if (isFunctionCall(node) && isCtorTerm(node) && !hasCtorAncestor(node)) {
         if (hasNegationAncestor(node)) {
           throw parseErrorAtNode(
             "A constructor pattern may not appear under negation; match it in a positive body element instead (e.g. capture the proof, then negate a guard on it)",

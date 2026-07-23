@@ -7,7 +7,7 @@
             "args": [
               2
             ],
-            "$proof": "Lit"
+            "$proof": "ast::Lit"
           },
           {
             "args": [
@@ -15,19 +15,19 @@
                 "args": [
                   3
                 ],
-                "$proof": "Lit"
+                "$proof": "ast::Lit"
               },
               {
                 "args": [
                   4
                 ],
-                "$proof": "Lit"
+                "$proof": "ast::Lit"
               }
             ],
-            "$proof": "Mul"
+            "$proof": "ast::Mul"
           }
         ],
-        "$proof": "Add"
+        "$proof": "ast::Add"
       },
       "V": 14
     },
@@ -40,25 +40,25 @@
                 "args": [
                   2
                 ],
-                "$proof": "Lit"
+                "$proof": "ast::Lit"
               },
               {
                 "args": [
                   3
                 ],
-                "$proof": "Lit"
+                "$proof": "ast::Lit"
               }
             ],
-            "$proof": "Add"
+            "$proof": "ast::Add"
           },
           {
             "args": [
               4
             ],
-            "$proof": "Lit"
+            "$proof": "ast::Lit"
           }
         ],
-        "$proof": "Mul"
+        "$proof": "ast::Mul"
       },
       "V": 20
     }
