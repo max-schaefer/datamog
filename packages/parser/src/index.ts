@@ -86,7 +86,7 @@ export type BinaryOp =
   | "="
   | "<>";
 
-export { postProcess } from "./post-process.js";
+export { liftHeadAnnotations, postProcess } from "./post-process.js";
 export { createDatamogServices } from "./datamog-module.js";
 export {
   DatamogGeneratedModule,
@@ -96,7 +96,7 @@ export {
 
 import { createDatamogServices } from "./datamog-module.js";
 import type { Program } from "./generated/ast.js";
-import { postProcess } from "./post-process.js";
+import { liftHeadAnnotations, postProcess } from "./post-process.js";
 
 export { ParseError } from "./parse-error.js";
 import { ParseError } from "./parse-error.js";
@@ -181,6 +181,10 @@ export function parseRaw(source: string, file?: string): Program {
     }
     throw new ParseError(err.message, line, col, lineColumnToOffset(source, line, col), file);
   }
+  // Normalise head type annotations away before any consumer (elaboration,
+  // post-processing, analysis) sees the tree, stashing the declared types on
+  // each head's `argTypes`. Keeps AnnotatedHeadTerm out of every later stage.
+  liftHeadAnnotations(result.value);
   return result.value;
 }
 

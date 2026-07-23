@@ -1,5 +1,6 @@
 import { isExtDecl, isRule } from "datamog-parser";
 import { AnalyzerError, queryProjection } from "./analyzer.ts";
+import { asCoreRule } from "./ast.ts";
 import type { Binding, ExtDecl, PrimitiveType, Program, Query, Rule, Statement } from "./ast.ts";
 import { expandModule } from "./expand.ts";
 import { type TypedProgram, columnTypesCompatible } from "./types.ts";
@@ -383,7 +384,8 @@ function relabelOutputColumns(
   columnNames: string[],
 ): void {
   for (const stmt of statements) {
-    if (isRule(stmt) && stmt.head.predicate === outputPred) relabelRuleHead(stmt, columnNames);
+    if (isRule(stmt) && stmt.head.predicate === outputPred)
+      relabelRuleHead(asCoreRule(stmt), columnNames);
   }
 }
 

@@ -83,13 +83,15 @@ Query:
 HeadAtom:
     predicate=Identifier '(' (args+=HeadTerm (',' args+=HeadTerm)*)? ')';
 
-// HeadTerm parses as a plain Expression — aggregate calls (`count(X)`,
-// `sum(X)`, ...) look syntactically identical to FunctionCall and
-// would otherwise make HeadTerm ambiguous. Post-processing rewrites
-// FunctionCall nodes whose name is an aggregate into AggregateCall
-// when they appear at the top level of a head.
+// A head term is an Expression, optionally carrying a type annotation
+// (`x: integer`). When the `:` is present the parsed expression is wrapped in
+// an AnnotatedHeadTerm; post-processing lifts the type onto the head's
+// `argTypes` and unwraps the expression, so downstream stages still see a
+// plain head term. Aggregate calls (`count(X)`, `sum(X)`, ...) are
+// syntactically FunctionCalls here; post-processing rewrites those into
+// AggregateCall.
 HeadTerm:
-    Expression;
+    Expression ({infer AnnotatedHeadTerm.expr=current} ':' type=PrimitiveType)?;
 
 // Not referenced directly by the grammar — synthesised by post-processing
 // so downstream stages (analyzer, translator) can rely on the AggregateCall

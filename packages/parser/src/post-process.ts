@@ -18,6 +18,7 @@ import type {
   Variable,
 } from "./generated/ast.js";
 import {
+  isAnnotatedHeadTerm,
   isBracketAccess,
   isColumnDecl,
   isExtDecl,
@@ -235,6 +236,41 @@ function replaceNode(oldNode: AstNode, newNode: AstNode): void {
  *    they already implement. (Negated predicate calls keep their own
  *    `Literal.negated` flag — they are negation-as-failure, not `!`.)
  */
+/**
+ * Lift optional head-term type annotations onto the head. The grammar wraps an
+ * annotated head term `h(x: integer)` in an AnnotatedHeadTerm{expr, type}; this
+ * replaces each wrapper with its inner expression and records the declared type
+ * in a parallel `argTypes` array on the head (undefined for unannotated
+ * positions). The array is attached only when a rule annotates at least one
+ * argument; the per-predicate all-or-nothing rule is enforced later, during
+ * type inference.
+ *
+ * Runs in `parseRaw`, before elaboration and post-processing, so no later stage
+ * ever sees an AnnotatedHeadTerm node.
+ */
+export function liftHeadAnnotations(program: Program): void {
+  for (const stmt of program.statements) {
+    if (!isRule(stmt)) continue;
+    const args = stmt.head.args;
+    let annotated = false;
+    const argTypes: (string | undefined)[] = new Array(args.length).fill(undefined);
+    for (let i = 0; i < args.length; i++) {
+      const arg = args[i]!;
+      if (!isAnnotatedHeadTerm(arg)) continue;
+      annotated = true;
+      argTypes[i] = arg.type;
+      const inner = arg.expr;
+      (inner as { $container: AstNode }).$container = stmt.head;
+      (inner as { $containerProperty?: string }).$containerProperty = "args";
+      (inner as { $containerIndex?: number }).$containerIndex = i;
+      (args as unknown as Expression[])[i] = inner;
+    }
+    if (annotated) {
+      (stmt.head as { argTypes?: (string | undefined)[] }).argTypes = argTypes;
+    }
+  }
+}
+
 export function postProcess(program: Program): void {
   for (const node of streamAll(program)) {
     if (isExtDecl(node)) {

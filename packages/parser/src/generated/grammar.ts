@@ -821,11 +821,47 @@ export const DatamogGrammar = (): Grammar => loadedDatamogGrammar ?? (loadedData
       "$type": "ParserRule",
       "name": "HeadTerm",
       "definition": {
-        "$type": "RuleCall",
-        "rule": {
-          "$ref": "#/rules@17"
-        },
-        "arguments": []
+        "$type": "Group",
+        "elements": [
+          {
+            "$type": "RuleCall",
+            "rule": {
+              "$ref": "#/rules@17"
+            },
+            "arguments": []
+          },
+          {
+            "$type": "Group",
+            "elements": [
+              {
+                "$type": "Action",
+                "inferredType": {
+                  "$type": "InferredType",
+                  "name": "AnnotatedHeadTerm"
+                },
+                "feature": "expr",
+                "operator": "="
+              },
+              {
+                "$type": "Keyword",
+                "value": ":"
+              },
+              {
+                "$type": "Assignment",
+                "feature": "type",
+                "operator": "=",
+                "terminal": {
+                  "$type": "RuleCall",
+                  "rule": {
+                    "$ref": "#/rules@6"
+                  },
+                  "arguments": []
+                }
+              }
+            ],
+            "cardinality": "?"
+          }
+        ]
       },
       "entry": false,
       "fragment": false,

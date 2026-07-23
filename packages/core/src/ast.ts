@@ -81,13 +81,30 @@ export type Expression =
 // HeadTerm from the grammar is just `Expression`; aggregates are injected
 // by post-processing (see `packages/parser/src/post-process.ts`). Declare
 // the union at the core boundary so downstream code can narrow on
-// `$type === "AggregateCall"` at head positions.
+// `$type === "AggregateCall"` at head positions. The grammar's third
+// possibility, AnnotatedHeadTerm, is lifted away in `parseRaw`
+// (`liftHeadAnnotations`) before any core code runs, so it never appears here.
 export type HeadTerm = AggregateCall | Expression;
 
-// Mirror the parser's HeadAtom/Rule shapes but broaden `args` to include
-// the synthesised AggregateCall nodes.
-export type HeadAtom = Omit<ParserHeadAtom, "args"> & { args: HeadTerm[] };
+// Mirror the parser's HeadAtom/Rule shapes but broaden `args` to include the
+// synthesised AggregateCall nodes. `argTypes` carries optional per-column head
+// type annotations (`h(x: integer)`): the declared type per position, undefined
+// for unannotated positions; the whole array is absent when the rule has none.
+export type HeadAtom = Omit<ParserHeadAtom, "args"> & {
+  args: HeadTerm[];
+  argTypes?: (string | undefined)[];
+};
 export type Rule = Omit<ParserRule, "head"> & { head: HeadAtom };
+
+/**
+ * Treat a parsed statement as a core Rule. `parseRaw` strips AnnotatedHeadTerm
+ * wrappers and post-processing injects AggregateCall, so a Rule that has been
+ * through those passes matches the core shape; TS can't track the in-place
+ * normalisation, so callers assert it at that boundary.
+ */
+export function asCoreRule(rule: ParserRule): Rule {
+  return rule as unknown as Rule;
+}
 
 // Widen Query to carry its output name and provenance.
 // `outputName` labels the result: the predicate name for an `output predicate`,

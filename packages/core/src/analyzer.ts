@@ -9,6 +9,7 @@ import type {
   Query,
   Rule,
 } from "./ast.ts";
+import { asCoreRule } from "./ast.ts";
 import { BUILTINS, resolveCall } from "./builtins.ts";
 import { type NegationCycle, buildNegationCycle } from "./negation-cycle.ts";
 
@@ -280,9 +281,9 @@ function analyzeImpl(program: Program, file: string | undefined): AnalyzedProgra
               ...(pos ?? []),
             );
           }
-          existing.push(stmt);
+          existing.push(asCoreRule(stmt));
         } else {
-          rules.set(stmt.head.predicate, [stmt]);
+          rules.set(stmt.head.predicate, [asCoreRule(stmt)]);
           arities.set(stmt.head.predicate, stmt.head.args.length);
         }
         // An `output predicate` rule additionally exposes its predicate as a

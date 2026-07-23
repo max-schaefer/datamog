@@ -619,7 +619,7 @@ describe("parser", () => {
     const program = parse("cnt(X, count(Y)) :- bar(X, Y).");
     const rule = program.statements[0] as Rule;
     expect(rule.head.args[0]).toMatchObject({ $type: "Variable", name: "X" });
-    const agg = rule.head.args[1] as AggregateCall;
+    const agg = rule.head.args[1] as unknown as AggregateCall;
     expect(agg.$type).toBe("AggregateCall");
     expect(agg.func).toBe("count");
     expect(agg.arg).toMatchObject({ $type: "Variable", name: "Y" });
@@ -628,7 +628,7 @@ describe("parser", () => {
   test("aggregate sum in head", () => {
     const program = parse("total(X, sum(Y)) :- bar(X, Y).");
     const rule = program.statements[0] as Rule;
-    const agg = rule.head.args[1] as AggregateCall;
+    const agg = rule.head.args[1] as unknown as AggregateCall;
     expect(agg.$type).toBe("AggregateCall");
     expect(agg.func).toBe("sum");
   });
@@ -638,7 +638,7 @@ describe("parser", () => {
     for (const func of funcs) {
       const program = parse(`r(X, ${func}(Y)) :- bar(X, Y).`);
       const rule = program.statements[0] as Rule;
-      const agg = rule.head.args[1] as AggregateCall;
+      const agg = rule.head.args[1] as unknown as AggregateCall;
       expect(agg.$type).toBe("AggregateCall");
       expect(agg.func).toBe(func);
     }
@@ -647,7 +647,7 @@ describe("parser", () => {
   test("aggregate with expression argument", () => {
     const program = parse("total(X, sum(Y * Z)) :- bar(X, Y, Z).");
     const rule = program.statements[0] as Rule;
-    const agg = rule.head.args[1] as AggregateCall;
+    const agg = rule.head.args[1] as unknown as AggregateCall;
     expect(agg.func).toBe("sum");
     expect(agg.arg.$type).toBe("BinaryExpr");
   });

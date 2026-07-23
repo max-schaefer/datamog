@@ -16,6 +16,7 @@
 // never types those.
 
 import { AGGREGATE_NAMES, BUILTIN_BODY_ATOMS } from "./analyzer.ts";
+import { asCoreRule } from "./ast.ts";
 import type { HeadTerm, Program, Rule } from "./ast.ts";
 import { BUILTINS } from "./builtins.ts";
 
@@ -76,7 +77,7 @@ export function findEnclosingRule(program: Program, offset: number): Rule | unde
     if (stmt.$type !== "Rule") continue;
     const cst = stmt.$cstNode;
     if (!cst) continue;
-    if (offset >= cst.offset && offset <= cst.end) return stmt;
+    if (offset >= cst.offset && offset <= cst.end) return asCoreRule(stmt);
   }
   return undefined;
 }
