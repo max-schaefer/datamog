@@ -268,7 +268,12 @@ sub-spans), so run them on `native` / `seminaive`. See the *Peano Naturals* and
 
 - Naming is all-or-nothing: name every rule for a predicate, or
   none.
-- Constructor names are global and must be unique.
+- A constructor is scoped to its predicate: its full name is
+  `predicate::Ctor`, unique within that predicate but free to recur
+  across predicates. Reference it bare (`Cons(...)`) when only one
+  predicate declares the tag, or qualified (`num_list::Cons(...)`)
+  otherwise. You can also *declare* it with `head :: Ctor` instead of
+  `head[Ctor]` — the two are equivalent.
 - A proof-carrying predicate can't also aggregate.
 - A proof mark applies only to a positive, proof-carrying atom,
   not to an extensional predicate and not to a negated atom.

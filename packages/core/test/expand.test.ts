@@ -45,33 +45,36 @@ describe("expandModule", () => {
     expect(bodyPreds(byHead("I$reach")[1])).toEqual(["I$reach", "road"]);
     expect(bodyPreds(byHead("I$tagged")[0])).toEqual(["seed"]);
 
-    // The proof constructor is freshened.
-    expect(byHead("I$tagged")[0].ruleName).toBe("I$Mk");
+    // The constructor tag is left as-is; the renamed head predicate is what
+    // qualifies it (`I$tagged::Mk`) once post-processing runs.
+    expect(byHead("I$tagged")[0].ruleName).toBe("Mk");
   });
 
-  test("a second instantiation uses a distinct prefix (no name or constructor clash)", () => {
+  test("a second instantiation stays distinct via its predicate, not the tag", () => {
     const one = expandModule(parseRaw(MODULE), { prefix: "A$", inputs: { edge: "road" } });
     const two = expandModule(parseRaw(MODULE), { prefix: "B$", inputs: { edge: "flight" } });
+    // The tag is unchanged in both; distinctness comes from the (freshened) head
+    // predicate, so the qualified constructors `A$tagged::Mk` / `B$tagged::Mk`
+    // do not clash.
     const ctors = (s: Stmt[]) =>
       rules(s)
         .map((r) => r.ruleName)
         .filter(Boolean);
-    // Freshened names and constructors are disjoint across the two instances.
-    expect(ctors(one)).toEqual(["A$Mk"]);
-    expect(ctors(two)).toEqual(["B$Mk"]);
+    expect(ctors(one)).toEqual(["Mk"]);
+    expect(ctors(two)).toEqual(["Mk"]);
     const heads = (s: Stmt[]) => new Set(rules(s).map((r) => r.head.predicate));
     for (const h of heads(one)) expect(heads(two).has(h)).toBe(false);
   });
 
-  test("a user-facing import (exportAs) gives writable, binding-qualified constructor names", () => {
-    // With exportAs the instance is user-facing, so its constructors are named
-    // `<as>_<Ctor>` (a writable identifier) rather than `$`-prefix-freshened.
+  test("a user-facing import keeps the tag but re-qualifies via the renamed predicate", () => {
+    // The selected output is renamed to the importer's name (`mytag`); the tag
+    // stays `Mk`, so the constructor is `mytag::Mk` after post-processing.
     const stmts = expandModule(parseRaw(MODULE), {
       prefix: "I$",
       inputs: { edge: "road" },
       exportAs: { export: "tagged", as: "mytag" },
     });
     const tagRule = rules(stmts).find((r) => r.head.predicate === "mytag");
-    expect(tagRule?.ruleName).toBe("mytag_Mk");
+    expect(tagRule?.ruleName).toBe("Mk");
   });
 });

@@ -7,7 +7,7 @@ input predicate colour_opt(o: value) := opt from "option.dl"(elem = colour).
 
 # Each instance's constructors are named after the binding, so they are
 # distinct and writable -- one program can match against both Options at once.
-output predicate present(V) :- P : int_opt,    P = int_opt_Some(V).
-output predicate present(V) :- Q : colour_opt, Q = colour_opt_Some(V).
+output predicate present(V) :- P : int_opt,    P = int_opt::Some(V).
+output predicate present(V) :- Q : colour_opt, Q = colour_opt::Some(V).
 
 ?- present(V).

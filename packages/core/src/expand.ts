@@ -22,9 +22,8 @@ export interface ExpandOptions {
    * import); it is renamed to `as` (the importer's local name for the instance)
    * instead of being freshened with `prefix`, so the importer's existing
    * references resolve without an alias rule. Every other predicate is still
-   * prefix-freshened. Its presence also marks this as a user-facing instance,
-   * so the module's constructors are named `<as>_<Ctor>` (writable) rather than
-   * `prefix`-freshened.
+   * prefix-freshened. Constructors are not renamed; renaming the head predicate
+   * re-qualifies them (`<as>::<Ctor>`), a writable name the importer can match.
    */
   exportAs?: { export: string; as: string };
 }
@@ -57,11 +56,11 @@ function* walk(node: unknown): Generator<Record<string, unknown>> {
  * - **Substitute** each wired input predicate with the actual name the importer
  *   supplied, everywhere it is referenced; free inputs keep their name.
  * - **Freshen** every private and output predicate name with `prefix` so two
- *   instances do not collide. Proof **constructors** of a user-facing (entry)
- *   import are instead named `<as>_<Ctor>` after the importer's chosen output
- *   name — a writable identifier it can pattern-match; a nested instance's
- *   constructors keep the opaque `prefix` form. Either way the merged program's
- *   global constructor-uniqueness check catches a residual clash.
+ *   instances do not collide. Proof **constructors** are not renamed: a
+ *   constructor is scoped to its predicate (`opt::Some`), so renaming the head
+ *   predicate re-qualifies it for free (`dist::Some`). Bare constructor *terms*
+ *   are qualified here with their owning predicate's new name so they stay
+ *   unambiguous once several instances merge.
  * - **Drop** the declarations of wired inputs (they are supplied from outside);
  *   keep free-input declarations as EDBs.
  *
@@ -75,10 +74,16 @@ export function expandModule(
 ): Statement[] {
   const localNames = new Set<string>();
   const ctorNames = new Set<string>();
+  // Constructor tag -> the module predicate that declares it, so a bare
+  // constructor term can be qualified with that predicate's renamed name.
+  const ctorOwner = new Map<string, string>();
   for (const stmt of module.statements) {
     if (isRule(stmt)) {
       localNames.add(stmt.head.predicate);
-      if (stmt.ruleName !== undefined) ctorNames.add(stmt.ruleName);
+      if (stmt.ruleName !== undefined) {
+        ctorNames.add(stmt.ruleName);
+        if (!ctorOwner.has(stmt.ruleName)) ctorOwner.set(stmt.ruleName, stmt.head.predicate);
+      }
     }
   }
 
@@ -88,27 +93,22 @@ export function expandModule(
     if (localNames.has(name)) return `${prefix}${name}`;
     return name; // free input or built-in body atom
   };
-  // For a user-facing (entry) import, name the instance's constructors after the
-  // importer's chosen output name (`Some` -> `road_reach_Some`): a writable
-  // identifier the importer can pattern-match, unique because two bindings
-  // cannot share an output name. A nested instance (no `exportAs`) keeps the
-  // opaque `$`-prefixed name, since nobody writes it.
-  const renameConstructor = (name: string): string => {
-    if (!ctorNames.has(name)) return name;
-    return exportAs ? `${exportAs.as}_${name}` : `${prefix}${name}`;
-  };
 
   for (const stmt of module.statements) {
     for (const node of walk(stmt)) {
       if (isRule(node)) {
+        // The constructor tag (`ruleName`) is left as-is; renaming the head
+        // predicate re-qualifies the constructor (`opt::Some` -> `dist::Some`)
+        // when post-processing derives the `$proof` name from the head.
         node.head.predicate = renamePredicate(node.head.predicate);
-        if (node.ruleName !== undefined) node.ruleName = renameConstructor(node.ruleName);
       } else if (isLiteral(node)) {
         node.predicate = renamePredicate(node.predicate);
       } else if (isFunctionCall(node) && ctorNames.has(node.name)) {
-        // A constructor term `Ctor(...)` (a match), distinguished from a
-        // built-in call by membership in the module's constructor set.
-        node.name = renameConstructor(node.name);
+        // A constructor term `Ctor(...)` (a match). Qualify it with its owning
+        // predicate's new name so it stays unambiguous once several instances
+        // merge (an already-qualified term just has its qualifier renamed).
+        const owner = node.qualifier ?? ctorOwner.get(node.name);
+        if (owner !== undefined) node.qualifier = renamePredicate(owner);
       }
     }
   }

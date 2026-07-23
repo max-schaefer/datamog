@@ -221,20 +221,20 @@ colour("red").
 input predicate int_opt(o: value)    := opt from "option.dl"(elem = n).
 input predicate colour_opt(o: value) := opt from "option.dl"(elem = colour).
 
-output predicate present(V) :- P : int_opt,    P = int_opt_Some(V).
-output predicate present(V) :- Q : colour_opt, Q = colour_opt_Some(V).
+output predicate present(V) :- P : int_opt,    P = int_opt::Some(V).
+output predicate present(V) :- Q : colour_opt, Q = colour_opt::Some(V).
 ?- present(V).       # 1, 2, "red"
 ```
 
-An imported instance's constructors are named after the binding: `int_opt`'s
-`Some` is `int_opt_Some`, `colour_opt`'s is `colour_opt_Some`. That naming is
-what makes this work. Constructor names are global — a `Some` is a `Some`
-everywhere — so two instances' `Some`s could not otherwise coexist; qualifying
-each by its binding makes them distinct *and* writable, so one program can match
-against several instantiations of the same type at once: `Option<Int>` and
-`Option<String>` from the one `option.dl`. That is a poor-man's higher-order
-type — `option.dl` is `Option<_>`, applied to an element predicate at each
-binding.
+An imported instance's constructors are qualified by its predicate: `int_opt`'s
+is `int_opt::Some`, `colour_opt`'s is `colour_opt::Some`. Constructors are scoped
+to their predicate (Chapter 15), so the two `Some`s are genuinely distinct — no
+clash — and you match each with its qualified name. (A bare `Some(V)` also works
+whenever exactly one predicate in scope declares a `Some`; with two Options in
+play you must qualify.) So one program can match against several instantiations
+of the same type at once: `Option<Int>` and `Option<String>` from the one
+`option.dl`. That is a poor-man's higher-order type — `option.dl` is `Option<_>`,
+applied to an element predicate at each binding.
 
 If you would rather keep the representation abstract, don't import `opt` at all:
 export *operations* over it from `option.dl` — matching the constructors
@@ -292,7 +292,7 @@ each error name, and at what point in the pipeline is it caught?
 Following `option.dl`, write `pair.dl` parameterised over *two* element
 predicates `left` and `right`, whose proof terms are `Pair(l, r)` for each `l`
 in `left` and `r` in `right`. Instantiate it as `pr` and match its constructor
-(`pr_Pair(L, R)`) to recover the pairs — a poor-man's two-argument type
+(`pr::Pair(L, R)`) to recover the pairs — a poor-man's two-argument type
 constructor, `Pair<A, B>`. What happens if you wire both parameters to the same
 relation?
 
