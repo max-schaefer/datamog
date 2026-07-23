@@ -131,6 +131,20 @@ describe("module binding end-to-end", () => {
     ).toThrow(/column 1 has type 'integer' but 'string'/);
   });
 
+  test("a boundary rejects a declared type narrower than the module output", () => {
+    // option.dl's output column is `value`; declaring the importing column
+    // `integer` promises more than the module proves. The boundary check is a
+    // directional subtype test, so this narrowing is rejected rather than
+    // silently letting `narrowed` carry arbitrary values.
+    expect(() =>
+      DatamogExecutor.prepareElaborated(
+        `n(1). n(2). input predicate narrowed(o: integer) := opt from "option.dl"(elem = n).`,
+        resolve,
+        "main.dl",
+      ),
+    ).toThrow(/bound to 'narrowed': column 1 has type 'value' but 'integer' was declared/);
+  });
+
   test("imported ADT constructors are writable and distinct per instance", async () => {
     // Two Option instances; each instance's constructors are named after its
     // binding (int_opt::Some, colour_opt::Some), so both are matchable at once.

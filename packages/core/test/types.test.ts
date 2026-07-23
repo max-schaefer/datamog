@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { parse } from "datamog-parser";
 import { AnalyzerError, analyze } from "../src/analyzer.ts";
-import { inferTypes } from "../src/types.ts";
+import { columnTypesCompatible, inferTypes } from "../src/types.ts";
 
 function getTypes(source: string) {
   const program = parse(source);
@@ -1198,5 +1198,25 @@ describe("exponentiation operator ** types", () => {
         r(X) :- t(S), X = S ** 2.
       `),
     ).toThrow(/Operator '\*\*' requires numeric operands.*'string'/);
+  });
+});
+
+describe("columnTypesCompatible (directional subtype check)", () => {
+  test("declared may equal or widen the inferred type", () => {
+    expect(columnTypesCompatible("integer", "integer")).toBe(true);
+    expect(columnTypesCompatible("integer", "value")).toBe(true); // widen to value
+    expect(columnTypesCompatible("integer", "float")).toBe(true); // numeric widening
+    expect(columnTypesCompatible("string", "value")).toBe(true);
+  });
+
+  test("declaring narrower than the inferred type is rejected", () => {
+    expect(columnTypesCompatible("value", "integer")).toBe(false);
+    expect(columnTypesCompatible("float", "integer")).toBe(false);
+    expect(columnTypesCompatible("value", "string")).toBe(false);
+  });
+
+  test("unrelated types are incompatible either way", () => {
+    expect(columnTypesCompatible("string", "integer")).toBe(false);
+    expect(columnTypesCompatible("integer", "string")).toBe(false);
   });
 });

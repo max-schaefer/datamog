@@ -1708,6 +1708,9 @@ cannot determine is still an error (§5.2) even when annotated. Annotations carr
 no runtime effect; every backend produces identical results with or without
 them.
 
+Module boundaries (§9.3) apply this same directional subtype check: the value
+flowing across a boundary must fit within the type declared for it.
+
 ## 6 SQL Translation
 
 ### 6.1 Overview
@@ -2252,10 +2255,15 @@ names; the module's own head-variable names are not exposed.
 - **One output per import site.** An instance exposes only the selected output;
   the module's other outputs and its `?-` default do not leak into the merged
   program (they remain available internally as dependencies of the selection).
-- **Boundary types must agree.** Each actual's column types must be compatible
-  (§5.6) with the module input it is wired to, and the selected output's inferred
-  types must be compatible with the importing declaration's columns. A mismatch
-  is a static error.
+- **Boundary types must satisfy the declaration.** A boundary is checked as a
+  directional subtype relation (§5.10), not mutual compatibility: each actual's
+  inferred column types must equal or widen to the type declared for the module
+  input it is wired to, and the selected output's inferred types must fit within
+  the columns of the importing declaration. A declaration may therefore be the
+  same as, or wider than, what flows into it (up to `value`), but never narrower
+  -- declaring `integer` for a column the module produces as `value` is a static
+  error, since the declaration would promise more than the module proves. A
+  mismatch either way is a static error.
 
 ## 10 Examples
 

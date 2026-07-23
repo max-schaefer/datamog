@@ -291,9 +291,10 @@ diagnostics, per-module EDB directories):
   actual vs the callee input's declared columns; the selected output vs the
   receiving declaration's columns), since those declared types are dropped when
   the binding is elaborated away. `checkModuleBoundaries` verifies them against
-  the merged program's inferred `columnTypes` after `inferTypes`, reusing the
-  same column-type compatibility as an ordinary atom-argument position. The CLI
-  runs it right after inference. (Done.)
+  the merged program's inferred `columnTypes` after `inferTypes`, using the
+  directional subtype check `columnTypesCompatible` (the declared type must equal
+  or widen the inferred one, never narrow it -- the same rule head type
+  annotations use). The CLI runs it right after inference. (Done.)
 
 ## Deferred
 

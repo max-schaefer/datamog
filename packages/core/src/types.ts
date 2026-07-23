@@ -1154,13 +1154,16 @@ function joinTypesWithJsonLift(
 }
 
 /**
- * Whether an inferred column type is compatible with a declared one at a module
- * boundary. Uses the same lenient rule as unify-with-value (integer/float
- * interchange and primitive/value lift), so a boundary accepts exactly what an
- * ordinary atom-argument position would.
+ * Whether an inferred column type satisfies a declared one at a module boundary
+ * or head annotation. This is a directional subtype check: `declared` must equal
+ * or widen `inferred`, i.e. widening `inferred` towards `declared` lands exactly
+ * on `declared`. So `integer` fits a declared `value` or `float`, but a `value`
+ * column does *not* satisfy a declared `integer` (that would let a declaration
+ * promise more than the program proves). Widening follows `joinTypesWithJsonLift`
+ * (integer/float interchange and the primitive/value lift).
  */
 export function columnTypesCompatible(inferred: PrimitiveType, declared: PrimitiveType): boolean {
-  return joinTypesWithJsonLift(inferred, declared) !== null;
+  return joinTypesWithJsonLift(inferred, declared) === declared;
 }
 
 /**
@@ -1211,13 +1214,14 @@ function checkHeadAnnotations(
       }
     }
 
-    // Checked against inference: declared must equal or widen the inferred type.
+    // Checked against inference: declared must equal or widen the inferred type
+    // (the same directional subtype rule the module boundary uses).
     const inferred = types.get(pred);
     if (inferred === undefined) continue;
     for (let i = 0; i < declared.length; i++) {
       const inf = inferred[i];
       if (inf === undefined) continue; // unconstrained: the finalize step reports it
-      if (joinTypesWithJsonLift(inf, declared[i]!) !== declared[i]) {
+      if (!columnTypesCompatible(inf, declared[i]!)) {
         const cst = annotated[0]!.head.$cstNode;
         throw new AnalyzerError(
           `Predicate '${pred}' column ${i + 1} is annotated '${declared[i]}' but inferred as '${inf}'`,
