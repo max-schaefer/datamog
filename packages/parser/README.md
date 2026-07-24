@@ -41,7 +41,7 @@ Column types are `string`, `integer`, `float`, `boolean`, or `value`; the annota
 2. **Numeric literal preservation:** the raw source text of number literals is preserved on a `rawText` property to distinguish `1` from `1.0`.
 3. **Aggregate rewriting:** `FunctionCall` nodes in rule head positions whose name is an aggregate (`count`, `sum`, `avg`, `min`, `max`, `concat`, `list`) are rewritten to `AggregateCall`.
 4. **Bracket-access splitting:** the unified `BracketAccess` node the grammar produces (to avoid an LL(k) ambiguity) is split into `Subscript` (`x[i]`) or `Slice` (`x[i:j]`) based on whether a `:` was present.
-5. **Proof-term / ADT desugaring:** a named rule `p(...)[Ctor]` and constructor terms are lowered onto the `value` machinery.
+5. **Proof-term / ADT desugaring:** a named rule `p(...) :: Ctor` and constructor terms are lowered onto the `value` machinery.
 
 `parseRaw` itself applies two small normalisations up front (lifting optional head type annotations onto `head.argTypes`, and defaulting an unannotated column type to `string`), so every consumer, including the module elaborator that runs before `postProcess`, sees them.
 

@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <b>An educational Datalog you can actually run, in your terminal, your browser, or your notebook.</b>
+  <b>An educational Datalog you can run in your terminal, your browser, or your notebook.</b>
 </p>
 
 <p align="center">
@@ -19,8 +19,8 @@ Datamog is a small Datalog dialect built for **learning how Datalog works**. You
 write Horn-clause rules over relations, and Datamog runs them on the backend of
 your choice (three SQL databases or two pure-TypeScript in-memory evaluators),
 all honouring the same language semantics. On top of the classic core
-(recursion, stratified negation, aggregates) it adds a first-class type for
-nested data, algebraic data types, and a module system, and it ships with a
+(recursion, stratified negation, aggregates) it adds first-class support for
+JSON, algebraic data types, and a module system, and it ships with a
 browser playground, a VS Code extension, a REPL, and a Jupyter magic.
 
 It is a teaching tool, not a production database. If you want to understand
@@ -56,7 +56,7 @@ bun run datamog ancestor.dl   # parent data loads from ./parent.csv by conventio
   (null, primitives, arrays, objects) with subscript, slice, iteration, and
   structural equality that agree byte-for-byte across every backend. See
   [Working with values](doc/walkthrough/14-json.md).
-- **Algebraic data types via proof terms.** Name a rule `p(...)[Ctor]` and the
+- **Algebraic data types via proof terms.** Name a rule `p(...) :: Ctor` and the
   predicate becomes an ADT whose derivations are its values: enums, pairs, Peano
   naturals, lists, parse trees. See [Proof terms](doc/walkthrough/15-proof-terms.md).
 - **A module system.** A file is a function from its input predicates to its
