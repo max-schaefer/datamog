@@ -1,5 +1,7 @@
 # datamog-json
 
+*Part of the [Datamog](../../../README.md) monorepo.*
+
 Whole-file JSON loader plugin for Datamog. Populates an extensional predicate with a single row whose value is the parsed contents of a `.json` file.
 
 ## Usage

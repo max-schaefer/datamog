@@ -1,5 +1,7 @@
 # datamog-backend-postgres
 
+*Part of the [Datamog](../../../README.md) monorepo.*
+
 Postgres backend for Datamog, using `Bun.sql`.
 
 ## Usage

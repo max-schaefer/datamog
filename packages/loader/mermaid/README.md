@@ -1,5 +1,7 @@
 # datamog-mermaid
 
+*Part of the [Datamog](../../../README.md) monorepo.*
+
 Mermaid graph loader plugin for Datamog. Populates extensional predicate tables from [Mermaid](https://mermaid.js.org/) `graph`/`flowchart` diagram files.
 
 ## Usage

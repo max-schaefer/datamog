@@ -1,5 +1,7 @@
 # datamog-cli
 
+*Part of the [Datamog](../../README.md) monorepo.*
+
 Command-line interface for running Datamog programs. Uses in-memory SQLite (`bun:sqlite`) by default, or Postgres when `DATABASE_URL` is set.
 
 ## Usage

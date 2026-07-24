@@ -1,5 +1,7 @@
 # datamog-backend-sqljs
 
+*Part of the [Datamog](../../../README.md) monorepo.*
+
 [sql.js](https://sql.js.org/) (WASM SQLite) backend for Datamog. Runs entirely in-memory with no native dependencies, making it suitable for browser and Node.js environments. Reuses the SQLite SQL dialect from `datamog-backend-sqlite`.
 
 This is the backend used by the Datamog playground.

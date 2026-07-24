@@ -1,5 +1,7 @@
 # datamog-gsheet
 
+*Part of the [Datamog](../../../README.md) monorepo.*
+
 Google Sheets loader plugin for Datamog. Populates extensional predicate tables from Google Sheets using the [google-spreadsheet](https://www.npmjs.com/package/google-spreadsheet) library.
 
 ## Quick start

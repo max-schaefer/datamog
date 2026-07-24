@@ -1,5 +1,7 @@
 # datamog-backend-seminaive
 
+*Part of the [Datamog](../../../README.md) monorepo.*
+
 Semi-naive in-memory backend for Datamog. Like the `datamog-backend-native`
 package it interprets Datalog directly rather than compiling to SQL, but
 inside each recursive stratum it only re-derives tuples that could have

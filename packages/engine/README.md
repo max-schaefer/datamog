@@ -1,5 +1,7 @@
 # datamog-engine
 
+*Part of the [Datamog](../../README.md) monorepo.*
+
 SQL translator and executor for the Datamog Datalog system. This package provides the shared translation logic and the `Backend` interface that database-specific packages implement.
 
 ## Backend Interface

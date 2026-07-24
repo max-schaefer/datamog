@@ -1,5 +1,7 @@
 # datamog-jsonl
 
+*Part of the [Datamog](../../../README.md) monorepo.*
+
 JSONL (JSON Lines) loader plugin for Datamog. Populates extensional predicate tables from `.jsonl` files.
 
 ## Usage

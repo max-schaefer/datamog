@@ -1,5 +1,7 @@
 # datamog-backend-sqlite
 
+*Part of the [Datamog](../../../README.md) monorepo.*
+
 SQLite backend for Datamog, using `bun:sqlite`. Uses an in-memory database by default.
 
 ## Usage

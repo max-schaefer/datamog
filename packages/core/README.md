@@ -1,5 +1,7 @@
 # datamog-core
 
+*Part of the [Datamog](../../README.md) monorepo.*
+
 AST type definitions, semantic analyzer, and type inference for the Datamog Datalog system.
 
 ## AST Types

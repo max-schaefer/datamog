@@ -1,5 +1,7 @@
 # datamog-csv
 
+*Part of the [Datamog](../../../README.md) monorepo.*
+
 CSV loader plugin for Datamog. Populates extensional predicate tables from CSV files.
 
 ## Usage
