@@ -3,7 +3,7 @@
 # Rather than enumerating expression trees, parse a token sequence into ASTs and
 # evaluate them. The tokens come from an extensional; `ast(i, k)` is a chart
 # parser producing an AST proof term for the span of tokens [i, k). Each grammar
-# production is a constructor, and `[Ctor(...)]` names exactly the sub-trees the
+# production is a constructor, and `:: Ctor(...)` names exactly the sub-trees the
 # proof term should carry, so intermediate positions stay out of the tree.
 #
 # The grammar is ambiguous (no precedence), so `2 + 3 * 4` parses two ways --
@@ -14,11 +14,11 @@
 input predicate token(pos: integer, kind: string, val: integer?).
 
 # A number token is a Lit leaf spanning one position.
-ast(i, i + 1)[Lit(V)] :- token(i, "num", V).
+ast(i, i + 1) :: Lit(V) :- token(i, "num", V).
 # An expression, a '+', and an expression make an Add over the whole span. The
 # split position j is a body variable, but [Add(L, R)] keeps it out of the tree.
-ast(i, k)[Add(L, R)] :- L : ast(i, j), token(j, "plus", _), R : ast(j + 1, k).
-ast(i, k)[Mul(L, R)] :- L : ast(i, j), token(j, "times", _), R : ast(j + 1, k).
+ast(i, k) :: Add(L, R) :- L : ast(i, j), token(j, "plus", _), R : ast(j + 1, k).
+ast(i, k) :: Mul(L, R) :- L : ast(i, j), token(j, "times", _), R : ast(j + 1, k).
 
 # The evaluator: a fold over the proof term, one rule per constructor.
 eval(Lit(N), as_integer(N)).

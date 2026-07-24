@@ -148,7 +148,7 @@ export function parseLenient(source: string): Program {
 /**
  * Parse without post-processing: the AST is exactly as the grammar produced
  * it (numeric literals not yet `rawText`-tagged, `_` not desugared, proof
- * terms still `[Ctor]` / `Ctor(...)` rather than lowered onto `value`). The
+ * terms still `:: Ctor` / `Ctor(...)` rather than lowered onto `value`). The
  * module elaborator parses each referenced module this way so it can expand
  * (substitute inputs, freshen names) before a single post-process runs over
  * the merged program. Lexer / parser errors still throw a `ParseError`.

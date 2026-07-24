@@ -19,12 +19,12 @@ that with four small datatypes.
 
 ## Naming a rule
 
-Write a constructor name in brackets after the head:
+Write a constructor name after the head with `::`:
 
 ```prolog
-colour()[Red].
-colour()[Green].
-colour()[Blue].
+colour() :: Red.
+colour() :: Green.
+colour() :: Blue.
 ```
 
 `colour` is a nullary predicate with three rules, now named
@@ -53,7 +53,7 @@ the head:
 
 ```prolog
 num(1). num(2).
-num_pair()[MkPair] :- num(Left), num(Right).
+num_pair() :: MkPair :- num(Left), num(Right).
 
 ?- P : num_pair().
 ```
@@ -73,8 +73,8 @@ Give a predicate a base case and a witnessed case and you get an
 optional-like type:
 
 ```prolog
-num_opt()[None].
-num_opt()[Some] :- num(Val).
+num_opt() :: None.
+num_opt() :: Some :- num(Val).
 
 ?- P : num_opt().
 ```
@@ -93,8 +93,8 @@ therefore nests:
 
 ```prolog
 num(7).
-num_list(0)[Nil].
-num_list(n + 1)[Cons] :- num(Car), n <= 3, num_list(n).
+num_list(0) :: Nil.
+num_list(n + 1) :: Cons :- num(Car), n <= 3, num_list(n).
 
 ?- Xs : num_list(Len).
 ```
@@ -147,8 +147,8 @@ warns about, and `--warn-finiteness` flags the proof column.
 Suppressing the recursive sub-proof cuts the nesting:
 
 ```prolog
-reach(X, Y)[Direct] :- edge(X, Y).
-reach(X, Z)[Step]   :- edge(X, Y), _ : reach(Y, Z).
+reach(X, Y) :: Direct :- edge(X, Y).
+reach(X, Z) :: Step   :- edge(X, Y), _ : reach(Y, Z).
 ```
 
 A `Step` proof now records only the intermediate node, not the
@@ -233,8 +233,8 @@ build any inductive datatype. Two more live in the examples.
 same way):
 
 ```prolog
-nat(0)[Zero].
-nat(n + 1)[Succ] :- nat(n), n <= 2.
+nat(0) :: Zero.
+nat(n + 1) :: Succ :- nat(n), n <= 2.
 
 plus(Zero(), B, B) :- B : nat.
 plus(Succ(A), B, Succ(C)) :- plus(A, B, C).
@@ -243,18 +243,18 @@ plus(Succ(A), B, Succ(C)) :- plus(A, B, C).
 **An expression parser and evaluator.** Feed a token sequence in through an
 extensional and a chart parser turns it into AST proof terms — only the trees
 the input allows. Each grammar production is a constructor. Naming its arguments
-explicitly, `[Add(L, R)]`, makes the proof term carry exactly the two captured
+explicitly, `:: Add(L, R)`, makes the proof term carry exactly the two captured
 sub-parses, keeping the parser's split position out of the AST:
 
 ```prolog
-ast(i, i + 1)[Lit(V)] :- token(i, "num", V).
-ast(i, k)[Add(L, R)] :- L : ast(i, j), token(j, "plus", _), R : ast(j + 1, k).
+ast(i, i + 1) :: Lit(V) :- token(i, "num", V).
+ast(i, k) :: Add(L, R) :- L : ast(i, j), token(j, "plus", _), R : ast(j + 1, k).
 
 eval(Lit(N), as_integer(N)).
 eval(Add(L, R), A + B) :- eval(L, A), eval(R, B).
 ```
 
-(`[Ctor(...)]` is the explicit form of the head annotation; bare `[Ctor]`
+(`:: Ctor(...)` is the explicit form of the head annotation; bare `:: Ctor`
 auto-derives the arguments as the witnesses followed by the sub-proofs.) The
 evaluator is a fold over the proof term — a definitional interpreter in Datalog.
 The grammar is ambiguous, so `2 + 3 * 4` yields both parses: `(2+3)*4 = 20` and

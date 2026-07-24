@@ -8,8 +8,8 @@
 # native/seminaive only: nat, plus, and leq are three recursive predicates whose
 # proof-column accessor chains nest into SQL beyond SQLite's parser depth.
 
-nat(0)[Zero].
-nat(n + 1)[Succ] :- nat(n), n <= 2.
+nat(0) :: Zero.
+nat(n + 1) :: Succ :- nat(n), n <= 2.
 
 # Addition, structural on the first argument -- the same shape as list append,
 # and clipped the same way: Succ(C) matches a nat proof, so a sum past the cap

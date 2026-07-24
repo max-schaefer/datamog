@@ -204,8 +204,8 @@ built that way, using the proof terms of Chapter 15 for its two cases:
 ```prolog
 # option.dl
 input predicate elem(v: value).           # the element type, as a set of values
-output predicate opt()[None].             # None, and...
-output predicate opt()[Some] :- elem(V).  # ...Some(v) for each element v
+output predicate opt() :: None.             # None, and...
+output predicate opt() :: Some :- elem(V).  # ...Some(v) for each element v
 ```
 
 `elem` is declared `value`, so the element type is whatever an importer wires

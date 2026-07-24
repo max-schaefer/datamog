@@ -8,8 +8,8 @@
 
 num(1). num(2).
 
-num_list(0)[Nil].
-num_list(n + 1)[Cons] :- num(Car), n <= 1, num_list(n).
+num_list(0) :: Nil.
+num_list(n + 1) :: Cons :- num(Car), n <= 1, num_list(n).
 
 # A catamorphism: Nil sums to 0; Cons adds its (coerced) head to the tail's sum.
 list_sum(Nil(), 0).

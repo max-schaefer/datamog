@@ -92,7 +92,7 @@ describe("output predicates", () => {
     // term leaked into the printed output; a hand-written `?- p(N)` hides it
     // (spec §8.3). The injected proof column must be projected under a
     // synthetic name so the output matches the query it stands for.
-    const source = "num(0). num(1). output predicate p(N)[Mk] :- num(N).";
+    const source = "num(0). num(1). output predicate p(N) :: Mk :- num(N).";
     for (const results of await runBoth(source)) {
       expect(results[0]!.label).toBe("p");
       expect(sortRows(results[0]!.rows)).toEqual([{ N: 0 }, { N: 1 }]);

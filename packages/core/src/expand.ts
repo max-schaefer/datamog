@@ -48,7 +48,7 @@ function* walk(node: unknown): Generator<Record<string, unknown>> {
 /**
  * Expand one instantiation of a module, in place, and return the statements to
  * merge into the importer's program. Runs on a **raw** (pre-post-process) AST
- * (see `parseRaw`), so proof terms are still `[Ctor]` / `Ctor(...)` rather than
+ * (see `parseRaw`), so proof terms are still `:: Ctor` / `Ctor(...)` rather than
  * lowered onto `value`.
  *
  * Per the functor design (`doc/design/imports-as-functors.md`):

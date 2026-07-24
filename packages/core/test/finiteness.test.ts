@@ -230,8 +230,8 @@ describe("finiteness of proof terms", () => {
     // sub-proof, so over a cyclic graph the proof term grows without bound.
     const source = `
       input predicate edge(a: integer, b: integer).
-      path(A, B)[Edge] :- edge(A, B).
-      path(A, C)[Trans] :- edge(A, B), path(B, C).
+      path(A, B) :: Edge :- edge(A, B).
+      path(A, C) :: Trans :- edge(A, B), path(B, C).
     `;
     expect(flagged(source)).toEqual(["path.3"]);
   });
@@ -241,8 +241,8 @@ describe("finiteness of proof terms", () => {
     // longer lies on a value-producing cycle and the derivation stays finite.
     const source = `
       input predicate edge(a: integer, b: integer).
-      path(A, B)[Edge] :- edge(A, B).
-      path(A, C)[Trans] :- edge(A, B), _ : path(B, C).
+      path(A, B) :: Edge :- edge(A, B).
+      path(A, C) :: Trans :- edge(A, B), _ : path(B, C).
     `;
     expect(flagged(source)).toEqual([]);
   });
@@ -250,7 +250,7 @@ describe("finiteness of proof terms", () => {
   test("a non-recursive proof-carrying predicate is finite", () => {
     const source = `
       input predicate num(n: integer).
-      num_pair()[MkPair] :- num(Left), num(Right).
+      num_pair() :: MkPair :- num(Left), num(Right).
     `;
     expect(flagged(source)).toEqual([]);
   });

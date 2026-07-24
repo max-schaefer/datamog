@@ -230,7 +230,7 @@ constraints below are the only exceptions.
   spelling in a different rule is unrelated. Names are case-sensitive, so `X`
   and `x` are distinct.
 - **Constructor names**: the rule names introduced by a head annotation
-  `p(args)[Ctor]` or `p(args) :: Ctor` (Section 8). Scoped to their predicate —
+  `p(args) :: Ctor` (Section 8). Scoped to their predicate —
   unique *within* a predicate but able to recur across predicates — so the full
   name is `predicate::Ctor`, referenced bare (`Ctor(...)`) when unambiguous or
   qualified (`p::Ctor(...)`) otherwise.
@@ -1984,7 +1984,7 @@ new UrlJsonLoader({
 ## 8 Proof Terms
 
 Naming a rule records *how* each fact is derived. A rule head annotated with a
-constructor name, `p(args)[Ctor]`, makes `p` a **proof-carrying** predicate: for
+constructor name, `p(args) :: Ctor`, makes `p` a **proof-carrying** predicate: for
 every derivation it carries a proof term, so the predicate's meaning becomes an
 algebraic datatype whose inhabitants are its derivations. This is the
 Curry-Howard reading of a Horn clause: the predicate, indexed by its head
@@ -1993,12 +1993,11 @@ an inhabitant.
 
 ### 8.1 Named rules and proof-carrying predicates
 
-A rule head may carry a constructor name, either in brackets after the closing
-parenthesis or after a `::`. The two forms are equivalent:
+A rule head may carry a constructor name after a `::`:
 
 ```prolog
-suit()[Hearts].
-suit()[Spades].
+suit() :: Hearts.
+suit() :: Spades.
 num_list(0) :: Nil.
 num_list(n + 1) :: Cons :- num(Car), n <= 9, num_list(n).
 ```
@@ -2017,7 +2016,7 @@ reference must be qualified.
 
 ### 8.2 Proof-term structure
 
-With the bare `[Ctor]` form, the proof term of a derivation is the constructor
+With the bare `:: Ctor` form, the proof term of a derivation is the constructor
 applied to, in order:
 
 1. the values of the *existential body variables* (the body variables that do
@@ -2041,18 +2040,18 @@ and so on: the proof terms *are* the lists. Output renders a proof bare —
 `Cons(7, Nil())` — dropping the qualifier, which is clear from context.
 
 A rule may instead **list the constructor's arguments explicitly**,
-`[Ctor(a1, ..., an)]`, and then the proof term carries exactly those expressions
+`:: Ctor(a1, ..., an)`, and then the proof term carries exactly those expressions
 (usually captured sub-proofs and chosen witnesses) rather than the auto-derived
 list. This keeps an intermediate body variable out of the proof term -- for
 instance a chart parser's split position:
 
 ```prolog
-ast(i, k)[Add(L, R)] :- L : ast(i, j), token(j, "plus", _), R : ast(j + 1, k).
+ast(i, k) :: Add(L, R) :- L : ast(i, j), token(j, "plus", _), R : ast(j + 1, k).
 ```
 
 The split point `j` is a body variable that auto-derivation would record;
-`[Add(L, R)]` lists only the two captured sub-parses, so the AST stays clean.
-Explicit `[Ctor()]` forces a nullary proof term even for a rule with witnesses.
+`:: Add(L, R)` lists only the two captured sub-parses, so the AST stays clean.
+Explicit `:: Ctor()` forces a nullary proof term even for a rule with witnesses.
 
 Because the proof term distinguishes derivations, a proof-carrying predicate is
 evaluated as a set of (head-argument, proof-term) rows: two different
@@ -2134,7 +2133,7 @@ append(Cons(H, T), B, Cons(H, R)) :- append(T, B, R).
 
 `Cons(H, T)` in a head argument takes a list apart; `Cons(H, R)` relates a
 result to a num_list proof. The only thing that *builds* a proof is the head
-annotation `[Ctor]` (§8.1); every other `Ctor(...)` matches one a rule already
+annotation `:: Ctor` (§8.1); every other `Ctor(...)` matches one a rule already
 derived. (append's base case still needs `B : num_list` — shorthand for
 `B : num_list(_)`, §8.3 — because `B` is a plain variable passed straight
 through, with no constructor term to range-restrict it.)

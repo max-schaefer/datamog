@@ -438,13 +438,13 @@ export function postProcess(program: Program): void {
     }
   }
 
-  // 6. Proof-term desugar. A rule whose head carries `[Ctor]` is a named rule:
+  // 6. Proof-term desugar. A rule whose head carries `:: Ctor` is a named rule:
   //    its predicate becomes "proof-carrying" and gains an implicit trailing
   //    `value` column holding the derivation as a tagged object
   //    `{ "$proof": Ctor, "args": [...] }`. Constructor args are the values of
   //    the existential body variables (first-occurrence order) followed by the
   //    sub-proofs of the positive IDB body atoms (body order). A body or query
-  //    atom `q(...)[V]` captures q's proof column into `V`; an unbound
+  //    capture `V : q(...)` binds q's proof column to `V`; an unbound
   //    reference to a proof-carrying predicate gets a fresh anonymous column so
   //    arities stay consistent.
   const proofCarrying = new Set<string>();
@@ -598,12 +598,12 @@ export function postProcess(program: Program): void {
     const ctor = decodeQuotedIdentifier(stmt.ruleName, stmt.head);
     let argExprs: Expression[];
     if (stmt.ctorParens) {
-      // Explicit constructor arguments `[Ctor(a, b, ...)]`: the proof term
+      // Explicit constructor arguments `:: Ctor(a, b, ...)`: the proof term
       // carries exactly these expressions (typically captured sub-proofs and
       // chosen witnesses), so intermediate body variables stay out of it.
       argExprs = stmt.ctorArgs as Expression[];
     } else {
-      // Bare `[Ctor]`: auto-derive the arguments as the existential witnesses
+      // Bare `:: Ctor`: auto-derive the arguments as the existential witnesses
       // followed by the sub-proofs. Existential witnesses are the body's own
       // value variables; a don't-care `_` (desugared to a `$`-prefixed
       // synthetic name) carries no information, so it is excluded.
@@ -626,7 +626,7 @@ export function postProcess(program: Program): void {
 
   // Constructor terms. A constructor `Ctor(p...)` is never a value builder:
   // it always matches a proof of its predicate. Proofs are built only by the
-  // labelled rule that introduces the proof column (the `[Ctor]` head
+  // labelled rule that introduces the proof column (the `:: Ctor` head
   // annotation, above). Everywhere a constructor term appears -- on a side of
   // a body/query equality, or (read as an implicit equality) as a head or
   // body-atom argument -- it desugars to a capture of the predicate's proof

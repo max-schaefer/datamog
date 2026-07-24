@@ -391,7 +391,7 @@ function analyzeImpl(program: Program, file: string | undefined): AnalyzedProgra
     }
   }
 
-  // A constructor name (a rule's `[Ctor]` annotation) may not collide with a
+  // A constructor name (a rule's `:: Ctor` annotation) may not collide with a
   // built-in operation name either, so a constructor term `Ctor(...)` in an
   // expression stays unambiguous with a built-in call.
   for (const predRules of rules.values()) {

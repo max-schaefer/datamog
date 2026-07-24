@@ -57,7 +57,7 @@ describe("module expansion end-to-end", () => {
   test("freshening proof constructors lets two instances of an ADT module coexist", async () => {
     const nat = `
       input predicate base(n: integer).
-      output predicate wrap(N)[Mk] :- base(N).
+      output predicate wrap(N) :: Mk :- base(N).
     `;
     const merged = (prefixA: string, prefixB: string): Program => {
       const importer = parseRaw("lo(1).\nhi(2).");

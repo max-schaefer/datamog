@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { create } from "datamog-backend-native";
 import { DatamogExecutor } from "datamog-engine";
 
-// Proof-term ADTs: a rule head annotated with `[Ctor]` names a rule; the
+// Proof-term ADTs: a rule head annotated with `:: Ctor` names a rule; the
 // predicate then carries an implicit `value` column holding the derivation as
 // a tagged object `{ "$proof": Ctor, "args": [...] }`. Constructor args are the
 // values of the existential body variables followed by the sub-proofs of the
@@ -45,9 +45,9 @@ describe("proof terms", () => {
   test("enums: nullary named facts are nullary constructors", async () => {
     const rows = (
       await run(`
-        colour()[Red].
-        colour()[Green].
-        colour()[Blue].
+        colour() :: Red.
+        colour() :: Green.
+        colour() :: Blue.
         ?- C : colour().
       `)
     )[0]!;
@@ -64,7 +64,7 @@ describe("proof terms", () => {
     const rows = (
       await run(`
         num(1). num(2).
-        num_pair()[MkPair] :- num(Left), num(Right).
+        num_pair() :: MkPair :- num(Left), num(Right).
         ?- P : num_pair().
       `)
     )[0]!;
@@ -85,7 +85,7 @@ describe("proof terms", () => {
     const rows = (
       await run(`
         num(1). num(2).
-        pick()[Only] :- num(X), num(_).
+        pick() :: Only :- num(X), num(_).
         ?- P : pick().
       `)
     )[0]!;
@@ -98,8 +98,8 @@ describe("proof terms", () => {
     const rows = (
       await run(`
         num(1). num(2).
-        num_opt()[None].
-        num_opt()[Some] :- num(Val).
+        num_opt() :: None.
+        num_opt() :: Some :- num(Val).
         ?- P : num_opt().
       `)
     )[0]!;
@@ -116,8 +116,8 @@ describe("proof terms", () => {
     const rows = (
       await run(`
         num(7).
-        short_num_list(0)[Nil].
-        short_num_list(n + 1)[Cons] :- num(Car), n <= 2, short_num_list(n).
+        short_num_list(0) :: Nil.
+        short_num_list(n + 1) :: Cons :- num(Car), n <= 2, short_num_list(n).
         ?- P : short_num_list(L).
       `)
     )[0]!;
@@ -136,8 +136,8 @@ describe("proof terms", () => {
   test("capture binder surfaces a proof term as an ordinary value", async () => {
     const rows = (
       await run(`
-        colour()[Red].
-        colour()[Green].
+        colour() :: Red.
+        colour() :: Green.
         seen(C) :- C : colour().
         ?- seen(C).
       `)
@@ -151,8 +151,8 @@ describe("proof terms", () => {
     const suppressed = (
       await run(`
         edge(1, 2). edge(2, 3).
-        reach(X, Y)[Direct] :- edge(X, Y).
-        reach(X, Z)[Step] :- edge(X, Y), _ : reach(Y, Z).
+        reach(X, Y) :: Direct :- edge(X, Y).
+        reach(X, Z) :: Step :- edge(X, Y), _ : reach(Y, Z).
         ?- P : reach(X, Z).
       `)
     )[0]!;
@@ -168,8 +168,8 @@ describe("proof terms", () => {
     const included = (
       await run(`
         edge(1, 2). edge(2, 3).
-        reach(X, Y)[Direct] :- edge(X, Y).
-        reach(X, Z)[Step] :- edge(X, Y), reach(Y, Z).
+        reach(X, Y) :: Direct :- edge(X, Y).
+        reach(X, Z) :: Step :- edge(X, Y), reach(Y, Z).
         ?- P : reach(X, Z).
       `)
     )[0]!;
@@ -189,8 +189,8 @@ describe("proof terms", () => {
     const rows = (
       await run(`
         num(1). num(2).
-        ok()[FromOne] :- num(1).
-        ok()[FromAny] :- num(N).
+        ok() :: FromOne :- num(1).
+        ok() :: FromAny :- num(N).
         ?- P : ok().
       `)
     )[0]!;
@@ -205,13 +205,13 @@ describe("proof terms", () => {
 
   describe("validation", () => {
     test("rejects mixing named and unnamed rules for one predicate", async () => {
-      await expect(run("c()[A].\nc().\n?- P : c().")).rejects.toThrow(
+      await expect(run("c() :: A.\nc().\n?- P : c().")).rejects.toThrow(
         /mixes named and unnamed rules/,
       );
     });
 
     test("rejects a constructor name reused within one predicate", async () => {
-      await expect(run("a()[Dup].\na()[Dup].\n?- P : a().")).rejects.toThrow(
+      await expect(run("a() :: Dup.\na() :: Dup.\n?- P : a().")).rejects.toThrow(
         /used by more than one rule of 'a'/,
       );
     });
@@ -219,32 +219,32 @@ describe("proof terms", () => {
     test("two predicates may share a constructor tag", async () => {
       // Per-predicate scoping: a::Both and b::Both are distinct constructors.
       const rows = (
-        await run("a()[Both].\nb()[Both].\nseen(X) :- X : a.\nseen(X) :- X : b.\n?- seen(X).")
+        await run("a() :: Both.\nb() :: Both.\nseen(X) :- X : a.\nseen(X) :- X : b.\n?- seen(X).")
       )[0]!;
       expect(rows.length).toBe(2);
     });
 
     test("a bare constructor shared across predicates is ambiguous", async () => {
-      await expect(run("a()[Both].\nb()[Both].\nq(X) :- X = Both().\n?- q(X).")).rejects.toThrow(
-        /ambiguous.*qualify/,
-      );
+      await expect(
+        run("a() :: Both.\nb() :: Both.\nq(X) :- X = Both().\n?- q(X)."),
+      ).rejects.toThrow(/ambiguous.*qualify/);
     });
 
     test("a qualified constructor selects one predicate's proofs", async () => {
       const rows = (
-        await run("a()[Both].\nb()[Both].\nonly_a(X) :- X = a::Both().\n?- only_a(X).")
+        await run("a() :: Both.\nb() :: Both.\nonly_a(X) :- X = a::Both().\n?- only_a(X).")
       )[0]!;
       expect(rows.length).toBe(1);
     });
 
     test("rejects capturing a proof from a predicate with no named rules", async () => {
-      await expect(run("n(1). dummy()[D].\nq(X) :- P : n(X).\n?- q(X).")).rejects.toThrow(
+      await expect(run("n(1). dummy() :: D.\nq(X) :- P : n(X).\n?- q(X).")).rejects.toThrow(
         /Cannot capture a proof from 'n'/,
       );
     });
 
     test("rejects marking a proof on a negated atom", async () => {
-      await expect(run("c()[A].\nc()[B].\nq() :- P : not c().\n?- q().")).rejects.toThrow(
+      await expect(run("c() :: A.\nc() :: B.\nq() :- P : not c().\n?- q().")).rejects.toThrow(
         /negated atom/,
       );
     });
@@ -255,7 +255,9 @@ describe("proof terms", () => {
       // Some(3) match" (so it dropped every row when no Some(3) existed).
       // Reject it, like a negated proof capture.
       await expect(
-        run("val(5). val(6).\nopt()[Some] :- val(X).\nr(P) :- P : opt, not P = Some(3).\n?- r(P)."),
+        run(
+          "val(5). val(6).\nopt() :: Some :- val(X).\nr(P) :- P : opt, not P = Some(3).\n?- r(P).",
+        ),
       ).rejects.toThrow(/constructor pattern may not appear under negation/);
     });
 
@@ -263,7 +265,7 @@ describe("proof terms", () => {
       // A backtick-quoted variable decoding to a `$`-name (`$w`) collided with
       // the internal `$anon`/`$sub`/`$pat` namespace and was silently dropped
       // from the proof witnesses. Reject any identifier that decodes to `$...`.
-      await expect(run("val(5).\nopt()[Some] :- val(`$w`).\n?- P : opt.")).rejects.toThrow(
+      await expect(run("val(5).\nopt() :: Some :- val(`$w`).\n?- P : opt.")).rejects.toThrow(
         /may not start with '\$'/,
       );
     });
@@ -274,8 +276,8 @@ describe("proof terms", () => {
       const rows = (
         await run(`
           num(1). num(2).
-          num_opt()[None].
-          num_opt()[Some] :- num(Val).
+          num_opt() :: None.
+          num_opt() :: Some :- num(Val).
           opt_value(V) :- P : num_opt(), P = Some(V).
           ?- opt_value(V).
         `)
@@ -288,8 +290,8 @@ describe("proof terms", () => {
       const rows = (
         await run(`
           num(5).
-          num_list(0)[Nil].
-          num_list(n + 1)[Cons] :- num(Car), n <= 3, num_list(n).
+          num_list(0) :: Nil.
+          num_list(n + 1) :: Cons :- num(Car), n <= 3, num_list(n).
           second(X) :- P : num_list(_), P = Cons(_, Cons(X, _)).
           ?- second(X).
         `)
@@ -301,8 +303,8 @@ describe("proof terms", () => {
       const rows = (
         await run(`
           num(7).
-          num_list(0)[Nil].
-          num_list(n + 1)[Cons] :- num(Car), n <= 3, num_list(n).
+          num_list(0) :: Nil.
+          num_list(n + 1) :: Cons :- num(Car), n <= 3, num_list(n).
           list_sum(P, 0) :- P : num_list(_), P = Nil().
           list_sum(P, S) :- P : num_list(_), P = Cons(H, T), list_sum(T, S0), S = as_integer(H) + S0.
           sum_by_len(Len, S) :- P : num_list(Len), list_sum(P, S).
@@ -324,8 +326,8 @@ describe("proof terms", () => {
       await expect(
         run(`
           num(7).
-          num_list(0)[Nil].
-          num_list(n + 1)[Cons] :- num(Car), n <= 2, num_list(n).
+          num_list(0) :: Nil.
+          num_list(n + 1) :: Cons :- num(Car), n <= 2, num_list(n).
           bad(X) :- P : num_list(_), P = Cons(X).
           ?- bad(X).
         `),
@@ -333,7 +335,9 @@ describe("proof terms", () => {
     });
 
     test("rejects a constructor name that collides with a built-in", async () => {
-      await expect(run("foo()[length].\n?- P : foo().")).rejects.toThrow(/conflicts with built-in/);
+      await expect(run("foo() :: length.\n?- P : foo().")).rejects.toThrow(
+        /conflicts with built-in/,
+      );
     });
   });
 
@@ -343,8 +347,8 @@ describe("proof terms", () => {
     // head-pattern rules read like Prolog and desugar to captures + accessors.
     const listPrelude = `
       num(1). num(2).
-      num_list(0)[Nil].
-      num_list(n + 1)[Cons] :- num(Car), n <= 2, num_list(n).
+      num_list(0) :: Nil.
+      num_list(n + 1) :: Cons :- num(Car), n <= 2, num_list(n).
       append(Nil(), B, B) :- B : num_list(_).
       append(Cons(H, T), B, Cons(H, R)) :- append(T, B, R).
     `;
@@ -408,8 +412,8 @@ describe("proof terms", () => {
       await expect(
         run(`
           num(7).
-          num_list(0)[Nil].
-          num_list(n + 1)[Cons] :- num(Car), n <= 1, num_list(n).
+          num_list(0) :: Nil.
+          num_list(n + 1) :: Cons :- num(Car), n <= 1, num_list(n).
           bad(Cons(7)).
           ?- bad(X).
         `),
@@ -419,8 +423,8 @@ describe("proof terms", () => {
 
   describe("capture shorthand", () => {
     test("V : p abbreviates V : p() for a nullary predicate", async () => {
-      const bare = (await run("colour()[Red].\ncolour()[Green].\n?- C : colour."))[0]!;
-      const full = (await run("colour()[Red].\ncolour()[Green].\n?- C : colour()."))[0]!;
+      const bare = (await run("colour() :: Red.\ncolour() :: Green.\n?- C : colour."))[0]!;
+      const full = (await run("colour() :: Red.\ncolour() :: Green.\n?- C : colour()."))[0]!;
       expect(sortRows(bare)).toEqual(sortRows(full));
       expect(bare.length).toBe(2);
     });
@@ -430,8 +434,8 @@ describe("proof terms", () => {
       // ignores it, exactly like `X : num_list(_)`.
       const prog = `
         num(1). num(2).
-        num_list(0)[Nil].
-        num_list(n + 1)[Cons] :- num(Car), n <= 1, num_list(n).
+        num_list(0) :: Nil.
+        num_list(n + 1) :: Cons :- num(Car), n <= 1, num_list(n).
       `;
       const bare = (await run(`${prog}\n?- X : num_list.`))[0]!;
       const full = (await run(`${prog}\n?- X : num_list(_).`))[0]!;
@@ -442,7 +446,7 @@ describe("proof terms", () => {
     test("a bare predicate reference without a capture is not a nullary atom", async () => {
       // Parentheses may be dropped only after a proof capture; `colour` alone
       // is parsed as a variable, not a nullary atom.
-      await expect(run("colour()[Red].\nseen() :- colour.\n?- seen().")).rejects.toThrow(
+      await expect(run("colour() :: Red.\nseen() :- colour.\n?- seen().")).rejects.toThrow(
         /Unsafe variable 'colour'/,
       );
     });
@@ -455,7 +459,7 @@ describe("proof terms", () => {
       const rows = (
         await run(`
           num(1). num(2).
-          pick()[Mk(X)] :- num(X), num(Y).
+          pick() :: Mk(X) :- num(X), num(Y).
           ?- P : pick().
         `)
       )[0]!;
@@ -470,8 +474,8 @@ describe("proof terms", () => {
       const rows = (
         await run(`
           token(0, "num", 2). token(1, "plus", 0). token(2, "num", 3).
-          ast(i, i + 1)[Lit(V)] :- token(i, "num", V).
-          ast(i, k)[Add(L, R)] :- L : ast(i, j), token(j, "plus", _), R : ast(j + 1, k).
+          ast(i, i + 1) :: Lit(V) :- token(i, "num", V).
+          ast(i, k) :: Add(L, R) :- L : ast(i, j), token(j, "plus", _), R : ast(j + 1, k).
           ?- A : ast(0, 3).
         `)
       )[0]!;

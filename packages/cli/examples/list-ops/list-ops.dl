@@ -13,8 +13,8 @@
 
 num(1). num(2).
 
-num_list(0)[Nil].
-num_list(n + 1)[Cons] :- num(Car), n <= 2, num_list(n).
+num_list(0) :: Nil.
+num_list(n + 1) :: Cons :- num(Car), n <= 2, num_list(n).
 
 # append: concatenate two lists. The base case passes B through, so B needs an
 # explicit capture to be range-restricted (`B : num_list` is shorthand for

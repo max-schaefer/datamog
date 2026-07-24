@@ -6,5 +6,5 @@
 input predicate elem(v: value).
 
 # Two constructors: None, or Some(v) for each element v.
-output predicate opt()[None].
-output predicate opt()[Some] :- elem(V).
+output predicate opt() :: None.
+output predicate opt() :: Some :- elem(V).

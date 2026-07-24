@@ -11,7 +11,7 @@ const MODULE = `
   mid(X, Y) :- edge(X, Y).
   output predicate reach(X, Y) :- mid(X, Y).
   output predicate reach(X, Z) :- reach(X, Y), edge(Y, Z).
-  tagged(N)[Mk] :- seed(N).
+  tagged(N) :: Mk :- seed(N).
 `;
 
 // biome-ignore lint/suspicious/noExplicitAny: the helpers walk heterogeneous raw AST nodes.

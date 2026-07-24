@@ -33,8 +33,8 @@ const MODULES: Record<string, string> = {
   // An ADT (Option) parameterised over its element predicate.
   "option.dl": `
     input predicate elem(v: value).
-    output predicate opt()[None].
-    output predicate opt()[Some] :- elem(V).
+    output predicate opt() :: None.
+    output predicate opt() :: Some :- elem(V).
   `,
 };
 // Fresh parse per call (elaborate mutates the returned AST).
