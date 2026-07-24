@@ -21,9 +21,13 @@ semantics: three that compile a program to SQL (`CREATE TABLE` / `CREATE VIEW` /
 `SELECT`) and run it on a relational database (PostgreSQL, SQLite, and sql.js,
 the WASM build of SQLite), and two pure in-memory interpreters (a naive and a
 seminaive bottom-up evaluator) that serve as readable reference implementations.
-The surface is Prolog-like Horn clauses with typed `input predicate` declarations,
+The surface is Prolog-like Horn clauses with `input predicate` declarations,
 stratified negation, aggregates, and static type inference over five column
-types, one of which (`value`) is a first-class JSON/nested type. It is built for
+types, one of which (`value`) is a first-class JSON/nested type; type
+annotations are optional and, on rule heads, checked against inference. A small
+functor-style module system lets one file act as a function from its input
+predicates to its outputs, bound to data files or other modules with `:=`. It is
+built for
 teaching and experimentation: it ships a browser playground, a VS Code
 extension, and step-through tracing, and it deliberately stops short of the
 extensibility that production engines carry.
@@ -32,7 +36,7 @@ extensibility that production engines carry.
 
 | System | Category | Implemented in / how it runs | Surface syntax |
 |---|---|---|---|
-| **Datamog** | Educational | TypeScript/Bun; compiles to SQL (Postgres, SQLite, sql.js) or runs naive/seminaive in-memory interpreters | Prolog-like, typed `input predicate` declarations |
+| **Datamog** | Educational | TypeScript/Bun; compiles to SQL (Postgres, SQLite, sql.js) or runs naive/seminaive in-memory interpreters | Prolog-like, `input predicate` declarations |
 | **DES** | Educational deductive DB | Prolog (SWI/SICStus); top-down-driven bottom-up evaluation with tabling | Prolog-like; also SQL and relational-algebra front-ends |
 | **Soufflé** | Research, production-used | C++; compiles Datalog to parallel C++ through a relational-algebra machine IR (semi-naive) | Prolog-like, `.decl` / `.input` / `.output` |
 | **CodeQL (QL)** | Production (commercial) | Proprietary engine; compiles QL and evaluates bottom-up (parity-stratified least fixed point) over an extracted snapshot database | Object-oriented first-order logic; SQL-like `from` / `where` / `select` |
@@ -53,7 +57,7 @@ extensibility that production engines carry.
 
 | System | Recursion | Negation | Aggregation | Types | Standout feature |
 |---|---|---|---|---|---|
-| **Datamog** | General (in-memory) / linear only (SQL backends) | Stratified | count, sum, avg, min, max, concat, list | Static inference: string/integer/float/boolean/value (JSON); algebraic datatypes as proof terms | Multiple cross-checked backends; compiles Datalog to SQL |
+| **Datamog** | General (in-memory) / linear only (SQL backends) | Stratified | count, sum, avg, min, max, concat, list | Static inference (annotations optional): string/integer/float/boolean/value (JSON); algebraic datatypes as proof terms | Multiple cross-checked backends; compiles Datalog to SQL |
 | **DES** | General | Stratified | Yes, with `group_by` | Optional, declared as integrity constraints | One database queried via Datalog, SQL, and relational algebra; tracers and declarative debuggers; nulls and duplicates |
 | **Soufflé** | General | Stratified | count, sum, min, max, mean | Static: number/unsigned/float/symbol plus records and ADTs | Subsumption, choice domains, generic components, C++ foreign functors |
 | **CodeQL** | General, plus `+`/`*` transitive-closure operators | Parity-stratified (recursion through an even number of negations) | Yes, plus monotonic aggregates usable inside recursion | Static OO: int/float/string/boolean/date/bigint, classes, and algebraic datatypes (`newtype`) | First-order-logic bodies (not just Horn clauses); OO classes plus ADTs; no nulls |
@@ -186,8 +190,10 @@ as a teaching device; they just cross the bridge from opposite banks.
 
 Datamog is narrower than DES (no relational-algebra or SQL front-end, no
 integrity constraints, no bag semantics) but adds things DES does not have: a
-browser playground, multiple backends that check each other, and a first-class
-JSON `value` type.
+browser playground, multiple backends that check each other, a first-class
+JSON `value` type, algebraic datatypes as proof terms, and a functor-style
+module system that lets a file act as a function from its input predicates to
+its outputs.
 
 ### Research and production analysis engines
 
@@ -386,6 +392,10 @@ small set of deliberate choices:
 - **It presents algebraic datatypes as proof terms.** Naming a rule turns its
   predicate into a datatype whose values are the derivations — a concrete
   Curry-Howard reading you can compute with, unusual among Datalogs.
+- **It composes files as functions.** A functor-style module system treats each
+  file as a function from its input predicates to its outputs, wired with `:=`
+  to data or to other modules — a level of modular composition most teaching
+  Datalogs lack.
 - **It is approachable.** A browser playground, a VS Code extension, and
   step-through tracing lower the barrier for learners.
 
