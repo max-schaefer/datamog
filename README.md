@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <b>An educational Datalog you can actually run — in your terminal, your browser, or your notebook.</b>
+  <b>An educational Datalog you can actually run, in your terminal, your browser, or your notebook.</b>
 </p>
 
 <p align="center">
@@ -17,7 +17,7 @@
 
 Datamog is a small Datalog dialect built for **learning how Datalog works**. You
 write Horn-clause rules over relations, and Datamog runs them on the backend of
-your choice — three SQL databases or two pure-TypeScript in-memory evaluators —
+your choice (three SQL databases or two pure-TypeScript in-memory evaluators),
 all honouring the same language semantics. On top of the classic core
 (recursion, stratified negation, aggregates) it adds a first-class type for
 nested data, algebraic data types, and a module system, and it ships with a
@@ -25,12 +25,13 @@ browser playground, a VS Code extension, a REPL, and a Jupyter magic.
 
 It is a teaching tool, not a production database. If you want to understand
 recursion, stratified negation, seminaive evaluation, or how Datalog compiles to
-SQL — by reading it, running it, and stepping through it — this is for you.
+SQL, and to learn it by reading, running, and stepping through code, this is for
+you.
 
 ## Example
 
 ```prolog
-# ancestor.dl — who descends from whom
+# ancestor.dl: who descends from whom
 input predicate parent(name: string, child: string).
 
 ancestor(X, Y) :- parent(X, Y).                  # base case
@@ -43,20 +44,20 @@ ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).  # recursive case
 bun run datamog ancestor.dl   # parent data loads from ./parent.csv by convention
 ```
 
-**[Try it in the browser, no install needed →](https://max-schaefer.github.io/datamog/)**
+**[Try it in the browser, no install needed](https://max-schaefer.github.io/datamog/)**
 
 ## Highlights
 
 - **Five backends, one language.** The same program runs on Postgres, SQLite, or
   sql.js through a SQL translator, or on the pure-TypeScript `native` /
-  `seminaive` evaluators with no SQL at all — handy for tracing the semantics
-  step by step. See the [language spec](doc/spec.md).
+  `seminaive` evaluators with no SQL at all, which is handy for tracing the
+  semantics step by step. See the [language spec](doc/spec.md).
 - **Nested data, first-class.** A `value` type is the union of every JSON shape
   (null, primitives, arrays, objects) with subscript, slice, iteration, and
   structural equality that agree byte-for-byte across every backend. See
   [Working with values](doc/walkthrough/14-json.md).
 - **Algebraic data types via proof terms.** Name a rule `p(...)[Ctor]` and the
-  predicate becomes an ADT whose derivations are its values — enums, pairs, Peano
+  predicate becomes an ADT whose derivations are its values: enums, pairs, Peano
   naturals, lists, parse trees. See [Proof terms](doc/walkthrough/15-proof-terms.md).
 - **A module system.** A file is a function from its input predicates to its
   outputs; bind an input with `:=` to a data file or to an instance of another
@@ -92,7 +93,7 @@ Sheet/GitHub path you pass explicitly. The [CLI README](packages/cli/README.md)
 covers data loading, output formats, and every flag.
 
 Over 40 runnable programs live in
-[`packages/cli/examples/`](packages/cli/examples/) — transitive closure,
+[`packages/cli/examples/`](packages/cli/examples/), covering transitive closure,
 stratified negation, aggregates, puzzles, JSON handling, proof-term ADTs, and
 Boolean-circuit solvers:
 
@@ -104,7 +105,7 @@ bun run datamog packages/cli/examples/family/family.dl
 
 The [playground](https://max-schaefer.github.io/datamog/) is a zero-install,
 fully client-side IDE: write a program, attach CSV/JSONL data, and run the whole
-pipeline (parse → analyze → translate → execute) in your browser. SQL runs on
+pipeline (parse, analyze, translate, execute) in your browser. SQL runs on
 sql.js (SQLite compiled to WASM); the `native` / `seminaive` evaluators run
 directly in JavaScript. It offers live diagnostics, jump-to-definition, a
 dependency-graph view, and a step-through trace of the in-memory evaluators. It
@@ -143,19 +144,19 @@ A sibling Python package, [`datamog-magic`](python/datamog-magic), provides a
 
 ## Documentation
 
-- [Language specification](doc/spec.md) — the full reference: syntax, semantics,
-  type system, and SQL translation.
-- [Language walkthrough](doc/walkthrough/README.md) — the feature-by-feature
-  tutorial (chapters 00–16 plus appendices), with runnable code and exercises.
-- [Case studies](doc/case-studies/README.md) — a puzzle-driven companion that
+- [Language specification](doc/spec.md): the full reference for syntax,
+  semantics, the type system, and SQL translation.
+- [Language walkthrough](doc/walkthrough/README.md): the feature-by-feature
+  tutorial (chapters 00-16 plus appendices), with runnable code and exercises.
+- [Case studies](doc/case-studies/README.md): a puzzle-driven companion that
   builds end-to-end solutions to bigger problems.
-- [Comparison with other Datalog systems](doc/comparison.md) — how Datamog
+- [Comparison with other Datalog systems](doc/comparison.md): how Datamog
   relates to Soufflé, CodeQL, Datomic, DES, Flix, and others.
-- [Jupyter notebook tutorial](doc/jupyter/README.md) — runnable `%%datamog`
+- [Jupyter notebook tutorial](doc/jupyter/README.md): runnable `%%datamog`
   cells with pandas DataFrame binding.
-- [Embed tutorials](doc/embed-tutorials/README.md) — Markdown whose code blocks
+- [Embed tutorials](doc/embed-tutorials/README.md): Markdown whose code blocks
   render as live, editable mini-playgrounds.
-- [FLOLAC 2026 course slides](https://max-schaefer.github.io/datamog/slides/) —
+- [FLOLAC 2026 course slides](https://max-schaefer.github.io/datamog/slides/):
   *Introduction to Logic Programming with Datalog*.
 
 ## Development

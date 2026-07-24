@@ -66,7 +66,7 @@ Each predicate is mapped to a spreadsheet via the `sheets` option:
 }
 ```
 
-When using the CLI with an input flag, the spreadsheet ID is extracted from the Google Sheets URL automatically. To select a specific tab, there is currently no CLI flag — the default tab `Sheet1` is used.
+When using the CLI with an input flag, the spreadsheet ID is extracted from the Google Sheets URL automatically. To select a specific tab, there is currently no CLI flag; the default tab `Sheet1` is used.
 
 ## Programmatic API
 

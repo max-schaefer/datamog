@@ -5,7 +5,7 @@
 Semi-naive in-memory backend for Datamog. Like the `datamog-backend-native`
 package it interprets Datalog directly rather than compiling to SQL, but
 inside each recursive stratum it only re-derives tuples that could have
-produced new results — i.e. at every iteration, each rule is forced to read
+produced new results: at every iteration, each rule is forced to read
 from the previous iteration's *delta* on at least one body atom. Non-
 recursive strata are evaluated in a single pass.
 

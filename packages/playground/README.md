@@ -3,8 +3,8 @@
 *Part of the [Datamog](../../README.md) monorepo.*
 
 The browser-based Datamog playground: a zero-install, fully client-side IDE for
-writing and running Datamog programs. There is no backend server — the whole
-pipeline (parse → analyze → translate → execute) runs in your browser.
+writing and running Datamog programs. There is no backend server; the whole
+pipeline (parse, analyze, translate, execute) runs in your browser.
 
 **Live: [max-schaefer.github.io/datamog](https://max-schaefer.github.io/datamog/)**
 
@@ -14,13 +14,13 @@ pipeline (parse → analyze → translate → execute) runs in your browser.
   recursive-call markers, smart auto-complete, and live diagnostics (parse
   errors, arity mismatches, unsafe variables, unstratifiable negation,
   finiteness warnings).
-- **Cycle visualiser** — a rejected negation or finiteness cycle carries a "Show
+- **Cycle visualiser**: a rejected negation or finiteness cycle carries a "Show
   cycle" action that highlights the predicates and rules involved.
-- **Backend picker** — run on SQLite (via sql.js), the `native` / `seminaive`
+- **Backend picker**: run on SQLite (via sql.js), the `native` / `seminaive`
   in-memory evaluators, or generate PostgreSQL SQL (shown, not executed).
-- **Tabbed results** — query rows, generated SQL, a Mermaid dependency graph,
+- **Tabbed results**: query rows, generated SQL, a Mermaid dependency graph,
   and a per-iteration step trace for the in-memory evaluators.
-- **Data panel** — paste CSV/JSONL or fetch a CORS-enabled CSV URL per input
+- **Data panel**: paste CSV/JSONL or fetch a CORS-enabled CSV URL per input
   predicate; rows are held in memory as the EDB.
 
 SQL runs on [sql.js](https://sql.js.org/) (SQLite compiled to WASM); the

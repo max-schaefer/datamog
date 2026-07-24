@@ -3,8 +3,8 @@
 *Part of the [Datamog](../../README.md) monorepo.*
 
 Incremental REPL session engine for Datamog. It accumulates declarations, rules,
-and queries across inputs — each `input predicate`, rule, or `?-` query adds to a
-growing session — and re-runs affected outputs as the program evolves. This is
+and queries across inputs (each `input predicate`, rule, or `?-` query adds to a
+growing session) and re-runs affected outputs as the program evolves. This is
 the shared core behind the interactive CLI REPL and the `--repl --json` protocol
 that programmatic clients (such as the [`datamog-magic`](../../python/datamog-magic)
 Jupyter cell magic) speak.
@@ -27,12 +27,12 @@ await repl.close();
 The `sessionFactory` supplies a backend/executor pair (so the same engine works
 over SQLite, sql.js, or the in-memory evaluators), and `feed` returns the events
 produced by that chunk. The event union (`DeclaredEvent`, `RuleEvent`,
-`ResultEvent`, `SqlEvent`, `SchemaEvent`, `ErrorEvent`, …) is exported for
+`ResultEvent`, `SqlEvent`, `SchemaEvent`, `ErrorEvent`, and so on) is exported for
 consumers that render or serialise it.
 
-`boundary.ts` also exports helpers for line-oriented input handling —
-`isInputComplete` (has a full statement been typed?) and `offsetToLineColumn` —
-used by the CLI to decide when to submit a multi-line entry.
+`boundary.ts` also exports helpers for line-oriented input handling, used by the
+CLI to decide when to submit a multi-line entry: `isInputComplete` (has a full
+statement been typed?) and `offsetToLineColumn`.
 
 ## Drivers
 

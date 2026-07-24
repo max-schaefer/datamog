@@ -25,7 +25,7 @@ const sqlBackend: Backend = {
 // and optionally `insertRows` (replaces SQL INSERTs from loaders).
 const nativeBackend: Backend = {
   sqlDialect: null,
-  async execute() { throw new Error("no SQL — use evaluateProgram"); },
+  async execute() { throw new Error("no SQL; use evaluateProgram"); },
   async evaluateProgram(analyzed, loaders) { /* run rules in-memory */ },
   async insertRows(decl, rows) { /* append EDB tuples */ },
   async close() { /* clean up */ },

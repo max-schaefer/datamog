@@ -3,7 +3,7 @@
 *Part of the [Datamog](../../../README.md) monorepo.*
 
 Native in-memory backend for Datamog. Interprets Datalog directly with a
-naive bottom-up evaluator — no SQL is generated. Intended for teaching
+naive bottom-up evaluator; no SQL is generated. Intended for teaching
 the semantics: strata are computed in topological order and each stratum
 is re-run until its fixed point is reached.
 

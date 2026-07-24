@@ -15,7 +15,7 @@ const executor = new DatamogExecutor(backend, [
 ]);
 ```
 
-The loader looks for `<predicate>.json` in the configured directory (e.g. `data/config.json` for an `input predicate config(...)` declaration). The extensional declaration must have **exactly one column, typed `value`** — the file is parsed and inserted as one row whose single column holds the parsed contents:
+The loader looks for `<predicate>.json` in the configured directory (e.g. `data/config.json` for an `input predicate config(...)` declaration). The extensional declaration must have **exactly one column, typed `value`**; the file is parsed and inserted as one row whose single column holds the parsed contents:
 
 ```prolog
 input predicate config(blob: value).
@@ -31,6 +31,6 @@ with `data/config.json`:
 }
 ```
 
-— a single row whose `blob` column holds the whole parsed object. Use the JSON destructuring builtins (`J["key"]`, `object_entry`, `array_element`, `as_*`, `length`, `type_of`) inside rule bodies to project the bits you care about.
+It loads as a single row whose `blob` column holds the whole parsed object. Use the JSON destructuring builtins (`J["key"]`, `object_entry`, `array_element`, `as_*`, `length`, `type_of`) inside rule bodies to project the bits you care about.
 
 For row-per-line shaped data, use `datamog-jsonl` instead. For arbitrary nested JSON inside one of several typed columns, use `datamog-jsonl` with mixed columns.

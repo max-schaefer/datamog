@@ -81,7 +81,7 @@ Place a file named `<predicate>.json` in the data directory. The extensional dec
 
 ### Mermaid
 
-Place a file named `<predicate>.mmd` (a Mermaid `graph TD` / `graph LR` block) in the data directory. The loader extracts edges as `(source, target)` pairs — a convenient way to author small graph EDBs that double as illustrations in markdown.
+Place a file named `<predicate>.mmd` (a Mermaid `graph TD` / `graph LR` block) in the data directory. The loader extracts edges as `(source, target)` pairs, a convenient way to author small graph EDBs that double as illustrations in markdown.
 
 ### Google Sheets
 
